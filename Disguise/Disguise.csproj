@@ -8,6 +8,7 @@
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <LangVersion>10</LangVersion>
+    <Nullable>enable</Nullable>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
@@ -35,6 +36,9 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <!-- JotunnLib references UnityEngine.ProfilerModule, which does not exist in this game
+         build (MSB3245). The mod never uses it: drop the reference to keep the build clean. -->
+    <Reference Remove="UnityEngine.ProfilerModule" />
   </ItemGroup>
 
   <ItemGroup>
@@ -88,6 +92,27 @@
 
   <Target Name="JotunnPostBuildTaskWin" AfterTargets="Build" Condition=" '$(OS)' == 'Windows_NT' ">
     <Exec Command="powershell.exe -ExecutionPolicy RemoteSigned -File &quot;$(SolutionDir)scripts/publish.ps1&quot; -Target &quot;$(ConfigurationName)&quot; -TargetPath &quot;$(TargetDir.TrimEnd('\'))&quot; -TargetAssembly &quot;$(TargetFileName)&quot; -ValheimPath &quot;$(VALHEIM_INSTALL.TrimEnd('\'))&quot; -DeployPath &quot;$(MOD_DEPLOYPATH.TrimEnd('\'))&quot; -ProjectPath &quot;$(ProjectDir.TrimEnd('\'))&quot; " />
+  </Target>
+
+  <!-- Deployment: the mod is installed on exactly two machines.
+       - client: Gale profile "dev", read by ScriptEngine. The .pdb MUST follow the DLL,
+         ScriptEngine loads the assembly with Mono.Cecil (ReadSymbols=true) and throws
+         SymbolsNotFoundException without <name>.pdb next to it.
+       - dedicated server: r2modman profile "serveur", loaded by the BepInEx chainloader.
+       The server copy is allowed to fail (ContinueOnError): valheim_server.exe keeps the
+       DLL mapped, so a build made while the server runs only warns instead of breaking. -->
+  <PropertyGroup>
+    <DisguiseDeployClient>$(APPDATA)\com.kesomannen.gale\valheim\profiles\dev\BepInEx\scripts</DisguiseDeployClient>
+    <DisguiseDeployServer>$(APPDATA)\r2modmanPlus-local\Valheim\profiles\serveur\BepInEx\plugins\_manual_install</DisguiseDeployServer>
+  </PropertyGroup>
+  <Target Name="DeployDisguise" AfterTargets="Build">
+    <ItemGroup>
+      <_DisguiseDeployFiles Include="$(TargetPath)" />
+      <_DisguiseDeployFiles Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_DisguiseDeployFiles)" DestinationFolder="$(DisguiseDeployClient)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_DisguiseDeployFiles)" DestinationFolder="$(DisguiseDeployServer)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Message Importance="high" Text="Disguise deployed (dll + pdb) to:&#xA;  $(DisguiseDeployClient)  (client)&#xA;  $(DisguiseDeployServer)  (server)" />
   </Target>
 
   <Target Name="JotunnPostBuildTaskUnix" AfterTargets="Build" Condition=" '$(OS)' == 'Unix' ">
