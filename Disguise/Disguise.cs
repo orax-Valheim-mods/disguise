@@ -69,21 +69,23 @@ public partial class Disguise : BaseUnityPlugin
     private static bool s_loggedSummary;
     private static bool s_creatureWarningLogged;
 
-    // -- Observer refresh state (see the class summary) -----------------------------------
+    // -- Observer refresh state (see the class summary) -------------------------------
+    // The fields marked internal below are also read/restored by the Harmony patches
+    // (Patch_*.cs): SendZDOs must put the real position back exactly where it found it.
     /// <summary>Server only: ZDO currently relayed with a fake far-away position.</summary>
-    private static ZDO? s_refreshZdo;
+    internal static ZDO? s_refreshZdo;
 
     /// <summary>Server only: when the fake relay was armed (safety timeout).</summary>
     private static float s_refreshStart;
 
     /// <summary>Server only: fake position written into the outgoing relay packets.</summary>
-    private static Vector3 s_refreshFarPos;
+    internal static Vector3 s_refreshFarPos;
 
     /// <summary>Server only: real position stashed while SendZDOs runs (never left behind).</summary>
-    private static Vector3? s_savedPosition;
+    internal static Vector3? s_savedPosition;
 
     /// <summary>Server only: the ZDO whose position is currently stashed (always restored).</summary>
-    private static ZDO? s_savedZdo;
+    internal static ZDO? s_savedZdo;
 
     /// <summary>Owner: ZDO currently carrying cd_refresh = 1.</summary>
     private static ZDO? s_ownerRefreshZdo;
@@ -92,7 +94,7 @@ public partial class Disguise : BaseUnityPlugin
     private static float s_refreshEnd;
 
     /// <summary>True only while ZNetScene.CreateDestroyObjects runs (scopes the safety net below).</summary>
-    private static bool s_inCreateDestroy;
+    internal static bool s_inCreateDestroy;
 
     /// <summary>How far (metres) the fake relay position is moved: 64 zones, well out of any active area.</summary>
     private const float RefreshFarOffset = 4096f;
@@ -122,17 +124,26 @@ public partial class Disguise : BaseUnityPlugin
 
     // ZDO.m_position: private in the game. Written (and immediately restored) only while
     // ZDOMan.SendZDOs builds an outgoing packet: the ZDO state itself never changes.
-    private static readonly FieldInfo? s_zdoPositionField = typeof(ZDO).GetField(
+    internal static readonly FieldInfo? s_zdoPositionField = typeof(ZDO).GetField(
         "m_position",
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
     );
 
     private static bool s_consoleCommandRegistered;
 
+    // -- Logging: the plugin instance stays private, the patches log through these -------
+    internal static void LogDebug(string message) => s_instance?.Logger.LogDebug(message);
+
+    internal static void LogInfo(string message) => s_instance?.Logger.LogInfo(message);
+
+    internal static void LogWarning(string message) => s_instance?.Logger.LogWarning(message);
+
+    internal static void LogError(string message) => s_instance?.Logger.LogError(message);
+
     /// <summary>
     /// ZNetView of a character (Character.m_nview is "protected" -&gt; reflection).
     /// </summary>
-    private static ZNetView? GetNView(Character? character)
+    internal static ZNetView? GetNView(Character? character)
     {
         if (character == null || s_characterNViewField == null)
         {
@@ -144,7 +155,7 @@ public partial class Disguise : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            s_instance?.Logger.LogError($"Cannot read Character.m_nview: {ex.Message}");
+            LogError($"Cannot read Character.m_nview: {ex.Message}");
             return null;
         }
     }
@@ -406,7 +417,7 @@ public partial class Disguise : BaseUnityPlugin
                 if (!s_creatureWarningLogged)
                 {
                     s_creatureWarningLogged = true;
-                    s_instance?.Logger.LogWarning(
+                    LogWarning(
                         $"Creature prefab not found: \"{name}\". Console command: disguise list"
                     );
                 }
@@ -422,7 +433,7 @@ public partial class Disguise : BaseUnityPlugin
         s_creaturePrefabHash = 0;
         s_creatureWarningLogged = false;
         s_loggedSummary = false;
-        s_instance?.Logger.LogInfo($"Configured creature: \"{ConfigCreature.Value}\"");
+        LogInfo($"Configured creature: \"{ConfigCreature.Value}\"");
     }
 
     /// <summary>Prefab our player ZDO should carry according to the configuration.</summary>
@@ -504,7 +515,7 @@ public partial class Disguise : BaseUnityPlugin
                 return;
             }
             zdo.SetPrefab(desired);
-            s_instance?.Logger.LogInfo(
+            LogInfo(
                 $"[{reason}] ZDO {zdo.m_uid}: prefab {PrefabName(current)} -> {PrefabName(desired)}"
             );
 
@@ -519,7 +530,7 @@ public partial class Disguise : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            s_instance?.Logger.LogError($"ApplyTo ({reason}): {ex}");
+            LogError($"ApplyTo ({reason}): {ex}");
         }
     }
 
@@ -564,13 +575,13 @@ public partial class Disguise : BaseUnityPlugin
             s_ownerRefreshZdo = zdo;
             s_refreshEnd = Time.unscaledTime + hold;
             ArmObserverRefresh(zdo); // no-op on a plain client: the server arms it on Deserialize
-            s_instance?.Logger.LogInfo(
+            LogInfo(
                 $"Observer refresh for ZDO {zdo.m_uid}: other players re-create your object in ~{hold:0.0} s"
             );
         }
         catch (Exception ex)
         {
-            s_instance?.Logger.LogError($"StartObserverRefresh: {ex}");
+            LogError($"StartObserverRefresh: {ex}");
         }
     }
 
@@ -578,7 +589,7 @@ public partial class Disguise : BaseUnityPlugin
     /// Server side only: start writing the fake far-away position into the relay packets of
     /// this player ZDO. A client NEVER fakes anything: it always sends its real position.
     /// </summary>
-    private static void ArmObserverRefresh(ZDO zdo)
+    internal static void ArmObserverRefresh(ZDO zdo)
     {
         try
         {
@@ -601,7 +612,7 @@ public partial class Disguise : BaseUnityPlugin
                 // incoming update while the flag is still 1, and resetting the timer there
                 // would make the timeout impossible to reach.
                 s_refreshStart = Time.unscaledTime;
-                s_instance?.Logger.LogInfo(
+                LogInfo(
                     $"Observer refresh armed for ZDO {zdo.m_uid}: relaying a fake position (+"
                         + $"{RefreshFarOffset:0} m on X) to other clients."
                 );
@@ -609,11 +620,11 @@ public partial class Disguise : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            s_instance?.Logger.LogError($"ArmObserverRefresh: {ex}");
+            LogError($"ArmObserverRefresh: {ex}");
         }
     }
 
-    private static void DisarmObserverRefresh()
+    internal static void DisarmObserverRefresh()
     {
         s_refreshZdo = null;
     }
@@ -662,7 +673,7 @@ public partial class Disguise : BaseUnityPlugin
                     // Local world / host: we are our own server, stop faking right away.
                     DisarmObserverRefresh();
                 }
-                s_instance?.Logger.LogInfo(
+                LogInfo(
                     "Observer refresh done: your new look is now visible to every loaded player."
                 );
             }
@@ -673,7 +684,7 @@ public partial class Disguise : BaseUnityPlugin
                 DisarmObserverRefresh();
                 if (zdo != null && zdo.IsValid() && zdo.RemoveInt(RefreshKey))
                 {
-                    s_instance?.Logger.LogWarning(
+                    LogWarning(
                         $"Observer refresh flag still set after {RefreshMaxHoldSeconds:0} s on ZDO {zdo.m_uid} "
                             + "(owner never cleared it): fake position relay stopped."
                     );
@@ -682,7 +693,7 @@ public partial class Disguise : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            s_instance?.Logger.LogError($"TickObserverRefresh: {ex}");
+            LogError($"TickObserverRefresh: {ex}");
         }
     }
 
@@ -690,13 +701,13 @@ public partial class Disguise : BaseUnityPlugin
     /// Instantiates the requested prefab while reusing the existing ZDO
     /// (same mechanism as ZNetScene.CreateObject).
     /// </summary>
-    private static GameObject InstantiateAs(ZDO zdo, int prefabHash)
+    internal static GameObject InstantiateAs(ZDO zdo, int prefabHash)
     {
         ZNetScene zns = ZNetScene.instance;
         GameObject prefab = zns.GetPrefab(prefabHash);
         if (prefab == null)
         {
-            s_instance?.Logger.LogWarning($"Prefab not found: {PrefabName(prefabHash)}");
+            LogWarning($"Prefab not found: {PrefabName(prefabHash)}");
             return null!;
         }
         bool useInit = ZNetView.m_useInitZDO;
@@ -711,9 +722,7 @@ public partial class Disguise : BaseUnityPlugin
             );
             if (ZNetView.m_initZDO != null)
             {
-                s_instance?.Logger.LogWarning(
-                    $"ZDO {zdo.m_uid} not consumed while creating {prefab.name}"
-                );
+                LogWarning($"ZDO {zdo.m_uid} not consumed while creating {prefab.name}");
                 ZNetView.m_initZDO = null;
             }
             return result;
@@ -754,7 +763,7 @@ public partial class Disguise : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            s_instance?.Logger.LogError($"Failed to register the console command: {ex}");
+            LogError($"Failed to register the console command: {ex}");
         }
     }
 
@@ -990,7 +999,7 @@ public partial class Disguise : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            s_instance?.Logger.LogInfo(text + "  (console display error: " + ex.Message + ")");
+            LogInfo(text + "  (console display error: " + ex.Message + ")");
         }
     }
 }
