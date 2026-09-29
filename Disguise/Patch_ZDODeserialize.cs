@@ -28,11 +28,11 @@ internal static class Patch_ZDODeserialize
             }
             if (__instance.GetInt(PrefabResolver.RefreshHash, 0) == 1)
             {
-                Disguise.ArmObserverRefresh(__instance);
+                ObserverRefresh.ArmObserverRefresh(__instance);
             }
-            else if (Disguise.s_refreshZdo == __instance)
+            else if (ObserverRefresh.s_refreshZdo == __instance)
             {
-                Disguise.DisarmObserverRefresh();
+                ObserverRefresh.DisarmObserverRefresh();
                 Disguise.LogInfo(
                     $"Observer refresh flag cleared on ZDO {__instance.m_uid}: relaying the real position again."
                 );

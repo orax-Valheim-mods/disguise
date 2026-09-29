@@ -70,7 +70,7 @@ internal static class DisguiseApplier
             ZDO? local = GameAccess.GetLocalPlayerZDO();
             if (local != null && local.m_uid == zdo.m_uid)
             {
-                Disguise.StartObserverRefresh(zdo, force: false);
+                ObserverRefresh.StartObserverRefresh(zdo, force: false);
             }
         }
         catch (Exception ex)

@@ -14,20 +14,26 @@ namespace Disguise;
 [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.CreateDestroyObjects))]
 internal static class Patch_CreateDestroyObjects
 {
+    /// <summary>
+    /// True only while ZNetScene.CreateDestroyObjects runs. Read by
+    /// Patch_FindSectorObjects, which must include the local player in that window.
+    /// </summary>
+    internal static bool s_inCreateDestroy;
+
     private static void Prefix()
     {
-        Disguise.s_inCreateDestroy = true;
+        s_inCreateDestroy = true;
     }
 
     private static void Postfix()
     {
-        Disguise.s_inCreateDestroy = false;
+        s_inCreateDestroy = false;
     }
 
     // Runs even if the original method throws: never leave the flag stuck.
     private static Exception? Finalizer(Exception? __exception)
     {
-        Disguise.s_inCreateDestroy = false;
+        s_inCreateDestroy = false;
         return __exception;
     }
 }

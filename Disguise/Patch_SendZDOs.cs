@@ -27,24 +27,24 @@ internal static class Patch_SendZDOs
     {
         try
         {
-            if (Disguise.s_savedPosition.HasValue)
+            if (ObserverRefresh.s_savedPosition.HasValue)
             {
                 // Already inside a swap (defensive: no nested SendZDOs expected).
                 return;
             }
-            ZDO? zdo = Disguise.s_refreshZdo;
+            ZDO? zdo = ObserverRefresh.s_refreshZdo;
             if (zdo == null || GameAccess.s_zdoPositionField == null)
             {
                 return;
             }
-            Disguise.s_savedPosition = (Vector3?)GameAccess.s_zdoPositionField.GetValue(zdo);
-            Disguise.s_savedZdo = zdo;
-            GameAccess.s_zdoPositionField.SetValue(zdo, Disguise.s_refreshFarPos);
+            ObserverRefresh.s_savedPosition = (Vector3?)GameAccess.s_zdoPositionField.GetValue(zdo);
+            ObserverRefresh.s_savedZdo = zdo;
+            GameAccess.s_zdoPositionField.SetValue(zdo, ObserverRefresh.s_refreshFarPos);
         }
         catch (Exception ex)
         {
-            Disguise.s_savedPosition = null;
-            Disguise.s_savedZdo = null;
+            ObserverRefresh.s_savedPosition = null;
+            ObserverRefresh.s_savedZdo = null;
             Disguise.LogError($"Patch SendZDOs (prefix): {ex}");
         }
     }
@@ -64,13 +64,13 @@ internal static class Patch_SendZDOs
 
     private static void RestoreRealPosition()
     {
-        if (Disguise.s_savedPosition is not Vector3 saved)
+        if (ObserverRefresh.s_savedPosition is not Vector3 saved)
         {
             return;
         }
-        Disguise.s_savedPosition = null;
-        ZDO? zdo = Disguise.s_savedZdo;
-        Disguise.s_savedZdo = null;
+        ObserverRefresh.s_savedPosition = null;
+        ZDO? zdo = ObserverRefresh.s_savedZdo;
+        ObserverRefresh.s_savedZdo = null;
         if (zdo == null || GameAccess.s_zdoPositionField == null)
         {
             return;

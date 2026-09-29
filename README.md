@@ -250,15 +250,29 @@ both locations:
 
 Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file**:
 
-- `Disguise.cs` - the plugin class (constants, config, observer-refresh state,
-  reflection helpers, console command). Everything it does not share stays `private`.
+- `Disguise.cs` - the plugin class: constants (`PluginGUID`, `cd_disguise`, `cd_refresh`),
+  the log helpers and the lifecycle (`Awake` / `OnDestroy` / `Update`), which wires the
+  other classes together. Everything it does not share stays `private`.
+- `DisguiseConfig.cs` - the six settings and their binding to `orax.Disguise.cfg`.
+- `GameAccess.cs` - the only class reaching non-public game members: the reflection
+  handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
+  `GetLocalPlayerZDO`, `BumpDataRevision`).
+- `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the vanilla
+  `Player` prefab hash, the configured creature hash) and `PrefabName`.
+- `DisguiseApplier.cs` - `HasMarker` / `ApplyTo` / `InstantiateAs`: writes the marker and
+  swaps the network prefab.
+- `ObserverRefresh.cs` - the `cd_refresh` window and the fake far-away position the
+  modded server relays during it.
+- `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs` - the eight Harmony
-  patches, one `internal static` top-level class each. They reach the plugin through
-  the `internal` members of `Disguise` (fields it swaps in/out during `SendZDOs`,
+  patches, one `internal static` top-level class each. They reach the features through the
+  `internal` members of the classes above (fields they swap in/out during `SendZDOs`,
   helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log through
-  `Disguise.LogError(...)` - `s_instance` itself never leaves the class.
+  `Disguise.LogError(...)` - `s_instance` itself never leaves the plugin class.
+  `Patch_CreateDestroyObjects` additionally owns the `s_inCreateDestroy` scope flag read
+  by `Patch_FindSectorObjects`.
 
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
@@ -269,7 +283,7 @@ The project compiles against `valheim_Data\Managed\publicized_assemblies\*.dll`,
 `private` / `protected` stay: a direct reference to such a member makes the plugin fail
 at runtime with `FieldAccessException`. Already hit with `Terminal.commands` (protected),
 `ZDO.m_prefab` (private), `ZDO.IncreaseDataRevision()` (private) and `Character.m_nview`
-(protected) - all four are now reached through reflection (the `s_*` fields in the source).
+(protected) - all four are now reached through reflection (the `s_*` fields in `GameAccess.cs`).
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `

@@ -12,7 +12,7 @@ internal static class Patch_FindSectorObjects
     {
         try
         {
-            if (!Disguise.s_inCreateDestroy || sectorObjects == null)
+            if (!Patch_CreateDestroyObjects.s_inCreateDestroy || sectorObjects == null)
             {
                 return;
             }
