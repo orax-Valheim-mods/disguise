@@ -248,9 +248,18 @@ both locations:
 (`DeployDisguise` target in `Disguise\Disguise.csproj`,
 `DisguiseDeployClient` / `DisguiseDeployServer` properties).
 
-Sources: `Disguise\Disguise.cs` (plugin, config, state, console command) and
-`Disguise\Patch.cs` (all Harmony patches; the class is `partial`, so the patches keep
-access to the plugin's private members). Both in `A:\_MODDING\Valheim\MODS\Disguise\`.
+Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file**:
+
+- `Disguise.cs` - the plugin class (constants, config, observer-refresh state,
+  reflection helpers, console command). Everything it does not share stays `private`.
+- `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
+  `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
+  `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs` - the eight Harmony
+  patches, one `internal static` top-level class each. They reach the plugin through
+  the `internal` members of `Disguise` (fields it swaps in/out during `SendZDOs`,
+  helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log through
+  `Disguise.LogError(...)` - `s_instance` itself never leaves the class.
+
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
 ### Visibility audit (re-run after every build)

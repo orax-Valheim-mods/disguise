@@ -35,7 +35,7 @@ namespace Disguise;
 ///    modified (only the outgoing packet is), so saves and game logic stay untouched.
 /// </summary>
 [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
-public partial class Disguise : BaseUnityPlugin
+public class Disguise : BaseUnityPlugin
 {
     public const string PluginGUID = "orax.Disguise";
     public const string PluginName = "Disguise";
@@ -107,7 +107,7 @@ public partial class Disguise : BaseUnityPlugin
     // reference would throw a FieldAccessException at runtime. Only the "publicized" copy
     // (valheim_Data\Managed\publicized_assemblies) used for compilation exposes them as
     // public - hence this mandatory reflection layer.
-    private static readonly FieldInfo? s_zdoPrefabField = typeof(ZDO).GetField(
+    internal static readonly FieldInfo? s_zdoPrefabField = typeof(ZDO).GetField(
         "m_prefab",
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
     );
