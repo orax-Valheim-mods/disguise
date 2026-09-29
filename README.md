@@ -224,16 +224,20 @@ to `Player`, then remove the DLL.
 ## 6. Rebuilding the mod
 
 ```powershell
-& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" `
-  "A:\Steam\steamapps\common\Valheim\__mods\Disguise\Disguise.csproj" `
-  /p:Configuration=Release
+dotnet msbuild "A:\_MODDING\Valheim\MODS\Disguise\Disguise.sln" -p:Configuration=Release
 ```
 
-(`dotnet msbuild <csproj> -p:Configuration=Release` also works.)
+(Opening `Disguise.sln` in Visual Studio and building there is the same thing.)
 
-> ⚠️ The server copy fails with `MSB3027 / user-mapped section open` while
-> `valheim_server.exe` is running: **stop the dedicated server first**, then rebuild.
-> The client copy (`BepInEx\scripts`) is deployed either way.
+> ⚠️ **Always build the `.sln`, never the `.csproj` alone**: `SolutionDir` is what lets the
+> Jotunn build import `Environment.props` (Valheim / BepInEx / deploy paths). Built on its
+> own, the project silently falls back to the default BepInEx folder and skips that config.
+
+> ⚠️ The server copy warns (and is skipped, **without breaking the build**) while
+> `valheim_server.exe` is running: **stop the dedicated server first** if you need the
+> server DLL updated. The client copy is deployed either way.
+
+Output: `Disguise\bin\Release\net48\Disguise.dll` (+ `.pdb`).
 
 The build automatically places `Disguise.dll` **+ its `Disguise.pdb`** in
 both locations:
@@ -241,9 +245,12 @@ both locations:
 - client: `...\com.kesomannen.gale\valheim\profiles\dev\BepInEx\scripts\`
 - server: `...\r2modmanPlus-local\Valheim\profiles\serveur\BepInEx\plugins\_manual_install\`
 
-(`Deploy` target in the `.csproj`, `DeployClient` / `DeployServer` properties).
+(`DeployDisguise` target in `Disguise\Disguise.csproj`,
+`DisguiseDeployClient` / `DisguiseDeployServer` properties).
 
-Sources: `__mods\Disguise\Disguise.cs`
+Sources: `Disguise\Disguise.cs` (plugin, config, state, console command) and
+`Disguise\Patch.cs` (all Harmony patches; the class is `partial`, so the patches keep
+access to the plugin's private members). Both in `A:\_MODDING\Valheim\MODS\Disguise\`.
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
 ### Visibility audit (re-run after every build)
@@ -257,7 +264,7 @@ at runtime with `FieldAccessException`. Already hit with `Terminal.commands` (pr
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File "A:\Steam\steamapps\common\Valheim\__mods\Disguise\audit_visibility.ps1"
+  -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
 Expected output: `Game members referenced: 34   ISSUES: 0` (exit code 0).
