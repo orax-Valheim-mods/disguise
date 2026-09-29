@@ -33,13 +33,13 @@ internal static class Patch_SendZDOs
                 return;
             }
             ZDO? zdo = Disguise.s_refreshZdo;
-            if (zdo == null || Disguise.s_zdoPositionField == null)
+            if (zdo == null || GameAccess.s_zdoPositionField == null)
             {
                 return;
             }
-            Disguise.s_savedPosition = (Vector3?)Disguise.s_zdoPositionField.GetValue(zdo);
+            Disguise.s_savedPosition = (Vector3?)GameAccess.s_zdoPositionField.GetValue(zdo);
             Disguise.s_savedZdo = zdo;
-            Disguise.s_zdoPositionField.SetValue(zdo, Disguise.s_refreshFarPos);
+            GameAccess.s_zdoPositionField.SetValue(zdo, Disguise.s_refreshFarPos);
         }
         catch (Exception ex)
         {
@@ -71,13 +71,13 @@ internal static class Patch_SendZDOs
         Disguise.s_savedPosition = null;
         ZDO? zdo = Disguise.s_savedZdo;
         Disguise.s_savedZdo = null;
-        if (zdo == null || Disguise.s_zdoPositionField == null)
+        if (zdo == null || GameAccess.s_zdoPositionField == null)
         {
             return;
         }
         try
         {
-            Disguise.s_zdoPositionField.SetValue(zdo, saved);
+            GameAccess.s_zdoPositionField.SetValue(zdo, saved);
         }
         catch (Exception ex)
         {

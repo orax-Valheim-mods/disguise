@@ -17,18 +17,18 @@ internal static class Patch_CreateObject
     {
         try
         {
-            if (!Disguise.HasMarker(zdo))
+            if (!DisguiseApplier.HasMarker(zdo))
             {
                 return true; // not our business (normal creature, other vanilla player...)
             }
-            int playerHash = Disguise.PlayerPrefabHash;
+            int playerHash = PrefabResolver.PlayerPrefabHash;
             if (playerHash == 0 || zdo.GetPrefab() == playerHash)
             {
                 return true; // already normal
             }
             // Disguised player ZDO: the disguise stays in the network data,
             // but the real Player prefab is built locally.
-            __result = Disguise.InstantiateAs(zdo, playerHash);
+            __result = DisguiseApplier.InstantiateAs(zdo, playerHash);
             return false;
         }
         catch (Exception ex)

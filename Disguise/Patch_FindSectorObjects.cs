@@ -16,7 +16,7 @@ internal static class Patch_FindSectorObjects
             {
                 return;
             }
-            ZDO? local = Disguise.GetLocalPlayerZDO();
+            ZDO? local = GameAccess.GetLocalPlayerZDO();
             if (local == null || !local.IsValid() || sectorObjects.Contains(local))
             {
                 return;

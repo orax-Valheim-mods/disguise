@@ -26,7 +26,7 @@ internal static class Patch_ZDODeserialize
             {
                 return;
             }
-            if (__instance.GetInt(Disguise.RefreshHash, 0) == 1)
+            if (__instance.GetInt(PrefabResolver.RefreshHash, 0) == 1)
             {
                 Disguise.ArmObserverRefresh(__instance);
             }

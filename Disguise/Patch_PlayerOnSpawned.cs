@@ -16,12 +16,12 @@ internal static class Patch_PlayerOnSpawned
             {
                 return;
             }
-            ZNetView? nview = Disguise.GetNView(__instance);
+            ZNetView? nview = GameAccess.GetNView(__instance);
             if (nview == null)
             {
                 return;
             }
-            Disguise.ApplyTo(nview.GetZDO(), "spawn");
+            DisguiseApplier.ApplyTo(nview.GetZDO(), "spawn");
         }
         catch (Exception ex)
         {

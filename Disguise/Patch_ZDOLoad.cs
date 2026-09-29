@@ -23,24 +23,24 @@ internal static class Patch_ZDOLoad
             // A pending observer refresh (cd_refresh) is transient: it must never survive
             // a load, otherwise the server would relay a fake position with nobody to clear it.
             _ = __instance.RemoveInt(Disguise.RefreshKey);
-            if (Disguise.HasMarker(__instance))
+            if (DisguiseApplier.HasMarker(__instance))
             {
-                Disguise.ApplyTo(__instance, "load");
+                DisguiseApplier.ApplyTo(__instance, "load");
                 return;
             }
             // Older save without the marker: our creature prefab + the player field
             // means this is our disguised player.
-            int playerHash = Disguise.PlayerPrefabHash;
+            int playerHash = PrefabResolver.PlayerPrefabHash;
             if (playerHash == 0 || __instance.GetPrefab() == playerHash)
             {
                 return;
             }
             if (
-                __instance.GetPrefab() == Disguise.CreaturePrefabHash
+                __instance.GetPrefab() == PrefabResolver.CreaturePrefabHash
                 && __instance.GetLong(ZDOVars.s_playerID, 0L) != 0L
             )
             {
-                Disguise.ApplyTo(__instance, "load-legacy");
+                DisguiseApplier.ApplyTo(__instance, "load-legacy");
             }
         }
         catch (Exception ex)

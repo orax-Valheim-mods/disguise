@@ -19,26 +19,30 @@ internal static class Patch_ZDOSave
         __state = 0;
         try
         {
-            if (!Disguise.ConfigProtectSave.Value)
+            if (!DisguiseConfig.ConfigProtectSave.Value)
             {
                 return true;
             }
-            if (__instance == null || !__instance.IsValid() || !Disguise.HasMarker(__instance))
+            if (
+                __instance == null
+                || !__instance.IsValid()
+                || !DisguiseApplier.HasMarker(__instance)
+            )
             {
                 return true;
             }
-            int playerHash = Disguise.PlayerPrefabHash;
+            int playerHash = PrefabResolver.PlayerPrefabHash;
             int current = __instance.GetPrefab();
             if (playerHash == 0 || current == playerHash)
             {
                 return true;
             }
-            if (Disguise.s_zdoPrefabField == null)
+            if (GameAccess.s_zdoPrefabField == null)
             {
                 return true;
             }
             __state = current;
-            Disguise.s_zdoPrefabField.SetValue(__instance, playerHash);
+            GameAccess.s_zdoPrefabField.SetValue(__instance, playerHash);
         }
         catch (Exception ex)
         {
@@ -54,9 +58,9 @@ internal static class Patch_ZDOSave
         {
             return;
         }
-        if (Disguise.s_zdoPrefabField != null)
+        if (GameAccess.s_zdoPrefabField != null)
         {
-            Disguise.s_zdoPrefabField.SetValue(__instance, __state);
+            GameAccess.s_zdoPrefabField.SetValue(__instance, __state);
         }
     }
 }
