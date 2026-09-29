@@ -1,0 +1,1335 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using BepInEx;
+using BepInEx.Configuration;
+using HarmonyLib;
+using UnityEngine;
+
+namespace Disguise;
+
+/// <summary>
+/// Disguise - replaces the network prefab of YOUR player with a creature prefab,
+/// so that players WITHOUT the mod see a creature in your place.
+///
+/// How it works (derived from the game code):
+///  - ZDO.Serialize / ZDO.Deserialize carry the prefab hash (ZDO.m_prefab)
+///    -> every vanilla client instantiates that prefab through ZNetScene.CreateObject.
+///  - You are the OWNER of your player ZDO: your prefab change travels to the server
+///    (IncreaseDataRevision -> ZDOMan.ClientChanged), which relays it to all other
+///    clients (ZDOMan.RPC_ZDOData -> ZDO.Deserialize).
+///  - Modded machines (you + dedicated server) intercept ZNetScene.CreateObject and
+///    still instantiate the real "Player" prefab (cd_disguise marker), so that the
+///    server side game logic stays normal.
+///  - You still see your own viking: your Player object is created by Game.SpawnPlayer
+///    (Object.Instantiate of the Player prefab), never by CreateObject.
+///
+/// Observer refresh (a client that already had you instantiated):
+///  - ZDO.Deserialize NEVER re-creates an existing instance when m_prefab changes, and
+///    vanilla only re-creates objects that leave and re-enter its active area
+///    (ZNetScene.RemoveObjects / CreateObjectsSorted). So after a prefab change we make the
+///    modded server relay our player ZDO with a FAKE far-away position for ~0.6 s
+///    (cd_refresh flag): every vanilla client destroys its local instance and re-creates it
+///    at the next tick with the current prefab. The server's own ZDO position is never
+///    modified (only the outgoing packet is), so saves and game logic stay untouched.
+/// </summary>
+[BepInPlugin(PluginGUID, PluginName, PluginVersion)]
+public class Disguise : BaseUnityPlugin
+{
+    public const string PluginGUID = "orax.Disguise";
+    public const string PluginName = "Disguise";
+    public const string PluginVersion = "0.1.0";
+
+    /// <summary>Int flag set on the player ZDO to mean "this player is handled by Disguise".</summary>
+    public const string MarkerKey = "cd_disguise";
+
+    /// <summary>
+    /// Transient int flag (set by the OWNER for RefreshHoldSeconds, then removed) telling the
+    /// modded server: "relay my player ZDO with a fake far-away position". Vanilla clients then
+    /// destroy their instance and build it again with the current prefab.
+    /// </summary>
+    public const string RefreshKey = "cd_refresh";
+
+    internal static ConfigEntry<bool> ConfigEnabled = null!;
+    internal static ConfigEntry<string> ConfigCreature = null!;
+    internal static ConfigEntry<bool> ConfigProtectSave = null!;
+    internal static ConfigEntry<float> ConfigReassert = null!;
+    internal static ConfigEntry<bool> ConfigForceRefresh = null!;
+    internal static ConfigEntry<float> ConfigRefreshHold = null!;
+
+    internal static Harmony? PatchHarmony;
+
+    private static Disguise? s_instance;
+    private static int s_playerPrefabHash;
+    private static int s_creaturePrefabHash;
+    private static int s_markerHash;
+    private static int s_refreshHash;
+    private static float s_nextReassertTime;
+    private static bool s_loggedSummary;
+    private static bool s_creatureWarningLogged;
+
+    // -- Observer refresh state (see the class summary) -----------------------------------
+    /// <summary>Server only: ZDO currently relayed with a fake far-away position.</summary>
+    private static ZDO? s_refreshZdo;
+
+    /// <summary>Server only: when the fake relay was armed (safety timeout).</summary>
+    private static float s_refreshStart;
+
+    /// <summary>Server only: fake position written into the outgoing relay packets.</summary>
+    private static Vector3 s_refreshFarPos;
+
+    /// <summary>Server only: real position stashed while SendZDOs runs (never left behind).</summary>
+    private static Vector3? s_savedPosition;
+
+    /// <summary>Server only: the ZDO whose position is currently stashed (always restored).</summary>
+    private static ZDO? s_savedZdo;
+
+    /// <summary>Owner: ZDO currently carrying cd_refresh = 1.</summary>
+    private static ZDO? s_ownerRefreshZdo;
+
+    /// <summary>Owner: time at which cd_refresh must be removed.</summary>
+    private static float s_refreshEnd;
+
+    /// <summary>True only while ZNetScene.CreateDestroyObjects runs (scopes the safety net below).</summary>
+    private static bool s_inCreateDestroy;
+
+    /// <summary>How far (metres) the fake relay position is moved: 64 zones, well out of any active area.</summary>
+    private const float RefreshFarOffset = 4096f;
+
+    /// <summary>Safety: never keep faking a position longer than this (owner vanished mid-refresh).</summary>
+    private const float RefreshMaxHoldSeconds = 5f;
+
+    // -- Reflection access to the game's NON PUBLIC members ------------------------------
+    // In the game's (original) assembly these members are private/protected: any direct
+    // reference would throw a FieldAccessException at runtime. Only the "publicized" copy
+    // (valheim_Data\Managed\publicized_assemblies) used for compilation exposes them as
+    // public - hence this mandatory reflection layer.
+    private static readonly FieldInfo? s_zdoPrefabField = typeof(ZDO).GetField(
+        "m_prefab",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    private static readonly FieldInfo? s_characterNViewField = typeof(Character).GetField(
+        "m_nview",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    private static readonly MethodInfo? s_increaseDataRevisionMethod = typeof(ZDO).GetMethod(
+        "IncreaseDataRevision",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    // ZDO.m_position: private in the game. Written (and immediately restored) only while
+    // ZDOMan.SendZDOs builds an outgoing packet: the ZDO state itself never changes.
+    private static readonly FieldInfo? s_zdoPositionField = typeof(ZDO).GetField(
+        "m_position",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    private static bool s_consoleCommandRegistered;
+
+    /// <summary>
+    /// ZNetView of a character (Character.m_nview is "protected" -&gt; reflection).
+    /// </summary>
+    private static ZNetView? GetNView(Character? character)
+    {
+        if (character == null || s_characterNViewField == null)
+        {
+            return null;
+        }
+        try
+        {
+            return s_characterNViewField.GetValue(character) as ZNetView;
+        }
+        catch (Exception ex)
+        {
+            s_instance?.Logger.LogError($"Cannot read Character.m_nview: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>ZDO of the local player, or null (main menu / dedicated server without a player).</summary>
+    internal static ZDO? GetLocalPlayerZDO()
+    {
+        ZNetView? nview = GetNView(Player.m_localPlayer);
+        return nview != null ? nview.GetZDO() : null;
+    }
+
+    /// <summary>
+    /// Bumps the ZDO DataRevision so that the change reaches the server
+    /// (ZDOMan.ClientChanged -&gt; RPC_ZDOData). ZDO.IncreaseDataRevision is private in the
+    /// game: called through reflection.
+    /// </summary>
+    private static void BumpDataRevision(ZDO zdo)
+    {
+        if (s_increaseDataRevisionMethod != null)
+        {
+            s_increaseDataRevisionMethod.Invoke(zdo, null);
+            return;
+        }
+        // Public fallback: ZDO.Set(int, int) bumps the DataRevision by itself.
+        zdo.Set(MarkerHash, 0);
+    }
+
+    // ------------------------------------------------------------------ cycle de vie
+
+    public void Awake()
+    {
+        s_instance = this;
+
+        ConfigEnabled = Config.Bind(
+            "1 - General",
+            "Enabled",
+            true,
+            "Disguise enabled. To become a visible viking again: \"disguise disable\" in the console (F5), "
+                + "then restart the server. NEVER delete the DLL without disabling this option first (see ProtectSaveFile)."
+        );
+
+        ConfigCreature = Config.Bind(
+            "1 - General",
+            "CreaturePrefab",
+            "Troll",
+            "Exact name of the creature prefab (e.g. Troll, Draugr, Wolf, Greydwarf, Blob, Skeleton, Neck, Boar, Eikthyr...). "
+                + "Console command: disguise list to see the available names."
+        );
+
+        ConfigProtectSave = Config.Bind(
+            "1 - General",
+            "ProtectSaveFile",
+            true,
+            "Writes \"Player\" (not the creature prefab) to the world save. "
+                + "The disguise is re-applied automatically on load. Keeps the world usable if the mod is removed."
+        );
+
+        ConfigReassert = Config.Bind(
+            "1 - General",
+            "ReassertSeconds",
+            2f,
+            "Period (seconds) between checks / re-application of the disguise on your own player."
+        );
+
+        ConfigForceRefresh = Config.Bind(
+            "2 - Multiplayer",
+            "ForceObserverRefresh",
+            true,
+            "Automatically makes other players re-create your object right after a disguise change, "
+                + "so vanilla clients that already saw you switch immediately (requires this DLL on the dedicated server). "
+                + "Without it, they only refresh when you leave and re-enter their zone (~100 m) or after a reconnection."
+        );
+
+        ConfigRefreshHold = Config.Bind(
+            "2 - Multiplayer",
+            "RefreshHoldSeconds",
+            0.6f,
+            "How long (seconds) the server relays your player ZDO with a fake far-away position during an "
+                + "observer refresh. The change becomes visible to other players after roughly this delay. "
+                + "Increase it (e.g. 1.5) on a laggy connection if clients do not refresh."
+        );
+
+        ConfigCreature.SettingChanged += (_, _) => InvalidateCreatureHash();
+
+        PatchHarmony = new Harmony(PluginGUID);
+        PatchHarmony.PatchAll(Assembly.GetExecutingAssembly());
+
+        // Diagnostics: these members are private/protected in the game, they are only
+        // reachable through reflection (see the s_* fields above).
+        if (s_zdoPrefabField == null)
+        {
+            Logger.LogError("ZDO.m_prefab not found: save protection is disabled.");
+        }
+        if (s_characterNViewField == null)
+        {
+            Logger.LogError("Character.m_nview not found: disguise is disabled.");
+        }
+        if (s_increaseDataRevisionMethod == null)
+        {
+            Logger.LogWarning("ZDO.IncreaseDataRevision not found: falling back to ZDO.Set().");
+        }
+        if (s_zdoPositionField == null)
+        {
+            Logger.LogWarning(
+                "ZDO.m_position not found: observer refresh disabled (ForceObserverRefresh)."
+            );
+        }
+
+        RegisterConsoleCommands();
+
+        Logger.LogInfo(
+            $"{PluginName} {PluginVersion} loaded - disguise: {ConfigEnabled.Value}, creature: \"{ConfigCreature.Value}\""
+        );
+    }
+
+    public void OnDestroy()
+    {
+        PatchHarmony?.UnpatchSelf();
+        PatchHarmony = null;
+        s_instance = null;
+    }
+
+    public void Update()
+    {
+        // Runs every frame on both sides: ends the observer-refresh window (owner) and
+        // guarantees the fake relay position can never outlive its safety timeout (server).
+        TickObserverRefresh();
+
+        // Only the owner of a ZDO can change its prefab reliably, so we re-apply
+        // regularly on the LOCAL player (Player.m_localPlayer is null on a dedicated
+        // server: this path then never runs).
+        if (Time.unscaledTime < s_nextReassertTime)
+        {
+            return;
+        }
+        s_nextReassertTime = Time.unscaledTime + Mathf.Max(0.25f, ConfigReassert.Value);
+
+        ZDO? zdo = GetLocalPlayerZDO();
+        if (zdo == null || !zdo.IsValid())
+        {
+            return;
+        }
+
+        // Self-healing: a cd_refresh flag left over (crash, disconnect or scene change while a
+        // refresh was running) must never survive, or the server would keep relaying a fake
+        // position for your player forever.
+        if (s_ownerRefreshZdo == null && zdo.GetInt(RefreshHash, 0) == 1)
+        {
+            // Explicit 0, not RemoveInt: removals do not propagate (ZDO.Deserialize only
+            // adds/overwrites), so the server would keep relaying a fake position.
+            zdo.Set(RefreshHash, 0);
+            BumpDataRevision(zdo);
+            Logger.LogInfo("Cleared a stale cd_refresh flag on your player ZDO.");
+        }
+
+        if (!s_loggedSummary)
+        {
+            s_loggedSummary = true;
+            bool server = ZNet.instance != null && ZNet.instance.IsServer();
+            Logger.LogInfo(
+                $"Local player (ZDO {zdo.m_uid}) - current prefab: {PrefabName(zdo.GetPrefab())}, "
+                    + "desired prefab: "
+                    + PrefabName(DesiredPrefabHash())
+                    + (server ? " [local world / host]" : " [client]")
+                    + ", marker: "
+                    + (HasMarker(zdo) ? "yes" : "no")
+            );
+        }
+
+        ApplyTo(zdo, "reassert");
+    }
+
+    // ------------------------------------------------------------------ hashes / helpers
+
+    internal static int MarkerHash
+    {
+        get
+        {
+            if (s_markerHash == 0)
+            {
+                s_markerHash = StringExtensionMethods.GetStableHashCode(MarkerKey);
+            }
+            return s_markerHash;
+        }
+    }
+
+    internal static int RefreshHash
+    {
+        get
+        {
+            if (s_refreshHash == 0)
+            {
+                s_refreshHash = StringExtensionMethods.GetStableHashCode(RefreshKey);
+            }
+            return s_refreshHash;
+        }
+    }
+
+    internal static int PlayerPrefabHash
+    {
+        get
+        {
+            if (s_playerPrefabHash != 0)
+            {
+                return s_playerPrefabHash;
+            }
+            ZNetScene? zns = ZNetScene.instance;
+            if (zns == null)
+            {
+                return 0;
+            }
+            GameObject? prefab = Game.instance != null ? Game.instance.m_playerPrefab : null;
+            if (prefab == null)
+            {
+                prefab = zns.GetPrefab("Player");
+            }
+            if (prefab == null)
+            {
+                return 0;
+            }
+            s_playerPrefabHash = zns.GetPrefabHash(prefab);
+            return s_playerPrefabHash;
+        }
+    }
+
+    internal static int CreaturePrefabHash
+    {
+        get
+        {
+            if (s_creaturePrefabHash != 0)
+            {
+                return s_creaturePrefabHash;
+            }
+            ZNetScene? zns = ZNetScene.instance;
+            if (zns == null)
+            {
+                return 0;
+            }
+            string name = (ConfigCreature.Value ?? string.Empty).Trim();
+            if (name.Length == 0)
+            {
+                return 0;
+            }
+            GameObject? prefab = zns.GetPrefab(name);
+            if (prefab == null)
+            {
+                // case-insensitive lookup
+                foreach (string candidate in zns.GetPrefabNames())
+                {
+                    if (string.Equals(candidate, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        prefab = zns.GetPrefab(candidate);
+                        break;
+                    }
+                }
+            }
+            if (prefab == null)
+            {
+                if (!s_creatureWarningLogged)
+                {
+                    s_creatureWarningLogged = true;
+                    s_instance?.Logger.LogWarning(
+                        $"Creature prefab not found: \"{name}\". Console command: disguise list"
+                    );
+                }
+                return 0;
+            }
+            s_creaturePrefabHash = zns.GetPrefabHash(prefab);
+            return s_creaturePrefabHash;
+        }
+    }
+
+    private static void InvalidateCreatureHash()
+    {
+        s_creaturePrefabHash = 0;
+        s_creatureWarningLogged = false;
+        s_loggedSummary = false;
+        s_instance?.Logger.LogInfo($"Configured creature: \"{ConfigCreature.Value}\"");
+    }
+
+    /// <summary>Prefab our player ZDO should carry according to the configuration.</summary>
+    internal static int DesiredPrefabHash()
+    {
+        if (ConfigEnabled.Value)
+        {
+            int creature = CreaturePrefabHash;
+            if (creature != 0)
+            {
+                return creature;
+            }
+        }
+        return PlayerPrefabHash;
+    }
+
+    internal static string PrefabName(int hash)
+    {
+        if (hash == 0)
+        {
+            return "<none>";
+        }
+        ZNetScene? zns = ZNetScene.instance;
+        if (zns == null)
+        {
+            return "#" + hash;
+        }
+        GameObject? go = zns.GetPrefab(hash);
+        return go != null ? go.name : "#" + hash;
+    }
+
+    /// <summary>True if this ZDO is a player marked by Disguise.</summary>
+    internal static bool HasMarker(ZDO? zdo)
+    {
+        return zdo != null && zdo.IsValid() && zdo.GetInt(MarkerHash, 0) == 1;
+    }
+
+    /// <summary>
+    /// Applies (or removes) the disguise on a player ZDO.
+    /// Only call this on the local player's ZDO, or on an already marked ZDO (world load).
+    /// </summary>
+    internal static void ApplyTo(ZDO? zdo, string reason)
+    {
+        try
+        {
+            if (zdo == null || !zdo.IsValid())
+            {
+                return;
+            }
+            int playerHash = PlayerPrefabHash;
+            if (playerHash == 0)
+            {
+                return;
+            }
+            int desired = DesiredPrefabHash();
+            if (desired == 0)
+            {
+                return;
+            }
+
+            // Set or remove the marker: it is what tells the modded machines
+            // "this creature ZDO is actually a player, spawn a real Player".
+            if (desired != playerHash)
+            {
+                zdo.Set(MarkerHash, 1);
+            }
+            else if (zdo.GetInt(MarkerHash, 0) != 0)
+            {
+                // Explicit 0 instead of RemoveInt: a removed key is absent from the payload
+                // and receivers only add/overwrite values, so the marker removal would never
+                // reach the server (it would keep thinking you are disguised).
+                // Set() bumps the DataRevision by itself when the value actually changes.
+                zdo.Set(MarkerHash, 0);
+            }
+
+            int current = zdo.GetPrefab();
+            if (current == desired)
+            {
+                return;
+            }
+            zdo.SetPrefab(desired);
+            s_instance?.Logger.LogInfo(
+                $"[{reason}] ZDO {zdo.m_uid}: prefab {PrefabName(current)} -> {PrefabName(desired)}"
+            );
+
+            // The network prefab changed: ask the server for an observer refresh, but only when
+            // we are the live owner of that ZDO (never while the server re-applies disguises at
+            // world load, where there is no local player).
+            ZDO? local = GetLocalPlayerZDO();
+            if (local != null && local.m_uid == zdo.m_uid)
+            {
+                StartObserverRefresh(zdo, force: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            s_instance?.Logger.LogError($"ApplyTo ({reason}): {ex}");
+        }
+    }
+
+    // ------------------------------------------------------------------ observer refresh
+
+    /// <summary>
+    /// Makes other players re-create your object right now.
+    ///
+    /// Why it is needed: a vanilla client that already instantiated you keeps that GameObject
+    /// forever - ZDO.Deserialize only overwrites ZDO.m_prefab and vanilla has no mechanism that
+    /// replaces an existing instance when the prefab changes (ZNetScene.CreateDestroyObjects
+    /// only creates objects whose instance was destroyed).
+    ///
+    /// How it works: we raise the transient cd_refresh flag on our player ZDO. The modded
+    /// server (see Patch_ZDODeserialize / Patch_SendZDOs) then relays that ZDO with a fake
+    /// far-away position for RefreshHoldSeconds: on every vanilla client the ZDO leaves their
+    /// active area, RemoveObjects destroys the instance, and the next tick re-creates it with
+    /// the CURRENT prefab. The server's own ZDO position (and the save file) never changes.
+    ///
+    /// On a plain client this only sets the flag: the server arms the trick when it receives it.
+    /// </summary>
+    internal static void StartObserverRefresh(ZDO zdo, bool force)
+    {
+        try
+        {
+            if (!force && (ConfigForceRefresh == null || !ConfigForceRefresh.Value))
+            {
+                return;
+            }
+            if (zdo == null || !zdo.IsValid() || ZNet.instance == null)
+            {
+                return;
+            }
+            if (s_zdoPositionField == null)
+            {
+                // ZDO.m_position not reachable: the server could not fake anything anyway.
+                return;
+            }
+            float hold = Mathf.Clamp(ConfigRefreshHold.Value, 0.2f, 3f);
+            zdo.Set(RefreshHash, 1);
+            BumpDataRevision(zdo); // the flag must reach the server even if nothing else changed
+            s_ownerRefreshZdo = zdo;
+            s_refreshEnd = Time.unscaledTime + hold;
+            ArmObserverRefresh(zdo); // no-op on a plain client: the server arms it on Deserialize
+            s_instance?.Logger.LogInfo(
+                $"Observer refresh for ZDO {zdo.m_uid}: other players re-create your object in ~{hold:0.0} s"
+            );
+        }
+        catch (Exception ex)
+        {
+            s_instance?.Logger.LogError($"StartObserverRefresh: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Server side only: start writing the fake far-away position into the relay packets of
+    /// this player ZDO. A client NEVER fakes anything: it always sends its real position.
+    /// </summary>
+    private static void ArmObserverRefresh(ZDO zdo)
+    {
+        try
+        {
+            if (ZNet.instance == null || !ZNet.instance.IsServer())
+            {
+                return;
+            }
+            List<ZNetPeer>? peers = ZNet.instance.GetPeers();
+            if (peers == null || peers.Count == 0)
+            {
+                // Nobody connected: nothing to refresh (also protects world load).
+                return;
+            }
+            Vector3 pos = zdo.GetPosition();
+            s_refreshFarPos = new Vector3(pos.x + RefreshFarOffset, pos.y, pos.z);
+            if (s_refreshZdo != zdo)
+            {
+                s_refreshZdo = zdo;
+                // The safety timeout is measured from the FIRST arm: re-arms happen on every
+                // incoming update while the flag is still 1, and resetting the timer there
+                // would make the timeout impossible to reach.
+                s_refreshStart = Time.unscaledTime;
+                s_instance?.Logger.LogInfo(
+                    $"Observer refresh armed for ZDO {zdo.m_uid}: relaying a fake position (+"
+                        + $"{RefreshFarOffset:0} m on X) to other clients."
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            s_instance?.Logger.LogError($"ArmObserverRefresh: {ex}");
+        }
+    }
+
+    private static void DisarmObserverRefresh()
+    {
+        s_refreshZdo = null;
+    }
+
+    /// <summary>
+    /// Every frame, on both sides:
+    ///  - owner: remove cd_refresh once the hold time has elapsed (the server then relays the
+    ///    real position again -> vanilla clients re-create your object with the new prefab);
+    ///  - server: safety net, never keep faking a position if the owner vanished mid-refresh.
+    /// </summary>
+    private static void TickObserverRefresh()
+    {
+        try
+        {
+            if (ZNet.instance == null)
+            {
+                // Left the session: drop any pending refresh state.
+                DisarmObserverRefresh();
+                s_ownerRefreshZdo = null;
+                s_refreshEnd = 0f;
+                return;
+            }
+
+            float now = Time.unscaledTime;
+
+            if (s_ownerRefreshZdo != null && s_refreshEnd > 0f && now >= s_refreshEnd)
+            {
+                s_refreshEnd = 0f;
+                ZDO zdo = s_ownerRefreshZdo;
+                s_ownerRefreshZdo = null;
+                if (zdo.IsValid())
+                {
+                    // CRITICAL: write an explicit 0 - never RemoveInt here.
+                    // A removed key is simply ABSENT from the outgoing payload, and
+                    // ZDO.Deserialize only adds/overwrites the keys it receives
+                    // (ZDOExtraData.Add never deletes): the server would keep
+                    // cd_refresh = 1 forever, relay a fake position permanently and
+                    // vanilla clients would destroy your object and never re-create it
+                    // (you become invisible). With an explicit 0 the server overwrites it
+                    // and disarms (see Patch_ZDODeserialize).
+                    zdo.Set(RefreshHash, 0);
+                    BumpDataRevision(zdo);
+                }
+                if (s_refreshZdo == zdo)
+                {
+                    // Local world / host: we are our own server, stop faking right away.
+                    DisarmObserverRefresh();
+                }
+                s_instance?.Logger.LogInfo(
+                    "Observer refresh done: your new look is now visible to every loaded player."
+                );
+            }
+
+            if (s_refreshZdo != null && now - s_refreshStart > RefreshMaxHoldSeconds)
+            {
+                ZDO zdo = s_refreshZdo;
+                DisarmObserverRefresh();
+                if (zdo != null && zdo.IsValid() && zdo.RemoveInt(RefreshKey))
+                {
+                    s_instance?.Logger.LogWarning(
+                        $"Observer refresh flag still set after {RefreshMaxHoldSeconds:0} s on ZDO {zdo.m_uid} "
+                            + "(owner never cleared it): fake position relay stopped."
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            s_instance?.Logger.LogError($"TickObserverRefresh: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Instantiates the requested prefab while reusing the existing ZDO
+    /// (same mechanism as ZNetScene.CreateObject).
+    /// </summary>
+    private static GameObject InstantiateAs(ZDO zdo, int prefabHash)
+    {
+        ZNetScene zns = ZNetScene.instance;
+        GameObject prefab = zns.GetPrefab(prefabHash);
+        if (prefab == null)
+        {
+            s_instance?.Logger.LogWarning($"Prefab not found: {PrefabName(prefabHash)}");
+            return null!;
+        }
+        bool useInit = ZNetView.m_useInitZDO;
+        try
+        {
+            ZNetView.m_useInitZDO = true;
+            ZNetView.m_initZDO = zdo;
+            GameObject result = UnityEngine.Object.Instantiate(
+                prefab,
+                zdo.GetPosition(),
+                zdo.GetRotation()
+            );
+            if (ZNetView.m_initZDO != null)
+            {
+                s_instance?.Logger.LogWarning(
+                    $"ZDO {zdo.m_uid} not consumed while creating {prefab.name}"
+                );
+                ZNetView.m_initZDO = null;
+            }
+            return result;
+        }
+        finally
+        {
+            ZNetView.m_useInitZDO = useInit;
+        }
+    }
+
+    // ------------------------------------------------------------------ patches
+
+    /// <summary>
+    /// On a modded machine, a disguised player ZDO must ALWAYS produce a real Player object
+    /// (the server needs it for game logic), even though its network prefab is a creature.
+    /// Only ZDOs marked by this mod are touched: other disguise mods are left alone.
+    /// </summary>
+    [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.CreateObject))]
+    private static class Patch_CreateObject
+    {
+        private static bool Prefix(ZDO zdo, ref GameObject __result)
+        {
+            try
+            {
+                if (!HasMarker(zdo))
+                {
+                    return true; // not our business (normal creature, other vanilla player...)
+                }
+                int playerHash = PlayerPrefabHash;
+                if (playerHash == 0 || zdo.GetPrefab() == playerHash)
+                {
+                    return true; // already normal
+                }
+                // Disguised player ZDO: the disguise stays in the network data,
+                // but the real Player prefab is built locally.
+                __result = InstantiateAs(zdo, playerHash);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                s_instance?.Logger.LogError($"Patch CreateObject: {ex}");
+                return true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// World load (server / local world): re-applies the disguise to marked ZDOs, since the
+    /// protected save contains "Player".
+    /// Runs before opening to peers: no ZDO revision war.
+    /// </summary>
+    [HarmonyPatch(typeof(ZDO), nameof(ZDO.Load))]
+    private static class Patch_ZDOLoad
+    {
+        private static void Postfix(ZDO __instance)
+        {
+            try
+            {
+                if (ZNetScene.instance == null || __instance == null || !__instance.IsValid())
+                {
+                    return;
+                }
+                // A pending observer refresh (cd_refresh) is transient: it must never survive
+                // a load, otherwise the server would relay a fake position with nobody to clear it.
+                _ = __instance.RemoveInt(RefreshKey);
+                if (HasMarker(__instance))
+                {
+                    ApplyTo(__instance, "load");
+                    return;
+                }
+                // Older save without the marker: our creature prefab + the player field
+                // means this is our disguised player.
+                int playerHash = PlayerPrefabHash;
+                if (playerHash == 0 || __instance.GetPrefab() == playerHash)
+                {
+                    return;
+                }
+                if (
+                    __instance.GetPrefab() == CreaturePrefabHash
+                    && __instance.GetLong(ZDOVars.s_playerID, 0L) != 0L
+                )
+                {
+                    ApplyTo(__instance, "load-legacy");
+                }
+            }
+            catch (Exception ex)
+            {
+                s_instance?.Logger.LogError($"Patch ZDO.Load: {ex}");
+            }
+        }
+    }
+
+    /// <summary>Your player spawns (connect, respawn): apply the disguise immediately.</summary>
+    [HarmonyPatch(typeof(Player), nameof(Player.OnSpawned))]
+    private static class Patch_PlayerOnSpawned
+    {
+        private static void Postfix(Player __instance)
+        {
+            try
+            {
+                if (__instance == null || __instance != Player.m_localPlayer)
+                {
+                    return;
+                }
+                ZNetView? nview = GetNView(__instance);
+                if (nview == null)
+                {
+                    return;
+                }
+                ApplyTo(nview.GetZDO(), "spawn");
+            }
+            catch (Exception ex)
+            {
+                s_instance?.Logger.LogError($"Patch Player.OnSpawned: {ex}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Save protection: we write "Player" to disk so the world does not become unusable if the
+    /// mod is ever removed. The disguise is re-applied on load.
+    /// The m_prefab field is written directly (not through SetPrefab) so the DataRevision is
+    /// NOT bumped: otherwise the server would fight with the client-driven ZDO.
+    /// (ZDO.Save only feeds the disk, the network uses ZDO.Serialize.)
+    /// </summary>
+    [HarmonyPatch(typeof(ZDO), nameof(ZDO.Save))]
+    private static class Patch_ZDOSave
+    {
+        private static bool Prefix(ZDO __instance, out int __state)
+        {
+            __state = 0;
+            try
+            {
+                if (!ConfigProtectSave.Value)
+                {
+                    return true;
+                }
+                if (__instance == null || !__instance.IsValid() || !HasMarker(__instance))
+                {
+                    return true;
+                }
+                int playerHash = PlayerPrefabHash;
+                int current = __instance.GetPrefab();
+                if (playerHash == 0 || current == playerHash)
+                {
+                    return true;
+                }
+                if (s_zdoPrefabField == null)
+                {
+                    return true;
+                }
+                __state = current;
+                s_zdoPrefabField.SetValue(__instance, playerHash);
+            }
+            catch (Exception ex)
+            {
+                s_instance?.Logger.LogError($"Patch ZDO.Save (prefix): {ex}");
+                __state = 0;
+            }
+            return true; // let the original body run anyway
+        }
+
+        private static void Postfix(ZDO __instance, int __state)
+        {
+            if (__state == 0 || __instance == null)
+            {
+                return;
+            }
+            if (s_zdoPrefabField != null)
+            {
+                s_zdoPrefabField.SetValue(__instance, __state);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Server: the OWNER raised (cd_refresh = 1) or removed the flag on its player ZDO ->
+    /// start / stop relaying that ZDO with a fake far-away position.
+    /// Runs inside ZDOMan.RPC_ZDOData, always BEFORE ZDOMan sends anything in that frame,
+    /// so the very packet carrying the new prefab is already relayed with the fake position.
+    /// Never armed on a client: a client always sends its real position.
+    /// </summary>
+    [HarmonyPatch(typeof(ZDO), nameof(ZDO.Deserialize))]
+    private static class Patch_ZDODeserialize
+    {
+        private static void Postfix(ZDO __instance)
+        {
+            try
+            {
+                if (__instance == null || !__instance.IsValid())
+                {
+                    return;
+                }
+                if (ZNet.instance == null || !ZNet.instance.IsServer())
+                {
+                    return;
+                }
+                if (__instance.GetInt(RefreshHash, 0) == 1)
+                {
+                    ArmObserverRefresh(__instance);
+                }
+                else if (s_refreshZdo == __instance)
+                {
+                    DisarmObserverRefresh();
+                    s_instance?.Logger.LogInfo(
+                        $"Observer refresh flag cleared on ZDO {__instance.m_uid}: relaying the real position again."
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                s_instance?.Logger.LogError($"Patch ZDO.Deserialize: {ex}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Server: while an observer refresh is armed, ZDOMan.SendZDOs writes a fake far-away
+    /// position for the disguised player ZDO into the outgoing packet (the receiving vanilla
+    /// client then re-creates its instance with the current prefab).
+    ///
+    /// The real position is stashed in the Prefix and written back in the Postfix / Finalizer:
+    /// only the packet is faked, the server's ZDO state - and therefore saves and game logic -
+    /// always keeps the real position.
+    ///
+    /// NOTE: no per-peer filtering here (ZDOMan.ZDOPeer is a private type of the game): your own
+    /// connection cannot apply the fake anyway, because a ZDO update is only applied when its
+    /// DataRevision is STRICTLY newer than yours, and you are the author of every revision of
+    /// your own player ZDO (RPC_ZDOData, "num4 <= zDO.DataRevision -> continue").
+    /// Patch_FindSectorObjects is the second safety net, on top of that.
+    /// </summary>
+    [HarmonyPatch(typeof(ZDOMan), nameof(ZDOMan.SendZDOs))]
+    private static class Patch_SendZDOs
+    {
+        private static void Prefix()
+        {
+            try
+            {
+                if (s_savedPosition.HasValue)
+                {
+                    // Already inside a swap (defensive: no nested SendZDOs expected).
+                    return;
+                }
+                ZDO? zdo = s_refreshZdo;
+                if (zdo == null || s_zdoPositionField == null)
+                {
+                    return;
+                }
+                s_savedPosition = (Vector3?)s_zdoPositionField.GetValue(zdo);
+                s_savedZdo = zdo;
+                s_zdoPositionField.SetValue(zdo, s_refreshFarPos);
+            }
+            catch (Exception ex)
+            {
+                s_savedPosition = null;
+                s_savedZdo = null;
+                s_instance?.Logger.LogError($"Patch SendZDOs (prefix): {ex}");
+            }
+        }
+
+        private static void Postfix()
+        {
+            RestoreRealPosition();
+        }
+
+        // The finalizer runs even if the original method threw: a fake position must never
+        // survive the packet-building call.
+        private static Exception? Finalizer(Exception? __exception)
+        {
+            RestoreRealPosition();
+            return __exception;
+        }
+
+        private static void RestoreRealPosition()
+        {
+            if (s_savedPosition is not Vector3 saved)
+            {
+                return;
+            }
+            s_savedPosition = null;
+            ZDO? zdo = s_savedZdo;
+            s_savedZdo = null;
+            if (zdo == null || s_zdoPositionField == null)
+            {
+                return;
+            }
+            try
+            {
+                s_zdoPositionField.SetValue(zdo, saved);
+            }
+            catch (Exception ex)
+            {
+                s_instance?.Logger.LogError($"Patch SendZDOs (restore): {ex}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Safety net: on a machine with a local player (you), YOUR player object must never be
+    /// destroyed by the local create/destroy tick - Player.OnDestroy would null
+    /// Player.m_localPlayer and break everything. It is only ever out of its own active area
+    /// while an observer refresh relays a fake position, so this changes nothing normally.
+    /// Scoped to ZNetScene.CreateDestroyObjects: the network relay path is left untouched.
+    /// </summary>
+    [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.CreateDestroyObjects))]
+    private static class Patch_CreateDestroyObjects
+    {
+        private static void Prefix()
+        {
+            s_inCreateDestroy = true;
+        }
+
+        private static void Postfix()
+        {
+            s_inCreateDestroy = false;
+        }
+
+        // Runs even if the original method throws: never leave the flag stuck.
+        private static Exception? Finalizer(Exception? __exception)
+        {
+            s_inCreateDestroy = false;
+            return __exception;
+        }
+    }
+
+    [HarmonyPatch(typeof(ZDOMan), nameof(ZDOMan.FindSectorObjects))]
+    private static class Patch_FindSectorObjects
+    {
+        private static void Postfix(List<ZDO> sectorObjects)
+        {
+            try
+            {
+                if (!s_inCreateDestroy || sectorObjects == null)
+                {
+                    return;
+                }
+                ZDO? local = GetLocalPlayerZDO();
+                if (local == null || !local.IsValid() || sectorObjects.Contains(local))
+                {
+                    return;
+                }
+                sectorObjects.Add(local);
+            }
+            catch (Exception ex)
+            {
+                s_instance?.Logger.LogError($"Patch FindSectorObjects: {ex}");
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ console command
+
+    private static void RegisterConsoleCommands()
+    {
+        try
+        {
+            // The ConsoleCommand constructor registers itself into the Terminal table.
+            // NEVER touch Terminal.commands: that field is "protected" in the game and a
+            // direct access would throw a FieldAccessException.
+            if (s_consoleCommandRegistered)
+            {
+                return;
+            }
+            _ = new Terminal.ConsoleCommand(
+                "disguise",
+                "Disguise: status | set <prefab> | enable | disable | refresh | list [filter] | help",
+                OnDisguiseCommand,
+                isCheat: false,
+                isNetwork: false,
+                onlyServer: false,
+                isSecret: false,
+                allowInDevBuild: false,
+                hideBehindDevCommands: false,
+                optionsFetcher: DisguiseOptions,
+                alwaysRefreshTabOptions: true
+            );
+            s_consoleCommandRegistered = true;
+        }
+        catch (Exception ex)
+        {
+            s_instance?.Logger.LogError($"Failed to register the console command: {ex}");
+        }
+    }
+
+    private static List<string> DisguiseOptions()
+    {
+        List<string> options = new() { "status", "help", "enable", "disable", "refresh", "list" };
+        try
+        {
+            string current = ConfigCreature.Value;
+            if (!string.IsNullOrEmpty(current) && !options.Contains(current))
+            {
+                options.Insert(1, current);
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+        return options;
+    }
+
+    private static void OnDisguiseCommand(Terminal.ConsoleEventArgs args)
+    {
+        Terminal ctx = args.Context;
+        string sub = args.Length > 1 ? args[1].ToLowerInvariant() : "status";
+
+        switch (sub)
+        {
+            case "enable":
+                ConfigEnabled.Value = true;
+                ApplyNow(ctx, "enable");
+                Say(ctx, "[Disguise] Disguise enabled.");
+                break;
+
+            case "disable":
+                ConfigEnabled.Value = false;
+                ApplyNow(ctx, "disable");
+                Say(ctx, "[Disguise] Disabled: your player looks normal again for everyone.");
+                Say(
+                    ctx,
+                    "Keep ProtectSaveFile=true (default) or restart the server once you are undisguised."
+                );
+                Say(
+                    ctx,
+                    "Other players re-create your object automatically (ForceObserverRefresh); "
+                        + "if one still shows the old look, run \"disguise refresh\"."
+                );
+                break;
+
+            case "refresh":
+                RefreshObservers(ctx);
+                break;
+
+            case "set":
+                if (args.Length < 3)
+                {
+                    Say(ctx, "Usage: disguise set <prefab_name>   (disguise list for the names)");
+                    break;
+                }
+                ConfigCreature.Value = args[2];
+                ConfigEnabled.Value = true;
+                ApplyNow(ctx, "set");
+                Say(
+                    ctx,
+                    $"[Disguise] Creature set to \"{ConfigCreature.Value}\" (resolved prefab: {PrefabName(CreaturePrefabHash)})."
+                );
+                if (CreaturePrefabHash == 0)
+                {
+                    Say(ctx, "Warning: this prefab does not exist here (see disguise list).");
+                }
+                break;
+
+            case "list":
+                ListCreatures(ctx, args.Length > 2 ? args[2] : null);
+                break;
+
+            case "help":
+            case "?":
+                PrintHelp(ctx);
+                break;
+
+            case "status":
+                PrintStatus(ctx);
+                break;
+
+            default:
+                // sub defaults to "status" when there is no argument, so this branch is only
+                // reached with an unknown word in position 1 -> report it and show the help.
+                Say(ctx, $"[Disguise] Unknown subcommand \"{args[1]}\".");
+                PrintHelp(ctx);
+                break;
+        }
+    }
+
+    private static void PrintHelp(Terminal ctx)
+    {
+        Say(ctx, "[Disguise] Available commands:");
+        Say(ctx, "  disguise status           current state (creature, marker, save protection)");
+        Say(ctx, "  disguise list [filter]    list creature prefabs (e.g. disguise list troll)");
+        Say(ctx, "  disguise set <prefab>     change creature and enable the disguise");
+        Say(ctx, "  disguise enable           enable the disguise");
+        Say(ctx, "  disguise disable          disable it: you become a normal viking again");
+        Say(ctx, "  disguise refresh          force other players to re-create your object now");
+        Say(ctx, "  disguise help             show this help");
+        Say(ctx, "  Config file: BepInEx\\config\\orax.Disguise.cfg");
+        Say(ctx, "  Install on the dedicated server AND on your PC only, never for other players.");
+    }
+
+    private static void ApplyNow(Terminal ctx, string reason)
+    {
+        ZDO? zdo = GetLocalPlayerZDO();
+        if (zdo == null || !zdo.IsValid())
+        {
+            Say(
+                ctx,
+                "[Disguise] No local player (main menu): the change will be applied on the next spawn."
+            );
+            return;
+        }
+        ApplyTo(zdo, reason);
+    }
+
+    /// <summary>
+    /// "disguise refresh": re-applies the disguise and immediately asks the server for an
+    /// observer refresh - the manual fallback when a vanilla client still shows the old look.
+    /// </summary>
+    private static void RefreshObservers(Terminal ctx)
+    {
+        ZDO? zdo = GetLocalPlayerZDO();
+        if (zdo == null || !zdo.IsValid())
+        {
+            Say(ctx, "[Disguise] No local player (main menu): nothing to refresh.");
+            return;
+        }
+        ApplyTo(zdo, "refresh");
+        StartObserverRefresh(zdo, force: true);
+        if (!ConfigForceRefresh.Value)
+        {
+            Say(ctx, "Note: ForceObserverRefresh is false, so this refresh was forced manually.");
+        }
+        Say(
+            ctx,
+            $"[Disguise] Observer refresh requested: other players re-create your object "
+                + $"in ~{Mathf.Clamp(ConfigRefreshHold.Value, 0.2f, 3f):0.0} s (this mod is required on the dedicated server)."
+        );
+    }
+
+    private static void PrintStatus(Terminal ctx)
+    {
+        ZDO? zdo = GetLocalPlayerZDO();
+        bool isServer = ZNet.instance != null && ZNet.instance.IsServer();
+
+        Say(
+            ctx,
+            $"[Disguise] v{PluginVersion} - {(ConfigEnabled.Value ? "enabled" : "disabled")}"
+                + (isServer ? " (this process is a server)" : " (client)")
+        );
+        Say(
+            ctx,
+            $"  Configured creature: \"{ConfigCreature.Value}\" -> {PrefabName(CreaturePrefabHash)}"
+                + (CreaturePrefabHash == 0 ? "  (NOT FOUND)" : "")
+        );
+        Say(ctx, $"  Save protection: {(ConfigProtectSave.Value ? "yes" : "no")}");
+        if (zdo != null && zdo.IsValid())
+        {
+            int desired = DesiredPrefabHash();
+            Say(
+                ctx,
+                $"  Player ZDO {zdo.m_uid}: current prefab = {PrefabName(zdo.GetPrefab())}, desired = {PrefabName(desired)}, marker = {(HasMarker(zdo) ? "yes" : "no")}"
+            );
+            Say(
+                ctx,
+                zdo.GetPrefab() == desired
+                    ? "  State: OK, your disguise is applied."
+                    : "  State: PENDING (automatic re-application in "
+                        + Mathf.Max(0.25f, ConfigReassert.Value).ToString("0.0")
+                        + " s)"
+            );
+        }
+        else
+        {
+            Say(ctx, "  No local player right now.");
+        }
+        Say(
+            ctx,
+            "  Install this DLL on the dedicated server AND on your PC, never on other players."
+        );
+    }
+
+    private static void ListCreatures(Terminal ctx, string? filter)
+    {
+        ZNetScene? zns = ZNetScene.instance;
+        if (zns == null)
+        {
+            Say(
+                ctx,
+                "[Disguise] ZNetScene unavailable (main menu): the list is available in game."
+            );
+            return;
+        }
+        List<string> names = new();
+        foreach (string name in zns.GetPrefabNames())
+        {
+            if (filter != null && name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+            GameObject? go = zns.GetPrefab(name);
+            if (go != null && go.GetComponent<Character>() != null)
+            {
+                names.Add(name);
+            }
+        }
+        names.Sort(StringComparer.OrdinalIgnoreCase);
+        Say(
+            ctx,
+            $"[Disguise] {names.Count} creature prefab(s)"
+                + (filter != null ? $" containing \"{filter}\"" : "")
+                + ":"
+        );
+        for (int i = 0; i < names.Count; i += 4)
+        {
+            int count = Math.Min(4, names.Count - i);
+            Say(ctx, "  " + string.Join(", ", names.GetRange(i, count)));
+        }
+    }
+
+    private static void Say(Terminal ctx, string text)
+    {
+        try
+        {
+            ctx.AddString(text);
+        }
+        catch (Exception ex)
+        {
+            s_instance?.Logger.LogInfo(text + "  (console display error: " + ex.Message + ")");
+        }
+    }
+}
