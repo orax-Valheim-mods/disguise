@@ -108,6 +108,30 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `0.6` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 
+**Display section** (`3 - Display`, all `false` by default) - what the **other machines**
+see while you are disguised. `VisEquipment` reads the equipment hashes from your ZDO and
+attaches those items to the bones of whatever prefab carries it: on a vanilla client that
+prefab is your **creature**, so a helmet / cape / leggings gets glued at a nonsense
+position on humanoid creatures. These options hide the concerned keys **for the other
+machines only** - your own view always keeps your equipment.
+
+| Option | Default | Role |
+|---|---|---|
+| `HideHelmet` | `false` | Hide the helmet from the other machines |
+| `HideChest` | `false` | Hide the chest armour |
+| `HideLegs` | `false` | Hide the leggings |
+| `HideShoulder` | `false` | Hide the cape / shoulder item |
+| `HideHeldItems` | `false` | Hide the items in your hands and on your back |
+
+How it works (`EquipmentMask`): the real hashes always stay in your ZDO, they are only
+**swapped out of the packet** while `ZDO.Serialize` runs (the vanilla key carries `0`, the
+real hash moves into our own `cd_eq_*` key). The world save reads a *snapshot* taken at the
+start of the save (`ZDO.Save`), and the real hashes are written into that snapshot so the
+file keeps your equipment; a Harmony patch on `VisEquipment.UpdateEquipmentVisuals` puts
+them back for the modded machines, which therefore keep rendering your gear. Nothing is
+ever persisted masked and no extra traffic is produced (the swap does not bump the ZDO
+revision). `Hide*` changes are re-sent immediately while you are disguised.
+
 These options can also be changed in game with `disguise enable` / `disable` / `set`.
 
 ---
@@ -253,24 +277,28 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `Disguise.cs` - the plugin class: constants (`PluginGUID`, `cd_disguise`, `cd_refresh`),
   the log helpers and the lifecycle (`Awake` / `OnDestroy` / `Update`), which wires the
   other classes together. Everything it does not share stays `private`.
-- `DisguiseConfig.cs` - the six settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the eleven settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
-  `GetLocalPlayerZDO`, `BumpDataRevision`).
+  `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`).
 - `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the vanilla
   `Player` prefab hash, the configured creature hash) and `PrefabName`.
 - `DisguiseApplier.cs` - `HasMarker` / `ApplyTo` / `InstantiateAs`: writes the marker and
   swaps the network prefab.
+- `EquipmentMask.cs` - the equipment display options (`3 - Display`): swaps the equipment
+  hashes out of the outgoing packet, out of the save file, and back into the frame the
+  modded machines render (§ 2).
 - `ObserverRefresh.cs` - the `cd_refresh` window and the fake far-away position the
   modded server relays during it.
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
-  `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs` - the eight Harmony
-  patches, one `internal static` top-level class each. They reach the features through the
-  `internal` members of the classes above (fields they swap in/out during `SendZDOs`,
-  helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log through
-  `Disguise.LogError(...)` - `s_instance` itself never leaves the plugin class.
+  `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
+  `Patch_ZDOSerialize.cs`, `Patch_ZDOSaveEquipment.cs`, `Patch_VisEquipment.cs` - the
+  eleven Harmony patches, one `internal static` top-level class each. They reach the
+  features through the `internal` members of the classes above (fields they swap in/out
+  during `SendZDOs`, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
+  through `Disguise.LogError(...)` - `s_instance` itself never leaves the plugin class.
   `Patch_CreateDestroyObjects` additionally owns the `s_inCreateDestroy` scope flag read
   by `Patch_FindSectorObjects`.
 
@@ -282,15 +310,16 @@ The project compiles against `valheim_Data\Managed\publicized_assemblies\*.dll`,
 **every** member is made public. The game loads the *original* assembly instead, where
 `private` / `protected` stay: a direct reference to such a member makes the plugin fail
 at runtime with `FieldAccessException`. Already hit with `Terminal.commands` (protected),
-`ZDO.m_prefab` (private), `ZDO.IncreaseDataRevision()` (private) and `Character.m_nview`
-(protected) - all four are now reached through reflection (the `s_*` fields in `GameAccess.cs`).
+`ZDO.m_prefab` (private), `ZDO.IncreaseDataRevision()` (private), `Character.m_nview`
+(protected) and `VisEquipment.m_nview` (private) - all five are now reached through
+reflection (the `s_*` fields in `GameAccess.cs`).
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 34   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 45   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never

@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using BepInEx.Configuration;
 
 namespace Disguise;
@@ -20,6 +21,17 @@ internal static class DisguiseConfig
     internal static ConfigEntry<bool> ConfigForceRefresh = null!;
 
     internal static ConfigEntry<float> ConfigRefreshHold = null!;
+
+    // -- 3 - Display: what the OTHER machines see while you are disguised ---------------
+    internal static ConfigEntry<bool> ConfigHideHelmet = null!;
+
+    internal static ConfigEntry<bool> ConfigHideChest = null!;
+
+    internal static ConfigEntry<bool> ConfigHideLegs = null!;
+
+    internal static ConfigEntry<bool> ConfigHideShoulder = null!;
+
+    internal static ConfigEntry<bool> ConfigHideHeldItems = null!;
 
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
@@ -73,6 +85,64 @@ internal static class DisguiseConfig
                 + "Increase it (e.g. 1.5) on a laggy connection if clients do not refresh."
         );
 
+        // -- 3 - Display: the equipment hashes live in your ZDO, and VisEquipment attaches
+        // those items to whatever prefab carries it - the creature, on a vanilla client.
+        // Hiding them removes the misplaced gear, your own view keeps it (see EquipmentMask).
+        ConfigHideHelmet = config.Bind(
+            "3 - Display",
+            "HideHelmet",
+            false,
+            "Hide the helmet from the other machines while you are disguised (fixes a helmet glued "
+                + "at the wrong position on humanoid creatures). Your own view keeps it."
+        );
+
+        ConfigHideChest = config.Bind(
+            "3 - Display",
+            "HideChest",
+            false,
+            "Hide the chest armour from the other machines while you are disguised. "
+                + "Your own view keeps it."
+        );
+
+        ConfigHideLegs = config.Bind(
+            "3 - Display",
+            "HideLegs",
+            false,
+            "Hide the leggings from the other machines while you are disguised. "
+                + "Your own view keeps them."
+        );
+
+        ConfigHideShoulder = config.Bind(
+            "3 - Display",
+            "HideShoulder",
+            false,
+            "Hide the cape / shoulder item from the other machines while you are disguised. "
+                + "Your own view keeps it."
+        );
+
+        ConfigHideHeldItems = config.Bind(
+            "3 - Display",
+            "HideHeldItems",
+            false,
+            "Hide the items held in your hands and carried on your back from the other machines "
+                + "while you are disguised. Your own view keeps them."
+        );
+
+        ConfigHideHelmet.SettingChanged += HideSettingChanged;
+        ConfigHideChest.SettingChanged += HideSettingChanged;
+        ConfigHideLegs.SettingChanged += HideSettingChanged;
+        ConfigHideShoulder.SettingChanged += HideSettingChanged;
+        ConfigHideHeldItems.SettingChanged += HideSettingChanged;
+
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
+    }
+
+    /// <summary>
+    /// A "hide" option changed: the other machines still hold the state of the last packet,
+    /// EquipmentMask re-sends it right away.
+    /// </summary>
+    private static void HideSettingChanged(object sender, EventArgs e)
+    {
+        EquipmentMask.OnSettingChanged();
     }
 }
