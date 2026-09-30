@@ -106,10 +106,10 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
-| `RefreshHoldSeconds` | `0.6` | Delay (seconds) before other players see the new look; increase on a laggy connection |
+| `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 
-**Display section** (`3 - Display`, all `false` by default) - what the **other machines**
-see while you are disguised. `VisEquipment` reads the equipment hashes from your ZDO and
+**Display section** (`3 - Display`) - what the **other machines** see while you are
+disguised. `VisEquipment` reads the equipment hashes from your ZDO and
 attaches those items to the bones of whatever prefab carries it: on a vanilla client that
 prefab is your **creature**, so a helmet / cape / leggings gets glued at a nonsense
 position on humanoid creatures. These options hide the concerned keys **for the other
@@ -117,10 +117,10 @@ machines only** - your own view always keeps your equipment.
 
 | Option | Default | Role |
 |---|---|---|
-| `HideHelmet` | `false` | Hide the helmet from the other machines |
-| `HideChest` | `false` | Hide the chest armour |
-| `HideLegs` | `false` | Hide the leggings |
-| `HideShoulder` | `false` | Hide the cape / shoulder item |
+| `HideHelmet` | `true` | Hide the helmet from the other machines |
+| `HideChest` | `true` | Hide the chest armour |
+| `HideLegs` | `true` | Hide the leggings |
+| `HideCape` | `true` | Hide the cape |
 | `HideHeldItems` | `false` | Hide the items in your hands and on your back |
 
 How it works (`EquipmentMask`): the real hashes always stay in your ZDO, they are only
@@ -177,7 +177,7 @@ save file (`ZDO.Save`). The chosen prefab determines **what each client instanti
      payload, the server would keep `cd_refresh = 1` forever, relay the fake position
      permanently and **make you invisible** to vanilla clients (their instance is
      destroyed and never re-created). Same rule for the `cd_disguise` marker.
-   The result: other players see the new look **~0.6 s** after `disguise set/enable/
+   The result: other players see the new look **~1.5 s** after `disguise set/enable/
    disable`, without moving and without anyone reconnecting.
    > This step runs **entirely on the server** (`ZDOMan.SendZDOs`): it needs the DLL
    > installed there (§ 1.b). Without it, everything else still works.
@@ -198,7 +198,7 @@ Visual synchronisation on vanilla clients:
 1. **A vanilla client that already saw you** used to keep showing your old look: the game
    never re-creates an object when its prefab changes. The automatic *observer refresh*
    (§ 3, step 5) fixes that: the change becomes visible to everyone
-   loaded after ~`RefreshHoldSeconds` (0.6 s), with nobody moving and nobody reconnecting.
+   loaded after ~`RefreshHoldSeconds` (1.5 s), with nobody moving and nobody reconnecting.
    - If a client still shows the old look (very laggy connection, or
      `ForceObserverRefresh = false`): run **`disguise refresh`** (needs the server DLL),
      or use the old fallbacks (move ~100 m away, or a reconnection on either side).
@@ -338,7 +338,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | `disguise status` says "NOT FOUND" | Wrong prefab name → `disguise list` |
 | You appear as a viking to others | They already saw you before → run `disguise refresh`, or move ~100 m / reconnect (§ 4.1) |
 | **You are invisible to a vanilla client** | Only possible with the DLL on the server: the relay is stuck on the fake position (the owner never sent `cd_refresh = 0`): the server log must show `Observer refresh flag cleared on ZDO ...` after every change. Restart the dedicated server (the flag is stripped at world load) with the current build. |
-| Others see your new look too late | Normal: ~`RefreshHoldSeconds` (0.6 s); raise it in the `.cfg` on a laggy connection |
+| Others see your new look too late | Normal: ~`RefreshHoldSeconds` (1.5 s); raise it in the `.cfg` on a laggy connection |
 | Fake position warning in the server log | `Observer refresh flag still set after 5 s`: owner vanished mid-refresh; it stopped by itself |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |

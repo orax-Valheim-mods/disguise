@@ -28,7 +28,8 @@ namespace Disguise;
 ///  - ZDO.Deserialize NEVER re-creates an existing instance when m_prefab changes, and
 ///    vanilla only re-creates objects that leave and re-enter its active area
 ///    (ZNetScene.RemoveObjects / CreateObjectsSorted). So after a prefab change we make the
-///    modded server relay our player ZDO with a FAKE far-away position for ~0.6 s
+///    modded server relay our player ZDO with a FAKE far-away position for
+///    ~RefreshHoldSeconds (1.5 s by default)
 ///    (cd_refresh flag): every vanilla client destroys its local instance and re-creates it
 ///    at the next tick with the current prefab. The server's own ZDO position is never
 ///    modified (only the outgoing packet is), so saves and game logic stay untouched.

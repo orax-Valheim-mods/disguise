@@ -7,10 +7,10 @@ namespace Disguise;
 /// Hides the equipped items of a disguised player from the other machines.
 ///
 /// Why: VisEquipment.UpdateEquipmentVisuals() reads the equipment hashes of a ZDO
-/// (HelmetItem, ChestItem, LegItem, ShoulderItem, LeftItem...) every frame and attaches
-/// those items to the bones of whatever prefab is bound to the ZDO. On a vanilla client a
-/// disguised player is a CREATURE, so your helmet, cape, leggings and weapons get glued to
-/// the creature rig and show up at nonsense positions.
+/// (HelmetItem, ChestItem, LegItem, ShoulderItem - the cape - , LeftItem...) every frame
+/// and attaches those items to the bones of whatever prefab is bound to the ZDO. On a
+/// vanilla client a disguised player is a CREATURE, so your helmet, cape, leggings and
+/// weapons get glued to the creature rig and show up at nonsense positions.
 ///
 /// What is done - your own view never changes, because the local ZDO keeps the real hashes:
 ///  - ZDO.Serialize (network only: ZDOMan.SendZDOs is its only caller) swaps the enabled
@@ -35,7 +35,7 @@ internal static class EquipmentMask
 
     private const int OptLegs = 2;
 
-    private const int OptShoulder = 3;
+    private const int OptCape = 3;
 
     private const int OptHeld = 4;
 
@@ -58,7 +58,7 @@ internal static class EquipmentMask
         Key("cd_eq_helmet"),
         Key("cd_eq_chest"),
         Key("cd_eq_leg"),
-        Key("cd_eq_shoulder"),
+        Key("cd_eq_cape"),
         Key("cd_eq_left"),
         Key("cd_eq_right"),
         Key("cd_eq_leftback"),
@@ -71,7 +71,7 @@ internal static class EquipmentMask
         OptHelmet,
         OptChest,
         OptLegs,
-        OptShoulder,
+        OptCape,
         OptHeld,
         OptHeld,
         OptHeld,
@@ -97,7 +97,7 @@ internal static class EquipmentMask
         return OptionEnabled(OptHelmet)
             || OptionEnabled(OptChest)
             || OptionEnabled(OptLegs)
-            || OptionEnabled(OptShoulder)
+            || OptionEnabled(OptCape)
             || OptionEnabled(OptHeld);
     }
 
@@ -111,8 +111,8 @@ internal static class EquipmentMask
                 return DisguiseConfig.ConfigHideChest.Value;
             case OptLegs:
                 return DisguiseConfig.ConfigHideLegs.Value;
-            case OptShoulder:
-                return DisguiseConfig.ConfigHideShoulder.Value;
+            case OptCape:
+                return DisguiseConfig.ConfigHideCape.Value;
             default:
                 return DisguiseConfig.ConfigHideHeldItems.Value;
         }

@@ -29,11 +29,11 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `ForceObserverRefresh` | `true` | Other players see a change right away (needs the DLL on the server) |
-| `RefreshHoldSeconds` | `0.6` | Delay (seconds) before other players see the new look |
-| `HideHelmet` | `false` | Hide the helmet from the other machines |
-| `HideChest` | `false` | Hide the chest armour from the other machines |
-| `HideLegs` | `false` | Hide the leggings from the other machines |
-| `HideShoulder` | `false` | Hide the cape / shoulder item from the other machines |
+| `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look |
+| `HideHelmet` | `true` | Hide the helmet from the other machines |
+| `HideChest` | `true` | Hide the chest armour from the other machines |
+| `HideLegs` | `true` | Hide the leggings from the other machines |
+| `HideCape` | `true` | Hide the cape from the other machines |
 | `HideHeldItems` | `false` | Hide the items in your hands and on your back |
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other

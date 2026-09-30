@@ -29,7 +29,7 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<bool> ConfigHideLegs = null!;
 
-    internal static ConfigEntry<bool> ConfigHideShoulder = null!;
+    internal static ConfigEntry<bool> ConfigHideCape = null!;
 
     internal static ConfigEntry<bool> ConfigHideHeldItems = null!;
 
@@ -79,10 +79,10 @@ internal static class DisguiseConfig
         ConfigRefreshHold = config.Bind(
             "2 - Multiplayer",
             "RefreshHoldSeconds",
-            0.6f,
+            1.5f,
             "How long (seconds) the server relays your player ZDO with a fake far-away position during an "
                 + "observer refresh. The change becomes visible to other players after roughly this delay. "
-                + "Increase it (e.g. 1.5) on a laggy connection if clients do not refresh."
+                + "Increase it (e.g. 2.5) on a laggy connection if clients do not refresh."
         );
 
         // -- 3 - Display: the equipment hashes live in your ZDO, and VisEquipment attaches
@@ -91,7 +91,7 @@ internal static class DisguiseConfig
         ConfigHideHelmet = config.Bind(
             "3 - Display",
             "HideHelmet",
-            false,
+            true,
             "Hide the helmet from the other machines while you are disguised (fixes a helmet glued "
                 + "at the wrong position on humanoid creatures). Your own view keeps it."
         );
@@ -99,7 +99,7 @@ internal static class DisguiseConfig
         ConfigHideChest = config.Bind(
             "3 - Display",
             "HideChest",
-            false,
+            true,
             "Hide the chest armour from the other machines while you are disguised. "
                 + "Your own view keeps it."
         );
@@ -107,17 +107,16 @@ internal static class DisguiseConfig
         ConfigHideLegs = config.Bind(
             "3 - Display",
             "HideLegs",
-            false,
+            true,
             "Hide the leggings from the other machines while you are disguised. "
                 + "Your own view keeps them."
         );
 
-        ConfigHideShoulder = config.Bind(
+        ConfigHideCape = config.Bind(
             "3 - Display",
-            "HideShoulder",
-            false,
-            "Hide the cape / shoulder item from the other machines while you are disguised. "
-                + "Your own view keeps it."
+            "HideCape",
+            true,
+            "Hide the cape from the other machines while you are disguised. Your own view keeps it."
         );
 
         ConfigHideHeldItems = config.Bind(
@@ -131,7 +130,7 @@ internal static class DisguiseConfig
         ConfigHideHelmet.SettingChanged += HideSettingChanged;
         ConfigHideChest.SettingChanged += HideSettingChanged;
         ConfigHideLegs.SettingChanged += HideSettingChanged;
-        ConfigHideShoulder.SettingChanged += HideSettingChanged;
+        ConfigHideCape.SettingChanged += HideSettingChanged;
         ConfigHideHeldItems.SettingChanged += HideSettingChanged;
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
