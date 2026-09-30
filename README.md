@@ -91,6 +91,7 @@ In game, open the console with **F5**:
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
+| `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
 | `disguise help` | List of the available commands (`disguise ?` also works) |
 
 The console tab-completion suggests the sub-commands.
@@ -107,6 +108,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
+| `SeeYourDisguise` | `false` | Show the creature on **your own screen** (`4 - Own view`, local only) |
 
 **Display section** (`3 - Display`) - what the **other machines** see while you are
 disguised. `VisEquipment` reads the equipment hashes from your ZDO and
@@ -133,6 +135,29 @@ ever persisted masked and no extra traffic is produced (the swap does not bump t
 revision). `Hide*` changes are re-sent immediately while you are disguised.
 
 These options can also be changed in game with `disguise enable` / `disable` / `set`.
+
+**Own view section** (`4 - Own view`, `SeeYourDisguise`, `false` by default) - what **you**
+see on your own screen. Your viking is substituted - its renderers and its cloth switched
+off - by an inert local clone of the creature, so your screen renders one character: what a
+vanilla client renders. That comes from your position, your rotation, and the animation
+parameters read from your own ZDO (a creature animates mostly in its idle pose on a vanilla
+client, because its sync list and the viking's only partly match - `GhostAnimation` reproduces
+exactly that). Console command: `disguise view [on|off]`, which switches it on the spot.
+
+The clone is **purely local**: no ZDO, no collision, no AI, no network component.
+`GhostFactory` builds it from a prefab deactivated for the duration of the instantiation,
+which defers every `Awake` and lets the mod strip `ZNetView`, `Character`, `BaseAI`,
+`ZSync*` and the colliders **before** the clone is activated (a live `ZNetView.Awake` would
+create a phantom networked ZDO). The clone sits at your player transform, copied once per
+frame from `LateUpdate`, and is deliberately **not parented** to you: a child would be walked
+by every `GetComponentsInChildren` the game and the mod run on your player, extending your
+hierarchy by a whole creature. Your own camera, controls and equipment data are untouched -
+nothing ever reaches the server or the other machines. Your visual components are re-scanned
+ten times a second rather than every frame - nothing in the game re-enables one of them
+(`Character.RPC_ResetCloth` only ever touches an already enabled cloth) - so the option costs
+one transform copy per frame. The clone carries no equipment either: with
+`HideHeldItems = false` the other machines still render your held item on the creature while
+your own screen shows none, so enable that option too for a perfect match.
 
 ---
 
@@ -319,7 +344,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 45   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 51   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never

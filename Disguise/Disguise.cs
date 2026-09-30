@@ -107,6 +107,7 @@ public class Disguise : BaseUnityPlugin
 
     public void OnDestroy()
     {
+        SelfView.Shutdown();
         PatchHarmony?.UnpatchSelf();
         PatchHarmony = null;
         s_instance = null;
@@ -117,6 +118,11 @@ public class Disguise : BaseUnityPlugin
         // Runs every frame on both sides: ends the observer-refresh window (owner) and
         // guarantees the fake relay position can never outlive its safety timeout (server).
         ObserverRefresh.TickObserverRefresh();
+
+        // Own view (purely local): builds / synchronises / removes the creature clone that
+        // replaces your own viking on your screen. No-op without a local player, without
+        // the option, or while your ZDO still carries the Player prefab.
+        SelfView.Tick();
 
         // Only the owner of a ZDO can change its prefab reliably, so we re-apply
         // regularly on the LOCAL player (Player.m_localPlayer is null on a dedicated
@@ -164,5 +170,13 @@ public class Disguise : BaseUnityPlugin
         }
 
         DisguiseApplier.ApplyTo(zdo, "reassert");
+    }
+
+    public void LateUpdate()
+    {
+        // Own view, second half: every game script has moved the player by now, so this is
+        // where the creature clone is landed on it (one transform copy) and where the rare
+        // renderer scan runs. Keeps the option free of any per-frame hierarchy walk.
+        SelfView.LateTick();
     }
 }

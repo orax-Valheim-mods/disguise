@@ -33,6 +33,9 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<bool> ConfigHideHeldItems = null!;
 
+    // -- 4 - Own view: what YOU see on your own screen ----------------------------------
+    internal static ConfigEntry<bool> ConfigSeeYourDisguise = null!;
+
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
     {
@@ -132,6 +135,17 @@ internal static class DisguiseConfig
         ConfigHideLegs.SettingChanged += HideSettingChanged;
         ConfigHideCape.SettingChanged += HideSettingChanged;
         ConfigHideHeldItems.SettingChanged += HideSettingChanged;
+
+        // -- 4 - Own view: purely local rendering, polled every frame by SelfView.Tick(),
+        // so no SettingChanged handler is needed here.
+        ConfigSeeYourDisguise = config.Bind(
+            "4 - Own view",
+            "SeeYourDisguise",
+            false,
+            "Show your disguise on your own screen: your viking is hidden and the creature is drawn in "
+                + "your place, exactly like the other clients see you. Local visuals only - it never "
+                + "changes what the other machines receive. Console command: disguise view [on|off]."
+        );
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
     }

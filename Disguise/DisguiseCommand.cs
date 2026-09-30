@@ -27,7 +27,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | list [filter] | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | list [filter] | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -48,7 +48,8 @@ internal static class DisguiseCommand
 
     private static List<string> DisguiseOptions()
     {
-        List<string> options = new() { "status", "help", "enable", "disable", "refresh", "list" };
+        List<string> options =
+            new() { "status", "help", "enable", "disable", "refresh", "view", "list" };
         try
         {
             string current = DisguiseConfig.ConfigCreature.Value;
@@ -94,6 +95,10 @@ internal static class DisguiseCommand
 
             case "refresh":
                 RefreshObservers(ctx);
+                break;
+
+            case "view":
+                SetOwnView(ctx, args.Length > 2 ? args[2] : null);
                 break;
 
             case "set":
@@ -146,6 +151,7 @@ internal static class DisguiseCommand
         Say(ctx, "  disguise enable           enable the disguise");
         Say(ctx, "  disguise disable          disable it: you become a normal viking again");
         Say(ctx, "  disguise refresh          force other players to re-create your object now");
+        Say(ctx, "  disguise view [on|off]    show the creature on your own screen (local only)");
         Say(ctx, "  disguise help             show this help");
         Say(ctx, "  Config file: BepInEx\\config\\orax.Disguise.cfg");
         Say(ctx, "  Install on the dedicated server AND on your PC only, never for other players.");
@@ -190,6 +196,57 @@ internal static class DisguiseCommand
         );
     }
 
+    /// <summary>
+    /// "disguise view [on|off]": shows or hides your creature on your OWN screen. Purely
+    /// local rendering (SelfView): it never changes what the other machines receive.
+    /// </summary>
+    private static void SetOwnView(Terminal ctx, string? argument)
+    {
+        bool ownView = DisguiseConfig.ConfigSeeYourDisguise.Value;
+        if (argument == null)
+        {
+            ownView = !ownView;
+        }
+        else
+        {
+            string value = argument.ToLowerInvariant();
+            if (value == "on" || value == "true" || value == "1" || value == "enable")
+            {
+                ownView = true;
+            }
+            else if (value == "off" || value == "false" || value == "0" || value == "disable")
+            {
+                ownView = false;
+            }
+            else
+            {
+                Say(ctx, "Usage: disguise view [on|off]");
+                return;
+            }
+        }
+        DisguiseConfig.ConfigSeeYourDisguise.Value = ownView;
+
+        if (ownView)
+        {
+            Say(
+                ctx,
+                "[Disguise] Own view ON: your screen shows the creature in your place, "
+                    + "exactly like the other clients see you (your own view only)."
+            );
+            if (PrefabResolver.CreaturePrefabHash == 0)
+            {
+                Say(
+                    ctx,
+                    "Warning: the configured creature does not exist here (see disguise list)."
+                );
+            }
+        }
+        else
+        {
+            Say(ctx, "[Disguise] Own view OFF: your screen shows your viking again.");
+        }
+    }
+
     private static void PrintStatus(Terminal ctx)
     {
         ZDO? zdo = GameAccess.GetLocalPlayerZDO();
@@ -206,6 +263,10 @@ internal static class DisguiseCommand
                 + (PrefabResolver.CreaturePrefabHash == 0 ? "  (NOT FOUND)" : "")
         );
         Say(ctx, $"  Save protection: {(DisguiseConfig.ConfigProtectSave.Value ? "yes" : "no")}");
+        Say(
+            ctx,
+            $"  Own view on your screen: {(DisguiseConfig.ConfigSeeYourDisguise.Value ? "on" : "off")} (disguise view)"
+        );
         if (zdo != null && zdo.IsValid())
         {
             int desired = PrefabResolver.DesiredPrefabHash();
