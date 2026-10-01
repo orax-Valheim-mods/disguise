@@ -149,7 +149,15 @@ The clone is **purely local**: no ZDO, no collision, no AI, no network component
 `GhostFactory` builds it from a prefab deactivated for the duration of the instantiation,
 which defers every `Awake` and lets the mod strip `ZNetView`, `Character`, `BaseAI`,
 `ZSync*` and the colliders **before** the clone is activated (a live `ZNetView.Awake` would
-create a phantom networked ZDO). The clone sits at your player transform, copied once per
+create a phantom networked ZDO). The strip runs in **several passes**: Unity refuses to
+remove a component another one still requires ("Can't remove Humanoid because CharacterDrop
+depends on it"), and a single surviving `Humanoid` would wake up as a live `Character` - its
+animator states call `IsTamed()` on it, `EnemyHud.TestShow()` throws on it from `LateUpdate`,
+and its `OnDestroy` throws on the stripped `SEMan`, so the dead entry would stay in
+`Character.s_characters` for the rest of the session: a health bar frozen on screen, an
+exception per frame and the frame time to go with it. Anything non-visual still present
+after the strip is therefore detected, and the clone is **discarded instead of activated**.
+The clone sits at your player transform, copied once per
 frame from `LateUpdate`, and is deliberately **not parented** to you: a child would be walked
 by every `GetComponentsInChildren` the game and the mod run on your player, extending your
 hierarchy by a whole creature. Your own camera, controls and equipment data are untouched -
@@ -375,6 +383,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | **You are invisible to a vanilla client** | Only possible with the DLL on the server: the relay is stuck on the fake position (the owner never sent `cd_refresh = 0`): the server log must show `Observer refresh flag cleared on ZDO ...` after every change. Restart the dedicated server (the flag is stripped at world load) with the current build. |
 | Others see your new look too late | Normal: ~`RefreshHoldSeconds` (1.5 s); raise it in the `.cfg` on a laggy connection |
 | Fake position warning in the server log | `Observer refresh flag still set after 5 s`: owner vanished mid-refresh; it stopped by itself |
+| An enemy name + health bar stays on screen (even after `disguise disable`), and the log fills with `NullReferenceException` on `EnemyHud.TestShow` / `Character.IsTamed` | A game component survived the clone's strip: the clone has to be discarded, not activated (§ 2, own view). Deploy a current DLL (§ 6) and **restart the game** - a dead entry already in `Character.s_characters` is not healed at runtime |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 

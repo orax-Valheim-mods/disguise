@@ -76,6 +76,11 @@ internal static class GhostFactory
             );
 
             Strip(clone);
+            if (!IsInert(clone))
+            {
+                UnityEngine.Object.Destroy(clone);
+                return null;
+            }
 
             clone.transform.SetPositionAndRotation(position, rotation);
 
@@ -94,21 +99,70 @@ internal static class GhostFactory
         }
     }
 
-    /// <summary>Removes every component that is not pure visuals. The clone is still inactive.</summary>
+    /// <summary>The strip repeats while it still manages to destroy something (dependency chains).</summary>
+    private const int MaxStripPasses = 10;
+
+    /// <summary>
+    /// Removes every component that is not pure visuals. The clone is still inactive.
+    ///
+    /// Several passes, in reverse attachment order, because Unity REFUSES to destroy a
+    /// component another one still requires ("Can't remove Humanoid (Script) because
+    /// CharacterDrop (Script) depends on it"). One surviving Humanoid is enough to turn the
+    /// inert copy into a walking fault: its Awake runs on activation, the creature's own
+    /// RandomIdle state calls IsTamed() on it every frame, EnemyHud.TestShow() throws on it
+    /// from LateUpdate, and its OnDestroy throws on the stripped SEMan - so the dead entry is
+    /// never removed from Character.s_characters and the exceptions outlive the clone:
+    /// a health bar frozen on screen and the frame time to go with it.
+    /// </summary>
     private static void Strip(GameObject clone)
+    {
+        for (int pass = 0; pass < MaxStripPasses; pass++)
+        {
+            Component[] components = clone.GetComponentsInChildren<Component>(true);
+            bool destroyedSomething = false;
+            for (int i = components.Length - 1; i >= 0; i--)
+            {
+                Component component = components[i];
+                // Transforms (the skeleton, the bone hierarchy) must stay: the skinned meshes
+                // reference them. Everything else keeps only if it is on the visual list.
+                if (component == null || component is Transform || IsVisual(component))
+                {
+                    continue;
+                }
+                // DestroyImmediate, not Destroy: the clone is activated in this same call, and a
+                // component scheduled for destruction at the end of the frame would still Awake.
+                UnityEngine.Object.DestroyImmediate(component);
+                // Only a component that is really gone counts as progress: a refusal (see
+                // summary) leaves it in place, and the next pass tries again once whatever
+                // required it has been removed.
+                destroyedSomething |= component == null;
+            }
+            if (!destroyedSomething)
+            {
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Belt and braces: anything left over that is not a transform or pure visuals would wake
+    /// up as a live object on an inert copy, so the clone is discarded instead of activated -
+    /// failing loudly once, with the type named, rather than throwing on every frame after.
+    /// </summary>
+    private static bool IsInert(GameObject clone)
     {
         foreach (Component component in clone.GetComponentsInChildren<Component>(true))
         {
-            // Transforms (the skeleton, the bone hierarchy) must stay: the skinned meshes
-            // reference them. Everything else keeps only if it is on the visual list.
             if (component == null || component is Transform || IsVisual(component))
             {
                 continue;
             }
-            // DestroyImmediate, not Destroy: the clone is activated in this same call, and a
-            // component scheduled for destruction at the end of the frame would still Awake.
-            UnityEngine.Object.DestroyImmediate(component);
+            Disguise.LogError(
+                $"Own view: {component.GetType().Name} survived the strip of {clone.name} - discarding it instead of activating a half-alive copy."
+            );
+            return false;
         }
+        return true;
     }
 
     private static bool IsVisual(Component component)
