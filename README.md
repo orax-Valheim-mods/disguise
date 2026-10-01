@@ -265,6 +265,25 @@ Visual synchronisation on vanilla clients:
    the disguise still reaches every vanilla client, but the automatic refresh,
    `ProtectSaveFile` and the server-side `Player` object are lost.
 
+5. **Footstep effects are resolved against the creature.** `FootStep.RPC_Step` carries an
+   index into the effect list of the object instantiated **by the machine that sent it**,
+   and vanilla relies on every machine building the same prefab for a ZDO: a disguised
+   player is a `Player` on machines running this DLL and a creature everywhere else, so
+   the two lists disagree in both directions and vanilla throws
+   `ArgumentOutOfRangeException` on every step (one per footstep, in the log of the
+   player watching you). The mod therefore resolves step and landing effects against the
+   **creature prefab's own list** (`Patch_FootStepFindBestStepEffect`) and tolerates an
+   out-of-range index on reception (`Patch_FootStepRPCStep`) instead of throwing: vanilla
+   observers play the creature's real footstep effect, machines running this DLL skip an
+   effect they cannot resolve, and no mix of vanilla/modded observers can throw. Nothing
+   is sent when the creature has no `FootStep` or no matching effect.
+
+6. **Dying while disguised logs a warning on vanilla observers.** `Player.OnDeath`
+   broadcasts `OnDeath` to every machine; a creature has no `Player` component to register
+   it, so each vanilla observer logs one `Failed to find rpc method <hash>` per death (a
+   warning, no exception). The broadcast is deliberately left alone: machines running
+   this DLL hold a real `Player` for you and need it (`RPC_OnDeath` hides your visual).
+
 ---
 
 ## 5. Clean uninstall (IMPORTANT)
@@ -354,15 +373,16 @@ The project compiles against `valheim_Data\Managed\publicized_assemblies\*.dll`,
 `private` / `protected` stay: a direct reference to such a member makes the plugin fail
 at runtime with `FieldAccessException`. Already hit with `Terminal.commands` (protected),
 `ZDO.m_prefab` (private), `ZDO.IncreaseDataRevision()` (private), `Character.m_nview`
-(protected) and `VisEquipment.m_nview` (private) - all five are now reached through
-reflection (the `s_*` fields in `GameAccess.cs`).
+(protected), `VisEquipment.m_nview` (private) and `FootStep.FindBestStepEffect` (private)
+- all reached through reflection (the `s_*` fields in `GameAccess.cs`); `FootStep.m_nview`
+(private) is read back with `GetComponent<ZNetView>()`, exactly like `FootStep.Start` does.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 51   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 53   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -384,6 +404,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | Others see your new look too late | Normal: ~`RefreshHoldSeconds` (1.5 s); raise it in the `.cfg` on a laggy connection |
 | Fake position warning in the server log | `Observer refresh flag still set after 5 s`: owner vanished mid-refresh; it stopped by itself |
 | An enemy name + health bar stays on screen (even after `disguise disable`), and the log fills with `NullReferenceException` on `EnemyHud.TestShow` / `Character.IsTamed` | A game component survived the clone's strip: the clone has to be discarded, not activated (§ 2, own view). Deploy a current DLL (§ 6) and **restart the game** - a dead entry already in `Character.s_characters` is not healed at runtime |
+| `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 

@@ -20,6 +20,10 @@ internal static class PrefabResolver
 
     private static bool s_creatureWarningLogged;
 
+    private static FootStep? s_creatureFootStep;
+
+    private static int s_creatureFootStepHash;
+
     // ------------------------------------------------------------------ hashes / helpers
 
     internal static int MarkerHash
@@ -123,9 +127,39 @@ internal static class PrefabResolver
     internal static void InvalidateCreatureHash()
     {
         s_creaturePrefabHash = 0;
+        s_creatureFootStepHash = 0;
+        s_creatureFootStep = null;
         s_creatureWarningLogged = false;
         Disguise.s_loggedSummary = false;
         Disguise.LogInfo($"Configured creature: \"{DisguiseConfig.ConfigCreature.Value}\"");
+    }
+
+    /// <summary>
+    /// FootStep of the configured creature prefab, or null when the creature has none. It is a
+    /// prefab asset (never instantiated, Start never ran), but FindBestStepEffect only reads
+    /// the m_effects list, so the component can be queried in place. Cached against the hash it
+    /// was resolved from, cleared together with that hash.
+    /// </summary>
+    internal static FootStep? CreatureFootStep()
+    {
+        int hash = CreaturePrefabHash;
+        if (hash == 0)
+        {
+            return null;
+        }
+        if (s_creatureFootStepHash == hash)
+        {
+            return s_creatureFootStep;
+        }
+        s_creatureFootStepHash = hash;
+        s_creatureFootStep = null;
+        ZNetScene? zns = ZNetScene.instance;
+        GameObject? prefab = zns != null ? zns.GetPrefab(hash) : null;
+        if (prefab != null)
+        {
+            s_creatureFootStep = prefab.GetComponentInChildren<FootStep>(true);
+        }
+        return s_creatureFootStep;
     }
 
     /// <summary>Prefab our player ZDO should carry according to the configuration.</summary>

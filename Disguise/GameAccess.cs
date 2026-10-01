@@ -52,6 +52,15 @@ internal static class GameAccess
         BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
     );
 
+    // FootStep.FindBestStepEffect: private in the game. Resolves an index into THAT instance's
+    // own m_effects list, which is what the disguise has to translate (see
+    // Patch_FootStepFindBestStepEffect). Invoked on the creature prefab's component: its Start
+    // never ran, but the method only reads the list.
+    internal static readonly MethodInfo? s_footStepFindBestMethod = typeof(FootStep).GetMethod(
+        "FindBestStepEffect",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
     /// <summary>
     /// ZNetView of a character (Character.m_nview is "protected" -&gt; reflection).
     /// </summary>
@@ -97,6 +106,29 @@ internal static class GameAccess
         {
             Disguise.LogError($"Cannot read VisEquipment.m_nview: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Index of the best step effect of this FootStep for the (material, motion) pair of the
+    /// original call, or -1 when nothing matches or the call could not be made. The arguments
+    /// are handed over exactly as Harmony received them: the parameter types are FootStep's own
+    /// enums, which this project never references directly.
+    /// </summary>
+    internal static int FindBestStepEffect(FootStep? step, object[]? args)
+    {
+        if (step == null || s_footStepFindBestMethod == null)
+        {
+            return -1;
+        }
+        try
+        {
+            return s_footStepFindBestMethod.Invoke(step, args) is int index ? index : -1;
+        }
+        catch (Exception ex)
+        {
+            Disguise.LogError($"Cannot call FootStep.FindBestStepEffect: {ex.Message}");
+            return -1;
         }
     }
 
