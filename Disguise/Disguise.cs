@@ -115,6 +115,10 @@ public class Disguise : BaseUnityPlugin
 
     public void Update()
     {
+        // Frame time of the window "disguise perf" reports: five float operations, no
+        // allocation - the meter must not become part of the cost it measures.
+        FrameMeter.Sample(Time.unscaledDeltaTime);
+
         // Runs every frame on both sides: ends the observer-refresh window (owner) and
         // guarantees the fake relay position can never outlive its safety timeout (server).
         ObserverRefresh.TickObserverRefresh();

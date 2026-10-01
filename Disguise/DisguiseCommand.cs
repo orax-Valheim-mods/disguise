@@ -27,7 +27,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | list [filter] | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | perf | list [filter] | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -49,7 +49,7 @@ internal static class DisguiseCommand
     private static List<string> DisguiseOptions()
     {
         List<string> options =
-            new() { "status", "help", "enable", "disable", "refresh", "view", "list" };
+            new() { "status", "help", "enable", "disable", "refresh", "view", "perf", "list" };
         try
         {
             string current = DisguiseConfig.ConfigCreature.Value;
@@ -99,6 +99,16 @@ internal static class DisguiseCommand
 
             case "view":
                 SetOwnView(ctx, args.Length > 2 ? args[2] : null);
+                break;
+
+            case "perf":
+                string? frameTime = FrameMeter.Report();
+                Say(
+                    ctx,
+                    frameTime != null
+                        ? $"[Disguise] Frame time: {frameTime} - window reset."
+                        : "[Disguise] No frames measured yet."
+                );
                 break;
 
             case "set":
@@ -152,6 +162,7 @@ internal static class DisguiseCommand
         Say(ctx, "  disguise disable          disable it: you become a normal viking again");
         Say(ctx, "  disguise refresh          force other players to re-create your object now");
         Say(ctx, "  disguise view [on|off]    show the creature on your own screen (local only)");
+        Say(ctx, "  disguise perf             frame time of the last few seconds (resets it)");
         Say(ctx, "  disguise help             show this help");
         Say(ctx, "  Config file: BepInEx\\config\\orax.Disguise.cfg");
         Say(ctx, "  Install on the dedicated server AND on your PC only, never for other players.");

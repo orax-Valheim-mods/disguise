@@ -18,6 +18,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | `disguise enable` / `disguise disable` | Toggle the disguise |
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
 | `disguise view [on|off]` | Show the creature on your own screen instead of your viking (local only) |
+| `disguise perf` | Frame time of the last few seconds: avg / min / max in ms and FPS (resets the window) |
 | `disguise status` | Current state (creature, marker, save protection) |
 
 ## Configuration

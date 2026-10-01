@@ -92,6 +92,7 @@ In game, open the console with **F5**:
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
 | `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
+| `disguise perf` | Frame time of the window since the previous call: avg / min / max in ms and FPS (the window resets at every report) |
 | `disguise help` | List of the available commands (`disguise ?` also works) |
 
 The console tab-completion suggests the sub-commands.
@@ -158,6 +159,15 @@ ten times a second rather than every frame - nothing in the game re-enables one 
 one transform copy per frame. The clone carries no equipment either: with
 `HideHeldItems = false` the other machines still render your held item on the creature while
 your own screen shows none, so enable that option too for a perfect match.
+
+**Measuring what it costs** - `disguise perf` reports the frame time of the window since the
+previous call (average / min / max in ms, plus FPS) and then resets it. Take three readings
+of about five seconds in the same spot to separate this mod's own cost from the clone's:
+`disguise view off` (your baseline), `disguise view on` with the disguise **off** (our code
+running, no clone, nothing hidden), then `disguise view on` with `disguise set <creature>`
+(the whole feature). The second reading should sit within noise of the first one - the
+difference between the third and the second is what the clone costs on your screen, which is
+exactly what the other machines pay to render you.
 
 ---
 
