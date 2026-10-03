@@ -51,6 +51,14 @@ public class Disguise : BaseUnityPlugin
     /// </summary>
     public const string RefreshKey = "cd_refresh";
 
+    /// <summary>
+    /// Int bitmask written by the OWNER of a disguised player: which equipment the other
+    /// machines must hide (see EquipmentMask). A relaying server masks what this value says
+    /// and only falls back to its own [3 - Display] config when the key is absent - that is,
+    /// when the owner runs no DLL (a disguise kept in the save, server alone).
+    /// </summary>
+    public const string HideKey = "cd_hide";
+
     internal static Harmony? PatchHarmony;
 
     private static Disguise? s_instance;
@@ -174,6 +182,12 @@ public class Disguise : BaseUnityPlugin
         }
 
         DisguiseApplier.ApplyTo(zdo, "reassert");
+
+        // The owner publishes which equipment must stay hidden from the others: relaying
+        // servers mask according to this value instead of their own [3 - Display] config
+        // (whose defaults would hide the gear whatever your client says). Set() only bumps
+        // the DataRevision when the mask really changes, so the steady state is free.
+        EquipmentMask.PublishMask(zdo);
     }
 
     public void LateUpdate()

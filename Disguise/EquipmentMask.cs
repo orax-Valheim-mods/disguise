@@ -22,6 +22,12 @@ namespace Disguise;
 ///  - VisEquipment.UpdateEquipmentVisuals restores the real values around the call, so the
 ///    machines running this DLL keep rendering your gear.
 ///
+/// WHO decides: the OWNER publishes its choice as a bitmask in its own ZDO (Disguise.HideKey,
+/// written by PublishMask). The server relaying the packet follows that value instead of its
+/// own [3 - Display] config, whose defaults (Hide* = true) would otherwise hide your gear no
+/// matter what your client says. The local config is only the fallback for an owner running
+/// no DLL at all (a disguise kept in the save, restored by the server alone).
+///
 /// Every swap goes through ZDOExtraData.Set, which does NOT bump the DataRevision, and the
 /// save path writes straight into its snapshot: the ZDO state - and therefore the game
 /// logic, the other packets and your own view - is never modified.
@@ -38,6 +44,17 @@ internal static class EquipmentMask
     private const int OptCape = 3;
 
     private const int OptHeld = 4;
+
+    // The same options as the bitmask published in the ZDO under Disguise.HideKey.
+    private const int BitHelmet = 1 << OptHelmet;
+
+    private const int BitChest = 1 << OptChest;
+
+    private const int BitLegs = 1 << OptLegs;
+
+    private const int BitCape = 1 << OptCape;
+
+    private const int BitHeld = 1 << OptHeld;
 
     /// <summary>Game keys read by VisEquipment - one row per hidden item.</summary>
     private static readonly int[] s_vanillaKeys =
@@ -91,15 +108,66 @@ internal static class EquipmentMask
 
     private static int Key(string name) => StringExtensionMethods.GetStableHashCode(name);
 
-    /// <summary>True as soon as one "hide" option is enabled.</summary>
-    internal static bool IsAnyOptionEnabled()
+    // ------------------------------------------------------------------ display decision
+
+    /// <summary>
+    /// The equipment this machine asks the others to hide, as a bitmask: 0 when the disguise
+    /// is off or every "hide" option is unchecked.
+    /// </summary>
+    internal static int BuildMask()
     {
-        return OptionEnabled(OptHelmet)
-            || OptionEnabled(OptChest)
-            || OptionEnabled(OptLegs)
-            || OptionEnabled(OptCape)
-            || OptionEnabled(OptHeld);
+        if (
+            !DisguiseConfig.ConfigEnabled.Value
+            || PrefabResolver.DesiredPrefabHash() == PrefabResolver.PlayerPrefabHash
+        )
+        {
+            return 0;
+        }
+
+        int mask = 0;
+        if (OptionEnabled(OptHelmet))
+        {
+            mask |= BitHelmet;
+        }
+        if (OptionEnabled(OptChest))
+        {
+            mask |= BitChest;
+        }
+        if (OptionEnabled(OptLegs))
+        {
+            mask |= BitLegs;
+        }
+        if (OptionEnabled(OptCape))
+        {
+            mask |= BitCape;
+        }
+        if (OptionEnabled(OptHeld))
+        {
+            mask |= BitHeld;
+        }
+        return mask;
     }
+
+    /// <summary>
+    /// Writes the choice into the local player ZDO. The owner is the only machine allowed to
+    /// decide, and a reassert publishes it every ReassertSeconds: ZDO.Set bumps the
+    /// DataRevision only when the value actually changes, so the steady state is free.
+    /// </summary>
+    internal static void PublishMask(ZDO? zdo)
+    {
+        if (zdo == null || !zdo.IsValid())
+        {
+            return;
+        }
+        int mask = BuildMask();
+        if (zdo.GetInt(Disguise.HideKey, -1) != mask)
+        {
+            zdo.Set(Disguise.HideKey, mask);
+        }
+    }
+
+    /// <summary>The mask published by the owner, or -1 when the owner never published one.</summary>
+    private static int OwnerMask(ZDO zdo) => zdo.GetInt(Disguise.HideKey, -1);
 
     private static bool OptionEnabled(int option)
     {
@@ -135,7 +203,15 @@ internal static class EquipmentMask
         {
             return false;
         }
-        if (!DisguiseConfig.ConfigEnabled.Value || !IsAnyOptionEnabled())
+        // What gets hidden is the OWNER's decision (Disguise.HideKey). This machine - the
+        // owner itself, the server relaying the packet, any observer - follows it, and only
+        // falls back on its own config when the owner runs no DLL and published nothing.
+        int mask = OwnerMask(zdo);
+        if (mask < 0)
+        {
+            mask = BuildMask();
+        }
+        if (mask == 0)
         {
             return false;
         }
@@ -146,7 +222,7 @@ internal static class EquipmentMask
         {
             for (int i = 0; i < s_vanillaKeys.Length; i++)
             {
-                if (!OptionEnabled(s_option[i]))
+                if ((mask & (1 << s_option[i])) == 0)
                 {
                     continue;
                 }
@@ -276,17 +352,13 @@ internal static class EquipmentMask
     // ------------------------------------------------------------------ config binding
 
     /// <summary>
-    /// A "hide" option changed while you are disguised: the other machines still hold the
-    /// state of the last packet, so bump the DataRevision to send the current one now.
+    /// A "hide" option changed while you are disguised: publishing the new mask bumps the
+    /// DataRevision, so the relaying server and the other clients receive the current
+    /// equipment values right away instead of keeping the state of the last packet.
     /// </summary>
     internal static void OnSettingChanged()
     {
-        ZDO? zdo = GameAccess.GetLocalPlayerZDO();
-        if (zdo == null || !zdo.IsValid() || !DisguiseApplier.HasMarker(zdo))
-        {
-            return;
-        }
-        GameAccess.BumpDataRevision(zdo);
+        PublishMask(GameAccess.GetLocalPlayerZDO());
     }
 
     // ------------------------------------------------------------------ internals

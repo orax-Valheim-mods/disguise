@@ -135,6 +135,14 @@ them back for the modded machines, which therefore keep rendering your gear. Not
 ever persisted masked and no extra traffic is produced (the swap does not bump the ZDO
 revision). `Hide*` changes are re-sent immediately while you are disguised.
 
+**Who decides**: the choice travels with you. Your client writes the selected options as a
+bitmask in **your own ZDO** (`cd_hide`, republished every `ReassertSeconds`), and every
+machine relaying your packets masks according to *that* value. A dedicated server therefore
+hides exactly what **you** asked for: its own `3 - Display` section is only the fallback for
+a player whose client has no DLL at all (a disguise kept in the save, server alone), never
+an override. Without this, the server's defaults (`Hide* = true`) would hide your gear on
+every other client no matter what your config says.
+
 These options can also be changed in game with `disguise enable` / `disable` / `set`.
 
 **Own view section** (`4 - Own view`, `SeeYourDisguise`, `false` by default) - what **you**
@@ -382,7 +390,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 53   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 55   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -405,6 +413,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | Fake position warning in the server log | `Observer refresh flag still set after 5 s`: owner vanished mid-refresh; it stopped by itself |
 | An enemy name + health bar stays on screen (even after `disguise disable`), and the log fills with `NullReferenceException` on `EnemyHud.TestShow` / `Character.IsTamed` | A game component survived the clone's strip: the clone has to be discarded, not activated (§ 2, own view). Deploy a current DLL (§ 6) and **restart the game** - a dead entry already in `Character.s_characters` is not healed at runtime |
 | `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
+| Your equipment is invisible to the other players although every `Hide*` option is `false` | A relaying server running an **older** DLL masks with its own `[3 - Display]` config (`Hide* = true` by default): deploy the current build on the server and restart it (§ 1.b). Since `cd_hide` your own config is the only one that decides |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 

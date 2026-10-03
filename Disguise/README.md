@@ -42,7 +42,10 @@ File: `BepInEx\config\orax.Disguise.cfg`
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.
-Your own view always keeps your equipment.
+Your own view always keeps your equipment. The choice is published in **your** ZDO
+(`cd_hide`): a dedicated server relaying your packets follows it, so your own config is the
+only thing that matters - its `Hide*` defaults are just a fallback for a player whose client
+has no DLL.
 
 `SeeYourDisguise` (also `disguise view`) is the opposite for your own screen only: your
 viking's renderers and cloth are switched off and a purely local, inert copy of the creature

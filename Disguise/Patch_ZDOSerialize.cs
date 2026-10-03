@@ -15,8 +15,9 @@ namespace Disguise;
 /// it costs no extra traffic and never changes the local ZDO state (your own view).
 ///
 /// This runs on every machine owning a disguised ZDO, but also on the server relaying it:
-/// the masking then works even when the owner's client has no DLL (e.g. a disguise kept in
-/// the save).
+/// what gets masked there follows the owner's own choice, published in its ZDO as
+/// Disguise.HideKey - the relaying machine's [3 - Display] config is only the fallback for
+/// an owner whose client has no DLL (e.g. a disguise kept in the save), never an override.
 /// </summary>
 [HarmonyPatch(typeof(ZDO), nameof(ZDO.Serialize))]
 internal static class Patch_ZDOSerialize
