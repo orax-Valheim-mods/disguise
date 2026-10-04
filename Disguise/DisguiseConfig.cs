@@ -24,6 +24,7 @@ internal static class DisguiseConfig
 
     // -- 3 - Display: what the OTHER machines see while you are disguised ---------------
     internal static ConfigEntry<bool> ConfigHideHelmet = null!;
+    internal static ConfigEntry<bool> ConfigShowAsAlly = null!;
 
     internal static ConfigEntry<bool> ConfigHideChest = null!;
 
@@ -91,6 +92,8 @@ internal static class DisguiseConfig
         // -- 3 - Display: the equipment hashes live in your ZDO, and VisEquipment attaches
         // those items to whatever prefab carries it - the creature, on a vanilla client.
         // Hiding them removes the misplaced gear, your own view keeps it (see EquipmentMask).
+        // ShowAsAlly is the other half of that display: the health bar EnemyHud draws over
+        // the very same creature (see AllyView).
         ConfigHideHelmet = config.Bind(
             "3 - Display",
             "HideHelmet",
@@ -130,11 +133,22 @@ internal static class DisguiseConfig
                 + "while you are disguised. Your own view keeps them."
         );
 
+        ConfigShowAsAlly = config.Bind(
+            "3 - Display",
+            "ShowAsAlly",
+            false,
+            "Show the creature to the other machines as an ALLY (green health bar) instead of an "
+                + "enemy (red). Only the display changes: EnemyHud asks BaseAI whether your ZDO is "
+                + "an enemy, and this answers no. Their game rules, your own view and your "
+                + "equipment stay exactly as they are."
+        );
+
         ConfigHideHelmet.SettingChanged += HideSettingChanged;
         ConfigHideChest.SettingChanged += HideSettingChanged;
         ConfigHideLegs.SettingChanged += HideSettingChanged;
         ConfigHideCape.SettingChanged += HideSettingChanged;
         ConfigHideHeldItems.SettingChanged += HideSettingChanged;
+        ConfigShowAsAlly.SettingChanged += (_, _) => AllyView.OnSettingChanged();
 
         // -- 4 - Own view: purely local rendering, polled every frame by SelfView.Tick(),
         // so no SettingChanged handler is needed here.

@@ -38,6 +38,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `HideLegs` | `true` | Hide the leggings from the other machines |
 | `HideCape` | `true` | Hide the cape from the other machines |
 | `HideHeldItems` | `false` | Hide the items in your hands and on your back |
+| `ShowAsAlly` | `false` | Show the creature to the others with the green health bar of an ally instead of the red one of an enemy |
 | `SeeYourDisguise` | `false` | Show the creature on your own screen instead of your viking (local only) |
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
@@ -46,6 +47,10 @@ Your own view always keeps your equipment. The choice is published in **your** Z
 (`cd_hide`): a dedicated server relaying your packets follows it, so your own config is the
 only thing that matters - its `Hide*` defaults are just a fallback for a player whose client
 has no DLL.
+
+`ShowAsAlly` travels the same way (`cd_rel`): the other machines draw the green health bar
+of an ally instead of the red one of an enemy, and only that display changes - never your
+own view, the game rules or your equipment.
 
 `SeeYourDisguise` (also `disguise view`) is the opposite for your own screen only: your
 viking's renderers and cloth are switched off and a purely local, inert copy of the creature

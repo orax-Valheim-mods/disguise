@@ -125,6 +125,7 @@ machines only** - your own view always keeps your equipment.
 | `HideLegs` | `true` | Hide the leggings |
 | `HideCape` | `true` | Hide the cape |
 | `HideHeldItems` | `false` | Hide the items in your hands and on your back |
+| `ShowAsAlly` | `false` | Draw the creature with the **green** health bar of an ally instead of the red one of an enemy |
 
 How it works (`EquipmentMask`): the real hashes always stay in your ZDO, they are only
 **swapped out of the packet** while `ZDO.Serialize` runs (the vanilla key carries `0`, the
@@ -142,6 +143,17 @@ hides exactly what **you** asked for: its own `3 - Display` section is only the 
 a player whose client has no DLL at all (a disguise kept in the save, server alone), never
 an override. Without this, the server's defaults (`Hide* = true`) would hide your gear on
 every other client no matter what your config says.
+
+**The health bar follows the same rule** (`ShowAsAlly`, `AllyView`): `EnemyHud` asks
+`BaseAI.IsEnemy(the player looking, your ZDO)` whether to draw the red bar of an enemy or
+the green one of an ally, and the only answer that function can read from your ZDO is the
+tamed flag - an int, so an explicit `1` / `0` does reach a vanilla client. Your client
+publishes the choice as `cd_rel`, and every machine serializing your ZDO writes it into
+the packet and restores the previous value right after: the stored ZDO, the save file and
+your own view never carry it. A modded machine also drops the flag on arrival, since it
+renders a real `Player` whose bar is already the ally one - only a vanilla client, the one
+drawing the creature, keeps it. Your relaying server follows `cd_rel` exactly like
+`cd_hide`, its own `ShowAsAlly` being the fallback for an owner running no DLL.
 
 These options can also be changed in game with `disguise enable` / `disable` / `set`.
 
@@ -344,10 +356,11 @@ both locations:
 
 Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file**:
 
-- `Disguise.cs` - the plugin class: constants (`PluginGUID`, `cd_disguise`, `cd_refresh`),
-  the log helpers and the lifecycle (`Awake` / `OnDestroy` / `Update`), which wires the
-  other classes together. Everything it does not share stays `private`.
-- `DisguiseConfig.cs` - the eleven settings and their binding to `orax.Disguise.cfg`.
+- `Disguise.cs` - the plugin class: constants (`PluginGUID`, `cd_disguise`, `cd_refresh`,
+  `cd_hide`, `cd_rel`), the log helpers and the lifecycle (`Awake` / `OnDestroy` /
+  `Update`), which wires the other classes together. Everything it does not share stays
+  `private`.
+- `DisguiseConfig.cs` - the twelve settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`).
@@ -358,14 +371,19 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `EquipmentMask.cs` - the equipment display options (`3 - Display`): swaps the equipment
   hashes out of the outgoing packet, out of the save file, and back into the frame the
   modded machines render (§ 2).
+- `AllyView.cs` - the other half of `3 - Display`: publishes the health-bar relation
+  (`cd_rel`) and writes it into `ZDOVars.s_tamed` for the duration of the packet, so a
+  vanilla client draws your creature as an ally or as an enemy (§ 2).
 - `ObserverRefresh.cs` - the `cd_refresh` window and the fake far-away position the
   modded server relays during it.
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
-  `Patch_ZDOSerialize.cs`, `Patch_ZDOSaveEquipment.cs`, `Patch_VisEquipment.cs` - the
-  eleven Harmony patches, one `internal static` top-level class each. They reach the
+  `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
+  `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`,
+  `Patch_FootStepRPCStep.cs` - the fourteen Harmony patches, one `internal static`
+  top-level class each. They reach the
   features through the `internal` members of the classes above (fields they swap in/out
   during `SendZDOs`, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
   through `Disguise.LogError(...)` - `s_instance` itself never leaves the plugin class.
@@ -390,7 +408,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 55   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 56   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -414,6 +432,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | An enemy name + health bar stays on screen (even after `disguise disable`), and the log fills with `NullReferenceException` on `EnemyHud.TestShow` / `Character.IsTamed` | A game component survived the clone's strip: the clone has to be discarded, not activated (§ 2, own view). Deploy a current DLL (§ 6) and **restart the game** - a dead entry already in `Character.s_characters` is not healed at runtime |
 | `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
 | Your equipment is invisible to the other players although every `Hide*` option is `false` | A relaying server running an **older** DLL masks with its own `[3 - Display]` config (`Hide* = true` by default): deploy the current build on the server and restart it (§ 1.b). Since `cd_hide` your own config is the only one that decides |
+| Your creature keeps the red enemy bar although `ShowAsAlly = true` | `cd_rel` is published by the client running the mod: restart **that** client with the current build (§ 6). An older server DLL is harmless here, it relays the flag exactly as it receives it |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 

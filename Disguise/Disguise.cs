@@ -59,6 +59,14 @@ public class Disguise : BaseUnityPlugin
     /// </summary>
     public const string HideKey = "cd_hide";
 
+    /// <summary>
+    /// Int flag written by the OWNER of a disguised player: how the other machines must
+    /// display it (0 = enemy with a red health bar, 1 = ally with a green one - see
+    /// AllyView). Relaying machines follow this value instead of their own ShowAsAlly
+    /// config, which is only the fallback for an owner running no DLL.
+    /// </summary>
+    public const string RelationKey = "cd_rel";
+
     internal static Harmony? PatchHarmony;
 
     private static Disguise? s_instance;
@@ -188,6 +196,11 @@ public class Disguise : BaseUnityPlugin
         // (whose defaults would hide the gear whatever your client says). Set() only bumps
         // the DataRevision when the mask really changes, so the steady state is free.
         EquipmentMask.PublishMask(zdo);
+
+        // Same rule for the health bar: the owner publishes the relation it wants to be
+        // seen with, relaying machines write it into the packet and restore it right after
+        // (AllyView) - their own ShowAsAlly config only ever is the fallback.
+        AllyView.Publish(zdo);
     }
 
     public void LateUpdate()

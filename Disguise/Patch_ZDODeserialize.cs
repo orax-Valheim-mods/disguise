@@ -22,6 +22,14 @@ internal static class Patch_ZDODeserialize
             {
                 return;
             }
+            if (DisguiseApplier.HasMarker(__instance))
+            {
+                // The health-bar relation is a display value for the VANILLA machines only
+                // (AllyView): a modded machine renders a real Player here, whose bar is
+                // already the ally one, so the flag is dropped instead of stored - which
+                // also keeps it out of the save file.
+                AllyView.ClearStored(__instance);
+            }
             if (ZNet.instance == null || !ZNet.instance.IsServer())
             {
                 return;
