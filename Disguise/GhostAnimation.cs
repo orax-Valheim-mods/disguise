@@ -94,6 +94,22 @@ internal static class GhostAnimation
         }
     }
 
+    /// <summary>
+    /// Plays one broadcast trigger on the clone (Patch_SetTrigger). The clone has no
+    /// ZNetView, hence no SetTrigger RPC and no echo: this is the only way a trigger - a
+    /// swing, a jump, a stagger - ever reaches it, and the name has already been resolved
+    /// against the creature's own controller by CreatureTriggers.
+    /// </summary>
+    internal static void SetTrigger(string? name)
+    {
+        Animator? animator = s_animator;
+        if (animator == null || !animator || string.IsNullOrEmpty(name))
+        {
+            return;
+        }
+        animator.SetTrigger(name!);
+    }
+
     /// <summary>Applies one frame of ZDO-driven animation to the clone.</summary>
     internal static void Apply(ZDO zdo)
     {

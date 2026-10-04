@@ -198,7 +198,11 @@ off - by an inert local clone of the creature, so your screen renders one charac
 vanilla client renders. That comes from your position, your rotation, and the animation
 parameters read from your own ZDO (a creature animates mostly in its idle pose on a vanilla
 client, because its sync list and the viking's only partly match - `GhostAnimation` reproduces
-exactly that). Console command: `disguise view [on|off]`, which switches it on the spot.
+exactly that) **plus the triggers**, which travel as a bare RPC and would never reach a clone
+that carries no `ZNetView` at all: `Patch_SetTrigger` hands them over, already resolved
+against the creature's own controller (`CreatureTriggers`), so your own screen swings, jumps
+and staggers with the creature like everyone else. Console command: `disguise view [on|off]`,
+which switches it on the spot.
 
 The clone is **purely local**: no ZDO, no collision, no AI, no network component.
 `GhostFactory` builds it from a prefab deactivated for the duration of the instantiation,
@@ -283,9 +287,20 @@ save file (`ZDO.Save`). The chosen prefab determines **what each client instanti
 Visual synchronisation on vanilla clients:
 
 - **Position**: yes, through `ZSyncTransform` (the creature follows you everywhere).
-- **Animations**: partial. `ZSyncAnimation` synchronises a list of parameters specific to
-  each prefab; the viking and creature parameter names only partly match. Common result:
-  the creature moves but stays in an idle pose.
+- **Animations**: partial, and bridged for melee attacks. `ZSyncAnimation.SetTrigger`
+  carries no name at all inside the ZDO: it broadcasts the raw **parameter name**, and each
+  machine applies it to the animator of the object *it* built for that ZDO - a real `Player`
+  here, the creature on a vanilla machine. A name the creature's controller does not have is
+  dropped without a trace (`ZSyncAnimation.Awake` sets `Animator.logWarnings = false`),
+  which is why a goblin never played `swing_axe0`, `knife_stab1` or `bow_fire`: `goblin_animator`
+  only knows `jump`, `spear_throw`, `stagger`, `swing_longsword` and `wakeup`.
+  `Patch_SetTrigger` therefore sends such a melee attack a **second time**, under a name the
+  creature really has (picked by `CreatureTriggers`, e.g. `swing_longsword` for a goblin) and
+  chosen so that `Player_animator` does not know it either: a machine rendering a viking
+  drops the second name exactly as the vanilla machine drops the first, nothing is rewritten
+  on reception, and your own character never changes. Everything else is untouched: the
+  parameters both controllers share (movement, `jump`, `stagger`...) arrive as they always
+  did, the rest is left to vanilla (§ 4.7).
 - **Name above the head**: no, vanilla clients have no `Player` component for you (the
   server player list does display your name).
 
@@ -338,6 +353,26 @@ Visual synchronisation on vanilla clients:
    it, so each vanilla observer logs one `Failed to find rpc method <hash>` per death (a
    warning, no exception). The broadcast is deliberately left alone: machines running
    this DLL hold a real `Player` for you and need it (`RPC_OnDeath` hides your visual).
+
+7. **Only some of your animations reach the creature** (`Patch_SetTrigger`).
+   - **Played**: every trigger whose name both controllers share (movement, `jump`,
+     `stagger`, `wakeup`, `spear_throw`...), plus **melee attacks**, which are re-sent
+     under the creature's own attack name (`swing_longsword` for a goblin). The creature
+     is then animated from *your* swing.
+   - **Not played**: ranged attacks (`bow_fire`, `crossbow_fire`, `staff_*`...), a
+     cancellation (`attack_abort`), the build-tool swings (placing, removing or repairing
+     with the Hammer / Hoe / Cultivator), and gestures the creature has no equivalent for
+     (`dodge`, `eat`, `interact`, `equip_hip`, `gpower`...) - the vanilla machine drops
+     them silently, exactly as it drops any unknown parameter, and so it did before this
+     mod existed. If the creature has no melee attack trigger the viking can borrow,
+     nothing extra is sent either.
+   - **Emotes never had a chance** on a vanilla observer, and this mod does not change
+     that: they are not triggers at all but ZDO keys (`emote` / `emoteID`) played by
+     `Player.UpdateEmote`, which a vanilla machine has no reason to run for you while you
+     are a creature.
+   - This costs **nothing on the other side**: the bridge is sent by the disguised
+     player's own client, so only *that* client has to run a current build (§ 6). No
+     vanilla client and no server DLL is involved.
 
 ---
 
@@ -417,13 +452,16 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `FakePosition.cs` - the fake map position (`disguise setFakePosition`): what the owner
   publishes (`cd_fake` / `cd_fpos`), and the swap the server runs over the player list
   before it writes it, always restored right after (§ 2).
+- `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
+  creature's own controller (and against `Player_animator`, so the companion name can only
+  ever be played by the creature), used by `Patch_SetTrigger`.
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
   `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
-  `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`,
-  `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the fifteen Harmony patches, one
+  `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`, `Patch_SetTrigger.cs`,
+  `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the sixteen Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
@@ -449,7 +487,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 63   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 65   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -474,6 +512,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
 | Your equipment is invisible to the other players although every `Hide*` option is `false` | A relaying server running an **older** DLL masks with its own `[3 - Display]` config (`Hide* = true` by default): deploy the current build on the server and restart it (§ 1.b). Since `cd_hide` your own config is the only one that decides |
 | Your creature keeps the red enemy bar although `ShowAsAlly = true` | `cd_rel` is published by the client running the mod: restart **that** client with the current build (§ 6). An older server DLL is harmless here, it relays the flag exactly as it receives it |
+| Your creature stands still while you swing (its attack never plays) | The bridge is sent by **the disguised player's own client** (§ 3): deploy a current build there and restart it (§ 6) - no other client and no server DLL is involved. Ranged weapons and gestures have no creature equivalent and never animated (§ 4.7) |
 | The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
