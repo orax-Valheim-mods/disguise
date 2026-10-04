@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace Disguise;
@@ -27,7 +28,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | perf | list [filter] | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | setFakePosition | perf | list [filter] | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -49,7 +50,18 @@ internal static class DisguiseCommand
     private static List<string> DisguiseOptions()
     {
         List<string> options =
-            new() { "status", "help", "enable", "disable", "refresh", "view", "perf", "list" };
+            new()
+            {
+                "status",
+                "help",
+                "enable",
+                "disable",
+                "refresh",
+                "view",
+                "setFakePosition",
+                "perf",
+                "list",
+            };
         try
         {
             string current = DisguiseConfig.ConfigCreature.Value;
@@ -99,6 +111,10 @@ internal static class DisguiseCommand
 
             case "view":
                 SetOwnView(ctx, args.Length > 2 ? args[2] : null);
+                break;
+
+            case "setfakeposition":
+                SetFakePosition(ctx, args);
                 break;
 
             case "perf":
@@ -162,6 +178,10 @@ internal static class DisguiseCommand
         Say(ctx, "  disguise disable          disable it: you become a normal viking again");
         Say(ctx, "  disguise refresh          force other players to re-create your object now");
         Say(ctx, "  disguise view [on|off]    show the creature on your own screen (local only)");
+        Say(
+            ctx,
+            "  disguise setFakePosition  fake the position the others see on their map ([x z] | off)"
+        );
         Say(ctx, "  disguise perf             frame time of the last few seconds (resets it)");
         Say(ctx, "  disguise help             show this help");
         Say(ctx, "  Config file: BepInEx\\config\\orax.Disguise.cfg");
@@ -258,6 +278,120 @@ internal static class DisguiseCommand
         }
     }
 
+    /// <summary>
+    /// "disguise setFakePosition [x z | off]": decides what the OTHER maps display as your
+    /// position. Without an argument the position you are standing on is recorded, so the
+    /// others keep seeing you there while you actually move; two numbers are a point of the
+    /// map plane (X and Z, your current height is kept); "off" shows the real position
+    /// again. Only the player list the server broadcasts moves (FakePosition) - your
+    /// character, the ZDO, your own screen and the world save stay at the real position,
+    /// and the dedicated server needs this DLL to write the fake into that list.
+    /// </summary>
+    private static void SetFakePosition(Terminal ctx, Terminal.ConsoleEventArgs args)
+    {
+        if (args.Length >= 3 && IsOffArgument(args[2]))
+        {
+            FakePosition.Clear();
+            PublishFakePosition(ctx);
+            Say(
+                ctx,
+                "[Disguise] Fake map position removed: the other maps show your real position again."
+            );
+            return;
+        }
+
+        Vector3 position;
+        if (args.Length >= 4)
+        {
+            if (
+                !TryParseMapCoordinate(args[2], out float x)
+                || !TryParseMapCoordinate(args[3], out float z)
+            )
+            {
+                PrintFakePositionUsage(ctx);
+                return;
+            }
+            position = new Vector3(x, CurrentHeight(), z);
+        }
+        else if (args.Length == 2)
+        {
+            if (Player.m_localPlayer == null)
+            {
+                Say(
+                    ctx,
+                    "[Disguise] No local player (main menu): nothing to record, "
+                        + "use \"disguise setFakePosition <x> <z>\" instead."
+                );
+                return;
+            }
+            position = Player.m_localPlayer.transform.position;
+        }
+        else
+        {
+            PrintFakePositionUsage(ctx);
+            return;
+        }
+
+        FakePosition.Set(position);
+        PublishFakePosition(ctx);
+        Say(
+            ctx,
+            $"[Disguise] Fake map position: ({position.x:0.0}, {position.z:0.0}) - the other maps show you there "
+                + "while you keep moving normally (needs this DLL on the dedicated server)."
+        );
+        Say(
+            ctx,
+            "Your character and your own screen never move: only the position the others see on their map does."
+        );
+    }
+
+    private static void PrintFakePositionUsage(Terminal ctx)
+    {
+        Say(
+            ctx,
+            "Usage: disguise setFakePosition          record where you stand and show it to the others"
+        );
+        Say(
+            ctx,
+            "       disguise setFakePosition <x> <z>  use that point of the map plane (X and Z)"
+        );
+        Say(ctx, "       disguise setFakePosition off      show your real position again");
+    }
+
+    private static bool IsOffArgument(string value)
+    {
+        string word = value.ToLowerInvariant();
+        return word == "off" || word == "clear" || word == "none" || word == "disable";
+    }
+
+    private static bool TryParseMapCoordinate(string text, out float value)
+    {
+        // InvariantCulture first (the game writes "10.5"), then the current culture, so
+        // that "10,5" is also accepted on a French keyboard.
+        if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+        {
+            return true;
+        }
+        return float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
+    }
+
+    /// <summary>The height at this very moment: only X and Z are asked for, Y is carried over.</summary>
+    private static float CurrentHeight()
+    {
+        return Player.m_localPlayer != null ? Player.m_localPlayer.transform.position.y : 0f;
+    }
+
+    private static void PublishFakePosition(Terminal ctx)
+    {
+        ZDO? zdo = GameAccess.GetLocalPlayerZDO();
+        if (zdo == null || !zdo.IsValid())
+        {
+            Say(ctx, "Note: no local player right now, it is published when you spawn.");
+            return;
+        }
+        FakePosition.Publish(zdo);
+    }
+
     private static void PrintStatus(Terminal ctx)
     {
         ZDO? zdo = GameAccess.GetLocalPlayerZDO();
@@ -277,6 +411,12 @@ internal static class DisguiseCommand
         Say(
             ctx,
             $"  Own view on your screen: {(DisguiseConfig.ConfigSeeYourDisguise.Value ? "on" : "off")} (disguise view)"
+        );
+        Say(
+            ctx,
+            FakePosition.Current is Vector3 fakePosition
+                ? $"  Fake map position: ({fakePosition.x:0.0}, {fakePosition.z:0.0}) - the other maps show you there"
+                : "  Fake map position: off (the other maps show your real position)"
         );
         if (zdo != null && zdo.IsValid())
         {

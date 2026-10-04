@@ -42,6 +42,7 @@ no mod). What the server DLL adds:
 | Automatic observer refresh after a change (§ 3, step 5) | **yes** (~`RefreshHoldSeconds`) | **no**: they keep your old look until they move ~100 m away from you, until a reconnect on either side - and `disguise refresh` does nothing |
 | `ProtectSaveFile` (§ 2): the world save stores `Player` | yes | **no**: the server is what writes the save, so it stores the creature |
 | Real `Player` object on the server (the `cd_disguise` marker patch) | yes | no: the server instantiates the creature prefab for your player |
+| Fake map position (`disguise setFakePosition`, § 2) | **yes**: the server writes it into the player list it broadcasts | **no**: the other maps keep showing your real position |
 
 > ⚠️ Without the server DLL, run **`disguise disable` before stopping / saving the server**
 > (§ 5): `ProtectSaveFile` does not exist there, so the creature would be written to the
@@ -92,10 +93,44 @@ In game, open the console with **F5**:
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
 | `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
+| `disguise setFakePosition [x z \| off]` | Show a **fake position** on the other players' map: no argument records where you stand, `off` shows the real one again (needs the DLL on the server, § 1.b) |
 | `disguise perf` | Frame time of the window since the previous call: avg / min / max in ms and FPS (the window resets at every report) |
 | `disguise help` | List of the available commands (`disguise ?` also works) |
 
 The console tab-completion suggests the sub-commands.
+
+### Fake map position (`disguise setFakePosition`)
+
+Valheim carries a player's position over **two unrelated channels**, and the map does not
+use the ZDO one: `ZNet.SendPlayerList` broadcasts a player list fed by the reference
+position each machine reports, and `Minimap.UpdatePlayerPins` draws the pin of another
+player from it (`GetOtherPublicPlayers` has no other reader). The command fakes **that**
+list - on the server, for the duration of the write:
+
+- `disguise setFakePosition` records the position you are standing on: the others keep
+  seeing you there while you actually move away;
+- `disguise setFakePosition 10 20` uses that point of the map plane (X and Z; your current
+  height is carried over - a map pin only draws X and Z);
+- `disguise setFakePosition off` shows your real position again (`clear`, `none` and
+  `disable` are accepted too);
+- `disguise status` shows the published value.
+
+Like `cd_hide` / `cd_rel` (**the owner decides**), the choice travels in your own ZDO
+(`cd_fake` + `cd_fpos`, republished every `ReassertSeconds`, and disabled by writing an
+explicit `0`, never by removing the key - § 3, step 5). The modded server then writes it
+into the player list it broadcasts, and **only into that packet**: the ZDO position,
+`peer.m_refPos` (what the server uses to decide which ZDOs a peer receives,
+`ZDOMan.CreateSyncList`), the save file and **your own screen** all keep the real
+position. Your character stays exactly where it really is - only the pin on the other
+maps moves.
+
+> ⚠️ The dedicated server must run this DLL (§ 1.b): without it nobody can write the fake
+> into the player list, and the other maps simply keep your real position. It only
+> replaces something while your position is shared at all - the *public position*
+> checkbox of the enlarged map: with it off, no pin of you is drawn anywhere, fake or
+> real. And it is session state: restarting **your** game drops it (the flag is published
+> back as `0` on the next join), while `disguise setFakePosition off` clears it on the
+> spot. It works whether or not the disguise itself is enabled.
 
 ### Configuration (`.cfg` file)
 
@@ -314,9 +349,12 @@ Procedure:
 
 1. On your PC: `disguise disable` in the F5 console (your player becomes `Player` in the
    ZDO again, the marker is removed).
-2. Let the server run one save cycle (or restart the server).
-3. Check with `disguise status` that the prefab is `Player`.
-4. Only then, remove the DLL from every location where you installed it (§ 1).
+2. Also run **`disguise setFakePosition off`** if you ever used it: `cd_fake` / `cd_fpos`
+   live in the ZDO like the marker, and a client with no DLL has no command left to clear
+   them - the other maps would keep showing that stale position (§ 2).
+3. Let the server run one save cycle (or restart the server).
+4. Check with `disguise status` that the prefab is `Player` and the fake position is `off`.
+5. Only then, remove the DLL from every location where you installed it (§ 1).
 
 If you delete the DLL directly while `ProtectSaveFile = true`, the save still contains
 `Player`: the world stays playable.
@@ -357,9 +395,9 @@ both locations:
 Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file**:
 
 - `Disguise.cs` - the plugin class: constants (`PluginGUID`, `cd_disguise`, `cd_refresh`,
-  `cd_hide`, `cd_rel`), the log helpers and the lifecycle (`Awake` / `OnDestroy` /
-  `Update`), which wires the other classes together. Everything it does not share stays
-  `private`.
+  `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
+  `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
+  share stays `private`.
 - `DisguiseConfig.cs` - the twelve settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
@@ -376,16 +414,19 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   vanilla client draws your creature as an ally or as an enemy (§ 2).
 - `ObserverRefresh.cs` - the `cd_refresh` window and the fake far-away position the
   modded server relays during it.
+- `FakePosition.cs` - the fake map position (`disguise setFakePosition`): what the owner
+  publishes (`cd_fake` / `cd_fpos`), and the swap the server runs over the player list
+  before it writes it, always restored right after (§ 2).
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
   `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
   `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`,
-  `Patch_FootStepRPCStep.cs` - the fourteen Harmony patches, one `internal static`
-  top-level class each. They reach the
-  features through the `internal` members of the classes above (fields they swap in/out
-  during `SendZDOs`, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
+  `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the fifteen Harmony patches, one
+  `internal static` top-level class each. They reach the features through the `internal`
+  members of the classes above (fields they swap in/out while a packet or the player list
+  is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
   through `Disguise.LogError(...)` - `s_instance` itself never leaves the plugin class.
   `Patch_CreateDestroyObjects` additionally owns the `s_inCreateDestroy` scope flag read
   by `Patch_FindSectorObjects`.
@@ -408,7 +449,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 56   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 63   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -433,6 +474,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
 | Your equipment is invisible to the other players although every `Hide*` option is `false` | A relaying server running an **older** DLL masks with its own `[3 - Display]` config (`Hide* = true` by default): deploy the current build on the server and restart it (§ 1.b). Since `cd_hide` your own config is the only one that decides |
 | Your creature keeps the red enemy bar although `ShowAsAlly = true` | `cd_rel` is published by the client running the mod: restart **that** client with the current build (§ 6). An older server DLL is harmless here, it relays the flag exactly as it receives it |
+| The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 

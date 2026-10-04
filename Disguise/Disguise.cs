@@ -67,6 +67,21 @@ public class Disguise : BaseUnityPlugin
     /// </summary>
     public const string RelationKey = "cd_rel";
 
+    /// <summary>
+    /// Int flag written by the OWNER of a player: 1 while the other maps must display a
+    /// fake position instead of the real one (see FakePosition). Disabled by writing an
+    /// explicit 0, like cd_refresh: a removed key never reaches the server, which would
+    /// keep faking the position forever.
+    /// </summary>
+    public const string FakeKey = "cd_fake";
+
+    /// <summary>
+    /// Vector3 written by the OWNER next to cd_fake: the position the other maps show
+    /// instead of the real one. X and Z are the map plane (Minimap draws those two), Y is
+    /// only carried along so that the stored value stays a sane world position.
+    /// </summary>
+    public const string FakePositionKey = "cd_fpos";
+
     internal static Harmony? PatchHarmony;
 
     private static Disguise? s_instance;
@@ -201,6 +216,12 @@ public class Disguise : BaseUnityPlugin
         // seen with, relaying machines write it into the packet and restore it right after
         // (AllyView) - their own ShowAsAlly config only ever is the fallback.
         AllyView.Publish(zdo);
+
+        // And the same rule for the map: the owner publishes the position the other maps
+        // must display (cd_fake / cd_fpos), the modded server is the one writing it into
+        // the player list it broadcasts (Patch_WritePlayerInfo). Nothing else - the ZDO
+        // position, peer.m_refPos, the save, your own screen - ever moves.
+        FakePosition.Publish(zdo);
     }
 
     public void LateUpdate()
