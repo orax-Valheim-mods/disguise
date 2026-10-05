@@ -61,8 +61,7 @@ what the other machines see.
 
 Copy `Disguise.dll` into:
 
-- `BepInEx\scripts\` - ScriptEngine (Gale game profile)
-- `BepInEx\plugins\` - mod managers and the dedicated server
+- `BepInEx\plugins\`
 
 Full documentation (how it works, build & visibility audit, sources) lives in
 `README.md` at the root of the repository.
