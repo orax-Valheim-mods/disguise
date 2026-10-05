@@ -13,15 +13,22 @@ namespace Disguise;
 /// the AI and the combat with - stays on the ground; only what the other machines DRAW is
 /// raised:
 ///  - your own screen: SelfView adds ViewOffset to the creature clone (SeeYourDisguise);
-///  - every other machine: while the relaying machine writes the outgoing packet,
-///    Patch_ZDOSerializeFlight adds the height to position.y for the duration of that call.
+///  - every other machine: while the relaying machine builds an outgoing packet, the height
+///    published in cd_fly is added to the position that packet carries for that ZDO
+///    (Patch_ZDOGetPosition, for the duration of that one call).
 ///
-/// ZDO.Serialize is the network path only (the save goes through ZDO.Save), and the server's
-/// own position is restored right after the call: neither can ever carry the fake height.
-/// That swap runs only when this machine IS the server - a client sending a raised position
-/// would have the server store it - and only for a ZDO whose prefab is NOT the player one,
-/// so a viking is never drawn in the air. Others therefore see the flight only when this DLL
-/// runs on the server (dedicated server, or your own PC hosting the world).
+/// A position travels on the wire in exactly ONE place: the per-ZDO header that
+/// ZDOMan.SendZDOs writes through ZDO.GetPosition, which the receiver applies with
+/// ZDO.InternalSetPosition before it deserializes the rest of the ZDO. ZDO.Deserialize never
+/// reads a position - the only other writer of one, ZDO.Save, is the save file - so raising
+/// it inside ZDO.Serialize (the body) changes nothing anybody reads. The raise therefore
+/// hands back a raised COPY and mutates nothing: the server's own state, the saves and the
+/// game logic keep the grounded player, and there is no fake position anywhere to restore.
+///
+/// That window is opened only when this machine IS the server - a client sending a raised
+/// position would have the server store it - and only for a ZDO whose prefab is NOT the
+/// player one, so a viking is never drawn in the air. Others therefore see the flight only
+/// when this DLL runs on the server (dedicated server, or your own PC hosting the world).
 /// </summary>
 internal static class FlightControl
 {
@@ -44,10 +51,9 @@ internal static class FlightControl
     private static float s_height;
     private static float s_nextPublishTime;
 
-    // Serialize window (server only, one ZDO at a time): the position that has to be put
-    // back the moment the packet has been written.
-    private static ZDO? s_serializedZdo;
-    private static Vector3 s_serializedPosition;
+    // Outgoing-packet window (server only): true exactly while ZDOMan.SendZDOs is building
+    // the packet, the only place a position leaves this machine. Patch_SendZDOs opens it.
+    private static bool s_sending;
 
     /// <summary>Whether the flight is on (the height can still be 0: flying at ground level).</summary>
     internal static bool IsFlying => s_flying;
@@ -250,66 +256,53 @@ internal static class FlightControl
         zdo.Set(Disguise.FlyKey, centimetres);
     }
 
-    // ------------------------------------------------------------------ server-side swap
+    // ------------------------------------------------------- outgoing packet window
 
     /// <summary>
-    /// Server: raises position.y of the outgoing packet for the duration of ZDO.Serialize,
-    /// so every machine that only renders this player - a vanilla client above all - draws
-    /// the creature in the air. Returns whether the swap really opened (the Finalizer then
-    /// closes it).
+    /// Opens the window for one ZDOMan.SendZDOs call: every position that call asks
+    /// ZDO.GetPosition for may then be raised (Patch_ZDOGetPosition). Only the relaying
+    /// machine opens it - a client sending a raised position would have the server store it.
     /// </summary>
-    internal static bool BeginSerialize(ZDO zdo)
+    internal static void BeginSend()
     {
-        try
-        {
-            if (s_serializedZdo != null)
-            {
-                return false; // defensive: no nested Serialize expected
-            }
-            if (ZNet.instance == null || !ZNet.instance.IsServer())
-            {
-                return false; // a client must never send a raised position
-            }
-            if (zdo.GetPrefab() == PrefabResolver.PlayerPrefabHash)
-            {
-                return false; // not disguised: never raise a viking
-            }
-            int centimetres = zdo.GetInt(Disguise.FlyKey, 0);
-            if (centimetres <= 0 || GameAccess.s_zdoPositionField == null)
-            {
-                return false;
-            }
-            Vector3 position = (Vector3)GameAccess.s_zdoPositionField.GetValue(zdo);
-            s_serializedZdo = zdo;
-            s_serializedPosition = position;
-            position.y += centimetres / 100f;
-            GameAccess.s_zdoPositionField.SetValue(zdo, position);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            s_serializedZdo = null;
-            Disguise.LogError($"Flight serialize (prefix): {ex}");
-            return false;
-        }
+        s_sending = ZNet.instance != null && ZNet.instance.IsServer();
     }
 
-    /// <summary>Puts the real position back: called by the Finalizer, even after an exception.</summary>
-    internal static void EndSerialize()
+    /// <summary>Closes the window: called by the Postfix and by the Finalizer.</summary>
+    internal static void EndSend()
     {
-        ZDO? zdo = s_serializedZdo;
-        s_serializedZdo = null;
-        if (zdo == null || GameAccess.s_zdoPositionField == null)
+        s_sending = false;
+    }
+
+    /// <summary>
+    /// Server, outgoing packet only: adds the height the owner published (cd_fly, in
+    /// centimetres) to the position that goes into the packet header, so every machine that
+    /// only renders this player - a vanilla client above all - draws the creature in the
+    /// air. GetPosition hands out a copy: nothing is written into the ZDO here, hence there
+    /// is nothing to put back.
+    /// </summary>
+    internal static void RaiseSentPosition(ZDO zdo, ref Vector3 position)
+    {
+        if (!s_sending)
         {
             return;
         }
         try
         {
-            GameAccess.s_zdoPositionField.SetValue(zdo, s_serializedPosition);
+            if (zdo.GetPrefab() == PrefabResolver.PlayerPrefabHash)
+            {
+                return; // not disguised: never raise a viking
+            }
+            int centimetres = zdo.GetInt(Disguise.FlyKey, 0);
+            if (centimetres <= 0)
+            {
+                return;
+            }
+            position.y += centimetres / 100f;
         }
         catch (Exception ex)
         {
-            Disguise.LogError($"Flight serialize (restore): {ex}");
+            Disguise.LogError($"Flight raise (outgoing position): {ex}");
         }
     }
 }

@@ -328,15 +328,21 @@ Visual synchronisation on vanilla clients:
   your ZDO - in **centimetres**, because `ZDO.Set` has no float overload in the original
   assembly - and that write is throttled to one per 100 ms so a held key cannot bump the
   DataRevision every frame. Your body itself never moves: the position the server holds, the
-  AI and the combat run on, and the save file writes is the grounded one. The raise happens
-  in the only place that can produce it, the machine relaying your packets, while
-  `ZDO.Serialize` writes them (`Patch_ZDOSerializeFlight`): it adds the height to
-  `position.y` for the duration of that single call and restores the real value right after,
-  exactly like the equipment and the ally flag windows beside it - so the fake lives only as
-  long as one packet is being written and can never reach the game logic or the file. Two
-  gates keep it honest: it runs **only when that machine is the server** (a client sending a
-  raised position would have the server store it), and **only while your prefab really is
-  the creature**, so a viking is never drawn in the air. Without the DLL on the server no
+  AI and the combat run on, and the save file writes is the grounded one. A position travels
+  on the wire in exactly **one** place: the per-ZDO header `ZDOMan.SendZDOs` writes through
+  `ZDO.GetPosition`, which the receiver applies with `ZDO.InternalSetPosition` *before* it
+  deserializes the rest of the ZDO - `ZDO.Deserialize` never reads a position at all (the
+  only other writer of one, `ZDO.Save`, is the save file; `ZDO.Serialize`, the body, carries
+  keys only). The raise is therefore a postfix on that getter, open only while
+  `ZDOMan.SendZDOs` is building a packet (`Patch_ZDOGetPosition`, window opened and closed
+  by `Patch_SendZDOs`): it hands back `y + cd_fly` and **writes nothing**, so the packet
+  header is raised while the stored ZDO is not - no fake position anywhere, nothing to
+  restore, no window that could be left open. Two gates keep it honest: it runs **only when
+  that machine is the server** (a client sending a raised position would have the server
+  store it), and **only while your prefab really is the creature**, so a viking is never
+  drawn in the air. The same getter also sorts a packet that is full by distance
+  (`ServerSortSendZDOS`), so a flying player can sort up to 100 m farther than it is and
+  land in the next packet - never in a different position. Without the DLL on the server no
   machine relays the raise and everybody but you stays on the ground (§ 1.b); on your own
   screen the clone simply gets your height added to your transform once per frame
   (`SelfView`), and a machine running this DLL - which renders you as a real `Player` - sees
@@ -571,8 +577,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   before it writes it, always restored right after (§ 2).
 - `FlightControl.cs` - the flight (`disguise fly`, § 2): the local state (on / off, height),
   the four key chords and their parsing, the throttled publication of the height (`cd_fly`),
-  and the position swap the relaying server opens around `ZDO.Serialize` - restored right
-  after, server only, creature only (§ 3).
+  and the raise the relaying server adds to the outgoing packet header - server only,
+  creature only, handed back as a copy so nothing has to be restored (§ 3).
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
   ever be played by the creature), decides which of the creature's attacks to play (normal
@@ -594,7 +600,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
   `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
   `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`, `Patch_SetTrigger.cs`,
-  `Patch_SetBool.cs`, `Patch_ZDOSerializeFlight.cs`,
+  `Patch_SetBool.cs`, `Patch_ZDOGetPosition.cs`,
   `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the
   nineteen Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
@@ -668,7 +674,7 @@ stays 82.
 | The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
-| You fly on your own screen but nobody else sees you in the air | The raise is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, a vanilla client receives your creature already raised; without it, only your own view flies (`disguise fly on` then `disguise status` to confirm the height is published). An older server DLL simply has no `Patch_ZDOSerializeFlight` yet: deploy the current build and restart it (§ 6) |
+| You fly on your own screen but nobody else sees you in the air | The raise is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, a vanilla client receives your creature already raised; without it, only your own view flies (`disguise fly on` then `disguise status` to confirm the height is published). Two older mistakes produce the same symptom, both fixed by deploying the **current** build on the server and restarting it (§ 6): a server whose DLL predates the flight, or one whose DLL raised the position inside `ZDO.Serialize` - the body of a ZDO, which the receiver never reads for a position |
 | The climb / descent keys do nothing | The flight must be **on** first (`disguise fly on` or `FlyEnableKey`): `FlyUpKey` / `FlyDownKey` only act while it is. Then check the four chords in the `[5 - Flight]` section - an unusable value disables that one binding and writes a `Flight: "..." is not a usable key` warning in the log. An invalid chord never throws |
 | Your own viking stays on the ground while the creature flies | Normal: your body really is on the ground (§ 4.8). Turn `SeeYourDisguise` on (§ 2) to watch the creature fly on your own screen too |
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
