@@ -19,19 +19,24 @@ namespace Disguise;
 /// five triggers (jump, spear_throw, stagger, swing_longsword, wakeup) while an axe sends
 /// swing_axe0, a knife knife_stab1, a bow bow_fire - and Player_animator knows 110.
 ///
-/// So an attack the creature does not know is broadcast a SECOND time, under a name taken
-/// from the creature's own controller and picked so that Player_animator does not know it
-/// either: a machine rendering a Player ignores it as silently as the vanilla machine
-/// ignores the first name, and no machine has to be patched or rewrite anything on
-/// reception. Your own character keeps its animation for the same reason - a trigger only
-/// reaches the object it was broadcast for, and the second name only exists on the creature.
+/// So an attack the creature does not know is broadcast a SECOND time, under the name of
+/// one of the creature's own attacks: its NORMAL one for a normal swing, its SPECIAL one
+/// for a secondary attack (right click) - the two designated by CreatureAttacks from the
+/// creature's weapon pool, with the normal one as the fallback when the pool holds no
+/// special attack. Some of those names are viking names too (every player spear throws
+/// under `spear_throw`, which is also the goblin's special attack), so the second name is
+/// never applied on your own machine: Patch_RPC_SetTrigger drops it there, and only there,
+/// while the clone - your own view - is fed directly by GhostAnimation. Nothing is
+/// rewritten on reception: a machine rendering the creature plays the name it already has,
+/// a machine rendering a viking ignores it, and no machine has to be patched.
 ///
 /// Both reference sets are read from ACTIVE objects: Animator.parameters returns an empty
 /// array while the animator is not active in the hierarchy, and a ZNetScene prefab never is
 /// (m_prefabs holds assets, in no scene at all) - reading them from the prefabs is what
 /// silently kept this bridge from ever sending anything. The player set therefore comes
 /// from the live local player, the creature set from one throwaway activated copy per
-/// creature (GhostFactory.BuildInert).
+/// creature (GhostFactory.BuildInert); the two attack ROLES come from the creature's
+/// serialized weapon pool, which needs neither (CreatureAttacks).
 /// </summary>
 internal static class CreatureTriggers
 {
@@ -98,6 +103,16 @@ internal static class CreatureTriggers
 
     private static HashSet<string> s_creatureTriggers = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The two attack roles of the current creature, designated from its weapon pool
+    /// (CreatureAttacks): what a normal swing plays, what a secondary attack plays. The
+    /// special one is null when the pool has only one attack - both buttons then play the
+    /// normal one, which is exactly what a creature with a single attack can do.
+    /// </summary>
+    private static string? s_normalAttack;
+
+    private static string? s_specialAttack;
+
     private static HashSet<string> s_playerTriggers = new(StringComparer.Ordinal);
 
     private static bool s_playerTriggersRead;
@@ -111,7 +126,7 @@ internal static class CreatureTriggers
     /// decision can be seen; section 7 of the README points at it. Repetitions of an
     /// outcome already reported are dropped, so a session stays at a handful of lines.
     /// </summary>
-    internal static void Trace(string name, bool mine, string? resolved)
+    internal static void Trace(string name, bool mine, string? resolved, string? kind)
     {
         if (mine && resolved == null && !LooksLikeAttack(name))
         {
@@ -133,7 +148,8 @@ internal static class CreatureTriggers
         }
         else
         {
-            outcome = $"sent again as {resolved}";
+            outcome =
+                kind != null ? $"sent again as {resolved} ({kind})" : $"sent again as {resolved}";
         }
         if (s_traced.TryGetValue(name, out string? previous) && previous == outcome)
         {
@@ -144,32 +160,87 @@ internal static class CreatureTriggers
     }
 
     /// <summary>
-    /// The trigger an object rendered as this ZDO's prefab must play, or null when the
-    /// creature has no such animation at all (nothing is sent, nothing is played - exactly
-    /// what vanilla does with a name its animator ignores).
+    /// The trigger an object rendered as this ZDO's prefab must play (with the role it
+    /// plays), or null when the creature has no such animation at all (nothing is sent,
+    /// nothing is played - exactly what vanilla does with a name its animator ignores).
     /// </summary>
-    internal static string? Resolve(ZDO? zdo, string name)
+    internal static (string? trigger, string? kind) Resolve(ZDO? zdo, string name)
     {
         if (zdo == null || string.IsNullOrEmpty(name))
         {
-            return null;
+            return (null, null);
         }
         int hash = zdo.GetPrefab();
         if (hash == 0 || hash == PrefabResolver.PlayerPrefabHash)
         {
-            return null; // not disguised: a vanilla machine renders a Player here
+            return (null, null); // not disguised: a vanilla machine renders a Player here
         }
         if (!ReadPlayerTriggers())
         {
-            return null; // no reference set yet: never risk a name the viking also knows
+            return (null, null); // no reference set yet: never risk a name the viking also knows
         }
         // Cheapest set first: the creature one costs an instantiation (see Probe).
         ReadCreatureTriggers(hash);
         if (s_creatureTriggers.Contains(name))
         {
-            return name; // already valid on the creature, nothing to bridge
+            return (name, null); // already valid on the creature, nothing to bridge
         }
-        return LooksLikeAttack(name) ? PickCompanion(name) : null;
+        if (!LooksLikeAttack(name))
+        {
+            return (null, null);
+        }
+        // Which of the two attacks the viking just used: a secondary attack (right click)
+        // plays the creature's special one, a normal swing its basic one - and the basic one
+        // again when the pool holds no special attack (a boar, a wolf).
+        if (IsSecondaryAttack(name) && s_specialAttack != null)
+        {
+            return (s_specialAttack, "special attack");
+        }
+        if (s_normalAttack != null)
+        {
+            return (s_normalAttack, "normal attack");
+        }
+        // No readable weapon pool (a prefab without Humanoid, an empty pool): the word match
+        // of the original design, still restricted to names the viking does not know.
+        string? companion = PickCompanion(name);
+        return (companion, companion != null ? "word match" : null);
+    }
+
+    /// <summary>
+    /// True when the local player's current weapon produces <paramref name="name"/> with its
+    /// SECONDARY attack (right click). The name is compared with the animation the game
+    /// itself starts (`Humanoid.StartAttack` picks m_secondaryAttack when secondaryAttack is
+    /// set), suffix digits included: Attack.Start appends the chain level and the random
+    /// variant to it. Reading it from the weapon is what covers the secondaries that are not
+    /// called *_secondary at all - every player spear throws under `spear_throw`, the fists
+    /// kick under `unarmed_kick` - while a weapon whose two clicks share one animation (the
+    /// grappling hook) stays a normal attack.
+    /// </summary>
+    private static bool IsSecondaryAttack(string name)
+    {
+        Player? player = Player.m_localPlayer;
+        ItemDrop.ItemData? weapon = player != null ? player.GetCurrentWeapon() : null;
+        if (weapon == null || !weapon.HaveSecondaryAttack())
+        {
+            return false;
+        }
+        string secondary = weapon.m_shared.m_secondaryAttack.m_attackAnimation;
+        if (
+            string.IsNullOrEmpty(secondary)
+            || (
+                weapon.HavePrimaryAttack()
+                && weapon.m_shared.m_attack.m_attackAnimation == secondary
+            )
+        )
+        {
+            return false;
+        }
+        int end = name.Length;
+        while (end > 0 && char.IsDigit(name[end - 1]))
+        {
+            end--;
+        }
+        return end == secondary.Length && string.CompareOrdinal(name, 0, secondary, 0, end) == 0;
     }
 
     /// <summary>The creature's trigger list, read once per creature (see <see cref="Probe"/>).</summary>
@@ -184,8 +255,12 @@ internal static class CreatureTriggers
         s_creatureTriggers = triggers;
         if (triggers.Count == 0)
         {
+            s_normalAttack = null;
+            s_specialAttack = null;
             s_creatureHash = 0; // prefab not resolvable yet: read it again on the next trigger
+            return;
         }
+        (s_normalAttack, s_specialAttack) = CreatureAttacks.Read(hash, triggers);
     }
 
     /// <summary>
@@ -264,10 +339,11 @@ internal static class CreatureTriggers
     }
 
     /// <summary>
-    /// The creature's own attack the companion should play: a trigger it has, that the viking
-    /// does not have (or the viking would swing twice), that reads as a melee attack, sharing
-    /// the source's word when one does - ties are broken alphabetically so the choice never
-    /// depends on the iteration order of the set.
+    /// Fallback, only when the weapon pool could not be read (a prefab without Humanoid, an
+    /// empty pool): the creature's own attack the companion should play - a trigger it has,
+    /// that the viking does not have (or the viking would swing twice), that reads as a melee
+    /// attack, sharing the source's word when one does - ties are broken alphabetically so
+    /// the choice never depends on the iteration order of the set.
     /// </summary>
     private static string? PickCompanion(string source)
     {

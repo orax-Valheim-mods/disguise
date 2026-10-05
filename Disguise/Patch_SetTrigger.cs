@@ -15,19 +15,30 @@ namespace Disguise;
 ///      replays the ZDO-driven parameters;
 ///   2. a vanilla machine: its creature animator silently ignores a viking trigger it does
 ///      not have (ZSyncAnimation.Awake sets logWarnings = false), so a goblin never plays
-///      swing_axe0 / knife_stab1 / bow_fire - the second broadcast carries a name that
-///      creature really has (CreatureTriggers).
+///      swing_axe0 / knife_stab1 / bow_fire - that is what the second broadcast is for.
 ///
-/// The second broadcast is harmless everywhere else by construction: the companion name is
-/// one Player_animator does not have, so machines rendering a viking drop it exactly as the
-/// vanilla machine drops the first name, and nothing is rewritten on reception. Both steps
-/// run only for the local player's own ZSyncAnimation while its ZDO carries the disguise
-/// marker: creatures you own, other players' triggers and a dedicated server
+/// The second broadcast carries the name the creature really has - its NORMAL attack for a
+/// normal swing, its SPECIAL one for a secondary attack (CreatureTriggers reads both from
+/// the creature's weapon pool) - and it never lands on your own viking: ZNetView routes an
+/// Everybody RPC through HandleRoutedRPC before InvokeRPC returns, so the local half of that
+/// second broadcast is dropped by Patch_RPC_SetTrigger (some creature attacks are viking
+/// attacks too: every player spear throws under `spear_throw`, which is also the goblin's
+/// special attack). Nothing is rewritten on reception anywhere else: a machine rendering the
+/// creature plays the name it already has, a machine rendering a viking ignores it. Both
+/// steps run only for the local player's own ZSyncAnimation while its ZDO carries the
+/// disguise marker: creatures you own, other players' triggers and a dedicated server
 /// (Player.m_localPlayer is null) go through untouched.
 /// </summary>
 [HarmonyPatch(typeof(ZSyncAnimation), nameof(ZSyncAnimation.SetTrigger))]
 internal static class Patch_SetTrigger
 {
+    /// <summary>
+    /// True only while our own companion RPC is in flight, and only on this machine: the
+    /// local half of ZNetView.Everybody is delivered synchronously, inside InvokeRPC, so it
+    /// is still true when it reaches RPC_SetTrigger - which Patch_RPC_SetTrigger reads.
+    /// </summary>
+    internal static bool s_applyingCompanion;
+
     private static void Postfix(ZSyncAnimation __instance, string name)
     {
         try
@@ -45,8 +56,13 @@ internal static class Patch_SetTrigger
             // The marker can only sit on our own player ZDO, so anything failing here is
             // worth one log line (see CreatureTriggers.Trace): it is the whole bridge.
             bool mine = __instance.GetComponent<Player>() == Player.m_localPlayer;
-            string? creatureName = mine ? CreatureTriggers.Resolve(zdo, name) : null;
-            CreatureTriggers.Trace(name, mine, creatureName);
+            string? creatureName = null;
+            string? kind = null;
+            if (mine)
+            {
+                (creatureName, kind) = CreatureTriggers.Resolve(zdo, name);
+            }
+            CreatureTriggers.Trace(name, mine, creatureName, kind);
             if (!mine || creatureName == null)
             {
                 return; // no creature animation for this one: vanilla behaviour, no extra RPC
@@ -56,10 +72,20 @@ internal static class Patch_SetTrigger
             GhostAnimation.SetTrigger(creatureName);
 
             // The wire: ZSyncAnimation.SetTrigger already sent the original name one line
-            // above, this is the companion for machines rendering the creature.
+            // above, this is the companion for machines rendering the creature. The local
+            // half of it is dropped (Patch_RPC_SetTrigger), so it can be a name the viking
+            // knows as well without your own body ever playing it.
             if (creatureName != name)
             {
-                nview?.InvokeRPC(ZNetView.Everybody, "SetTrigger", creatureName);
+                s_applyingCompanion = true;
+                try
+                {
+                    nview?.InvokeRPC(ZNetView.Everybody, "SetTrigger", creatureName);
+                }
+                finally
+                {
+                    s_applyingCompanion = false;
+                }
             }
         }
         catch (Exception ex)

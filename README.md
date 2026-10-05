@@ -297,16 +297,33 @@ Visual synchronisation on vanilla clients:
   which is why a goblin never played `swing_axe0`, `knife_stab1` or `bow_fire`: `goblin_animator`
   only knows `jump`, `spear_throw`, `stagger`, `swing_longsword` and `wakeup`.
   `Patch_SetTrigger` therefore sends such a melee attack a **second time**, under a name the
-  creature really has (picked by `CreatureTriggers`, e.g. `swing_longsword` for a goblin) and
-  chosen so that `Player_animator` does not know it either: a machine rendering a viking
-  drops the second name exactly as the vanilla machine drops the first, nothing is rewritten
-  on reception, and your own character never changes. Both reference sets are read from
+  creature really has (picked by `CreatureTriggers`, e.g. `swing_longsword` for a goblin).
+  That name is now the creature's own attack for the button you used: its **normal** one for a
+  normal swing, its **special** one for a secondary attack (right click) - the two designated
+  by `CreatureAttacks` from the creature's weapon pool (`Humanoid`: `m_defaultItems` /
+  `m_randomWeapon` / `m_randomItems` / `m_randomSets` / `m_unarmedWeapon`, i.e. exactly the
+  items `MonsterAI.EquipBestWeapon` equips from), because no creature item carries a
+  secondary attack the game could point at: the plain melee with the **shortest**
+  `m_aiAttackInterval` is the normal one, the **longest** one is the special (a pool holding
+  a single attack has no special: both buttons then play the normal one, as a boar or a wolf
+  must). Measured: Troll `punch` (4 s) vs `attack` ground slam (20 s), Goblin `swing_longsword`
+  (2 s) vs `spear_throw` (4 s), Greydwarf `attack` (2 s) vs `throw` (8 s). Only names the
+  creature's own controller really has are ever used; when no pool can be read (no `Humanoid`,
+  empty pool) it falls back to the original word match.
+  The second name never reaches your own viking: `ZNetView` routes an `Everybody` RPC through
+  `HandleRoutedRPC` *synchronously*, inside our own `InvokeRPC`, so `Patch_RPC_SetTrigger`
+  drops that local half (some creature names are viking names too - every player spear throws
+  under `spear_throw`, which is also the goblin's special attack), while your creature view is
+  fed directly by `GhostAnimation`. Nothing is rewritten on reception: a machine rendering the
+  creature plays the name it already has, a machine rendering a viking ignores it, and your
+  own character never changes. Both reference sets are read from
   **active** objects: `Animator.parameters` returns an empty array while its `GameObject` is
   not active in the hierarchy, and a `ZNetScene` prefab never is (`m_prefabs` holds assets, in
   no scene at all) - reading the prefabs is exactly what used to keep this bridge silently
   dead. The player set comes from your live character, the creature set from one throwaway
-  activated copy built per creature by `GhostFactory`; until both are non-empty **nothing is
-  sent** rather than risk a name the viking also knows. What the bridge decided for each
+  activated copy built per creature by `GhostFactory` (the weapon pool is read from the
+  prefab, which needs neither); until both are non-empty **nothing is
+  sent** rather than guess. What the bridge decided for each
   trigger is written once as `Attack bridge: <trigger> -> ...` in the log of your own client
   (§ 7). Everything else is untouched: the
   parameters both controllers share (movement, `jump`, `stagger`...) arrive as they always
@@ -367,9 +384,13 @@ Visual synchronisation on vanilla clients:
 7. **Only some of your animations reach the creature** (`Patch_SetTrigger`).
    - **Played**: every trigger whose name both controllers share (movement, `jump`,
      `stagger`, `wakeup`, `spear_throw`...), plus **melee attacks**, which are re-sent
-     under the creature's own attack name (`swing_longsword` for a goblin). The creature
-     is then animated from *your* swing.
-   - **Not played**: ranged attacks (`bow_fire`, `crossbow_fire`, `staff_*`...), a
+     under the creature's own attack name: its **normal** one for a normal swing
+     (`swing_longsword` for a goblin), its **special** one for a secondary attack
+     (right click) - a goblin then really throws its spear on your `sword_secondary`. The
+     creature is then animated from *your* swing.
+   - **Not played**: ranged attacks (`bow_fire`, `crossbow_fire`, `staff_*`, and the
+     spear's own right click `spear_throw`, which is a throw - it only reaches a creature
+     that has that very name, like the goblin, and that is the shared-name case above), a
      cancellation (`attack_abort`), the build-tool swings (placing, removing or repairing
      with the Hammer / Hoe / Cultivator), and gestures the creature has no equivalent for
      (`dodge`, `eat`, `interact`, `equip_hip`, `gpower`...) - the vanilla machine drops
@@ -463,24 +484,33 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   publishes (`cd_fake` / `cd_fpos`), and the swap the server runs over the player list
   before it writes it, always restored right after (§ 2).
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
-  creature's own controller (and against `Player_animator`, so the companion name can only
-  ever be played by the creature), used by `Patch_SetTrigger`. It reads the player set from
+  creature's own controller (and against `Player_animator`, so a companion name can only
+  ever be played by the creature), decides which of the creature's two attacks to play
+  (normal for a normal swing, special for a secondary attack, read from the weapon in your
+  hand), used by `Patch_SetTrigger`. It reads the player set from
   the live local player and the creature set from a throwaway activated copy (both reference
   sets are unreadable on a `ZNetScene` prefab), and owns the one-line `Attack bridge:` trace
   of its decision, the only place where that decision is visible.
+- `CreatureAttacks.cs` - designates those two attacks from the creature's weapon pool (the
+  `Humanoid` of its prefab): melee with the shortest `m_aiAttackInterval` = normal, longest
+  = special (null when the pool holds one attack), restricted to the triggers the probe
+  really read. Plain serialized fields, so unlike `Animator.parameters` it needs neither an
+  activation nor an instantiation.
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
   `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
   `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`, `Patch_SetTrigger.cs`,
-  `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the sixteen Harmony patches, one
+  `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the
+  seventeen Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
   through `Disguise.LogError(...)` - `s_instance` itself never leaves the plugin class.
   `Patch_CreateDestroyObjects` additionally owns the `s_inCreateDestroy` scope flag read
-  by `Patch_FindSectorObjects`.
+  by `Patch_FindSectorObjects`, and `Patch_SetTrigger` the `s_applyingCompanion` scope flag
+  read by `Patch_RPC_SetTrigger` (§ 3).
 
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
@@ -500,7 +530,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 65   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 82   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -525,7 +555,8 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
 | Your equipment is invisible to the other players although every `Hide*` option is `false` | A relaying server running an **older** DLL masks with its own `[3 - Display]` config (`Hide* = true` by default): deploy the current build on the server and restart it (§ 1.b). Since `cd_hide` your own config is the only one that decides |
 | Your creature keeps the red enemy bar although `ShowAsAlly = true` | `cd_rel` is published by the client running the mod: restart **that** client with the current build (§ 6). An older server DLL is harmless here, it relays the flag exactly as it receives it |
-| Your creature stands still while you swing (its attack never plays) | The bridge is sent by **the disguised player's own client** (§ 3): deploy a current build there and restart it (§ 6) - no other client and no server DLL is involved. Then read `Attack bridge: ...` in **that** client's `BepInEx\LogOutput.log`: no line at all = a DLL older than the fix (the bridge never sent anything, § 3); `sent again as ...` = the second broadcast went out; `no creature equivalent (player N, creature M triggers)` = a reference set came back empty (`M = 0`: look just above it for `Prefab not found` or `Inert copy: ... survived the strip`); `skipped: the component is not the local player's` = the bridge never saw your own animator. Ranged weapons and gestures have no creature equivalent and never animated (§ 4.7) |
+| Your creature stands still while you swing (its attack never plays) | The bridge is sent by **the disguised player's own client** (§ 3): deploy a current build there and restart it (§ 6) - no other client and no server DLL is involved. Then read `Attack bridge: ...` in **that** client's `BepInEx\LogOutput.log`: no line at all = a DLL older than the fix (the bridge never sent anything, § 3); `sent again as <name> (normal attack)` = the creature's basic attack was sent, `... (special attack)` = its heavy one (right click), `... (word match)` = no weapon pool could be read (§ 3); `no creature equivalent (player N, creature M triggers)` = a reference set came back empty (`M = 0`: look just above it for `Prefab not found` or `Inert copy: ... survived the strip`); `skipped: the component is not the local player's` = the bridge never saw your own animator. Ranged weapons and gestures have no creature equivalent and never animated (§ 4.7) |
+| Your right click plays exactly the same animation as your left click | The creature's weapon pool holds a single attack (a boar or a wolf really has no special attack) or could not be read: both buttons play the normal one, by design (§ 3). The `Attack bridge:` line ends with `(normal attack)` in that case, `(special attack)` when a special attack really exists |
 | The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |

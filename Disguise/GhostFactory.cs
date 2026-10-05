@@ -135,7 +135,7 @@ internal static class GhostFactory
         }
     }
 
-    private static GameObject? Prefab(int prefabHash)
+    internal static GameObject? Prefab(int prefabHash)
     {
         ZNetScene? zns = ZNetScene.instance;
         GameObject? prefab = zns != null ? zns.GetPrefab(prefabHash) : null;
