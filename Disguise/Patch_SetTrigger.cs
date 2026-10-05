@@ -27,7 +27,9 @@ namespace Disguise;
 /// creature plays the name it already has, a machine rendering a viking ignores it. Both
 /// steps run only for the local player's own ZSyncAnimation while its ZDO carries the
 /// disguise marker: creatures you own, other players' triggers and a dedicated server
-/// (Player.m_localPlayer is null) go through untouched.
+/// (Player.m_localPlayer is null) go through untouched. The sending half is `Send` below,
+/// reused by Patch_SetBool for the block key - a block has no SetTrigger of its own to
+/// follow.
 /// </summary>
 [HarmonyPatch(typeof(ZSyncAnimation), nameof(ZSyncAnimation.SetTrigger))]
 internal static class Patch_SetTrigger
@@ -68,29 +70,44 @@ internal static class Patch_SetTrigger
                 return; // no creature animation for this one: vanilla behaviour, no extra RPC
             }
 
-            // Your own screen: the clone is the creature and has no RPC, it is fed directly.
-            GhostAnimation.SetTrigger(creatureName);
-
-            // The wire: ZSyncAnimation.SetTrigger already sent the original name one line
-            // above, this is the companion for machines rendering the creature. The local
-            // half of it is dropped (Patch_RPC_SetTrigger), so it can be a name the viking
-            // knows as well without your own body ever playing it.
-            if (creatureName != name)
-            {
-                s_applyingCompanion = true;
-                try
-                {
-                    nview?.InvokeRPC(ZNetView.Everybody, "SetTrigger", creatureName);
-                }
-                finally
-                {
-                    s_applyingCompanion = false;
-                }
-            }
+            // Your own screen (the clone, which carries no RPC at all) and the wire: the
+            // original name already went out through ZSyncAnimation.SetTrigger one line
+            // above, so the companion is only for machines rendering the creature.
+            Send(nview, creatureName, creatureName != name);
         }
         catch (Exception ex)
         {
             Disguise.LogError($"Patch ZSyncAnimation.SetTrigger (postfix): {ex}");
+        }
+    }
+
+    /// <summary>
+    /// One resolved creature trigger, on the two screens it has to reach: the local clone
+    /// first - it IS the creature and carries no ZNetView, so GhostAnimation is its only
+    /// feed - then the wire, when the machines rendering the creature still have to be told.
+    ///
+    /// The local half of that Everybody RPC is dropped by Patch_RPC_SetTrigger, which reads
+    /// s_applyingCompanion while it is still true (ZNetView delivers the local half
+    /// synchronously, inside InvokeRPC), so the name can be one the viking knows too without
+    /// your own body ever playing it. The attack path passes `broadcast: false` when the
+    /// creature's own name was already sent by ZSyncAnimation.SetTrigger one line above;
+    /// the block path has no original name at all and always broadcasts.
+    /// </summary>
+    internal static void Send(ZNetView? nview, string creatureName, bool broadcast)
+    {
+        GhostAnimation.SetTrigger(creatureName);
+        if (!broadcast)
+        {
+            return;
+        }
+        s_applyingCompanion = true;
+        try
+        {
+            nview?.InvokeRPC(ZNetView.Everybody, "SetTrigger", creatureName);
+        }
+        finally
+        {
+            s_applyingCompanion = false;
         }
     }
 }

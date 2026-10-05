@@ -289,7 +289,7 @@ save file (`ZDO.Save`). The chosen prefab determines **what each client instanti
 Visual synchronisation on vanilla clients:
 
 - **Position**: yes, through `ZSyncTransform` (the creature follows you everywhere).
-- **Animations**: partial, and bridged for melee attacks. `ZSyncAnimation.SetTrigger`
+- **Animations**: partial, and bridged for melee attacks and for the block key. `ZSyncAnimation.SetTrigger`
   carries no name at all inside the ZDO: it broadcasts the raw **parameter name**, and each
   machine applies it to the animator of the object *it* built for that ZDO - a real `Player`
   here, the creature on a vanilla machine. A name the creature's controller does not have is
@@ -299,17 +299,30 @@ Visual synchronisation on vanilla clients:
   `Patch_SetTrigger` therefore sends such a melee attack a **second time**, under a name the
   creature really has (picked by `CreatureTriggers`, e.g. `swing_longsword` for a goblin).
   That name is now the creature's own attack for the button you used: its **normal** one for a
-  normal swing, its **special** one for a secondary attack (right click) - the two designated
-  by `CreatureAttacks` from the creature's weapon pool (`Humanoid`: `m_defaultItems` /
-  `m_randomWeapon` / `m_randomItems` / `m_randomSets` / `m_unarmedWeapon`, i.e. exactly the
+  normal swing, its **special** one for a secondary attack (middle click by default) - the two
+  designated by `CreatureAttacks` from the creature's weapon pool (`Humanoid`:
+  `m_defaultItems` / `m_randomWeapon` / `m_randomItems` / `m_randomSets` /
+  `m_unarmedWeapon`, i.e. exactly the
   items `MonsterAI.EquipBestWeapon` equips from), because no creature item carries a
   secondary attack the game could point at: the plain melee with the **shortest**
   `m_aiAttackInterval` is the normal one, the **longest** one is the special (a pool holding
-  a single attack has no special: both buttons then play the normal one, as a boar or a wolf
+  a single attack has no special: both attack keys then play the normal one, as a boar or a wolf
   must). Measured: Troll `punch` (4 s) vs `attack` ground slam (20 s), Goblin `swing_longsword`
   (2 s) vs `spear_throw` (4 s), Greydwarf `attack` (2 s) vs `throw` (8 s). Only names the
   creature's own controller really has are ever used; when no pool can be read (no `Humanoid`,
   empty pool) it falls back to the original word match.
+
+  The third combat key - **block**, right click by default - has no trigger to bridge at all:
+  the game travels a block as the `blocking` **bool** (`Humanoid.UpdateBlock` writes it
+  through `ZSyncAnimation.SetBool`, never through `SetTrigger`), so `Patch_SetBool` watches
+  that very call - once per block, at the moment the game itself decides your character
+  blocks - and sends the creature's **third** attack instead: the middle one of the same
+  pool, neither the basic nor the heaviest (`CreatureAttacks`, read by
+  `CreatureTriggers.ResolveBlock`), through the very same `Send` (so it never reaches your
+  own viking either, and your clone is fed by `GhostAnimation` as always). Measured: Troll
+  `swing_logh` (6 s), Wolf `attack3`. A pool with nothing left to designate - two attacks or
+  fewer, which is a goblin, a greydwarf or a draugr - has no third animation at all, and the
+  block then simply stays a block (§ 7).
   The second name never reaches your own viking: `ZNetView` routes an `Everybody` RPC through
   `HandleRoutedRPC` *synchronously*, inside our own `InvokeRPC`, so `Patch_RPC_SetTrigger`
   drops that local half (some creature names are viking names too - every player spear throws
@@ -381,15 +394,19 @@ Visual synchronisation on vanilla clients:
    warning, no exception). The broadcast is deliberately left alone: machines running
    this DLL hold a real `Player` for you and need it (`RPC_OnDeath` hides your visual).
 
-7. **Only some of your animations reach the creature** (`Patch_SetTrigger`).
+7. **Only some of your animations reach the creature** (`Patch_SetTrigger`, `Patch_SetBool`).
    - **Played**: every trigger whose name both controllers share (movement, `jump`,
      `stagger`, `wakeup`, `spear_throw`...), plus **melee attacks**, which are re-sent
      under the creature's own attack name: its **normal** one for a normal swing
      (`swing_longsword` for a goblin), its **special** one for a secondary attack
-     (right click) - a goblin then really throws its spear on your `sword_secondary`. The
-     creature is then animated from *your* swing.
+     (middle click by default) - a goblin then really throws its spear on your `sword_secondary`.
+     The creature is then animated from *your* swing, and from *your* block as well: a block
+     never becomes a trigger (the game travels it as the `blocking` bool), `Patch_SetBool`
+     picks it up and sends the creature's **third** attack for it - a Troll swings its log
+     sideways on `swing_logh`, while a goblin, a greydwarf or a draugr has only two attacks
+     to designate and simply stays put when you block.
    - **Not played**: ranged attacks (`bow_fire`, `crossbow_fire`, `staff_*`, and the
-     spear's own right click `spear_throw`, which is a throw - it only reaches a creature
+     spear's own secondary attack `spear_throw`, which is a throw - it only reaches a creature
      that has that very name, like the goblin, and that is the shared-name case above), a
      cancellation (`attack_abort`), the build-tool swings (placing, removing or repairing
      with the Hammer / Hoe / Cultivator), and gestures the creature has no equivalent for
@@ -485,15 +502,17 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   before it writes it, always restored right after (§ 2).
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
-  ever be played by the creature), decides which of the creature's two attacks to play
-  (normal for a normal swing, special for a secondary attack, read from the weapon in your
-  hand), used by `Patch_SetTrigger`. It reads the player set from
+  ever be played by the creature), decides which of the creature's attacks to play (normal
+  for a normal swing, special for a secondary attack - read from the weapon in your hand -
+  and, for the block key, the middle attack of the pool through `ResolveBlock`), used by
+  `Patch_SetTrigger` and `Patch_SetBool`. It reads the player set from
   the live local player and the creature set from a throwaway activated copy (both reference
   sets are unreadable on a `ZNetScene` prefab), and owns the one-line `Attack bridge:` trace
-  of its decision, the only place where that decision is visible.
-- `CreatureAttacks.cs` - designates those two attacks from the creature's weapon pool (the
+  of its decision (`Trace` / `TraceBlock`), the only place where that decision is visible.
+- `CreatureAttacks.cs` - designates those three attacks from the creature's weapon pool (the
   `Humanoid` of its prefab): melee with the shortest `m_aiAttackInterval` = normal, longest
-  = special (null when the pool holds one attack), restricted to the triggers the probe
+  = special (null when the pool holds one attack), the lower median of what is left over =
+  block (null when the pool holds two or fewer), restricted to the triggers the probe
   really read. Plain serialized fields, so unlike `Animator.parameters` it needs neither an
   activation nor an instantiation.
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
@@ -502,15 +521,17 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
   `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
   `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`, `Patch_SetTrigger.cs`,
+  `Patch_SetBool.cs`,
   `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the
-  seventeen Harmony patches, one
+  eighteen Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
   through `Disguise.LogError(...)` - `s_instance` itself never leaves the plugin class.
   `Patch_CreateDestroyObjects` additionally owns the `s_inCreateDestroy` scope flag read
   by `Patch_FindSectorObjects`, and `Patch_SetTrigger` the `s_applyingCompanion` scope flag
-  read by `Patch_RPC_SetTrigger` (§ 3).
+  read by `Patch_RPC_SetTrigger` plus the shared `Send` helper that `Patch_SetBool` also
+  uses to reach every machine with the block key (§ 3).
 
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
@@ -536,6 +557,10 @@ On exit code 2, replace every listed member with reflection
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
 mentions it in a signature - Harmony patch targets are only strings (`nameof`), and the
 outgoing packet is patched through `ZDOMan.SendZDOs` without any of its parameters.
+`Humanoid.s_blocking` (private) is not used either: `Patch_SetBool` compares the parameter
+against `Animator.StringToHash("blocking")`, the very expression the game uses to define
+that constant, so the block key adds no game member at all: still 82, exactly as before it
+existed.
 
 ---
 
@@ -555,8 +580,9 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
 | Your equipment is invisible to the other players although every `Hide*` option is `false` | A relaying server running an **older** DLL masks with its own `[3 - Display]` config (`Hide* = true` by default): deploy the current build on the server and restart it (§ 1.b). Since `cd_hide` your own config is the only one that decides |
 | Your creature keeps the red enemy bar although `ShowAsAlly = true` | `cd_rel` is published by the client running the mod: restart **that** client with the current build (§ 6). An older server DLL is harmless here, it relays the flag exactly as it receives it |
-| Your creature stands still while you swing (its attack never plays) | The bridge is sent by **the disguised player's own client** (§ 3): deploy a current build there and restart it (§ 6) - no other client and no server DLL is involved. Then read `Attack bridge: ...` in **that** client's `BepInEx\LogOutput.log`: no line at all = a DLL older than the fix (the bridge never sent anything, § 3); `sent again as <name> (normal attack)` = the creature's basic attack was sent, `... (special attack)` = its heavy one (right click), `... (word match)` = no weapon pool could be read (§ 3); `no creature equivalent (player N, creature M triggers)` = a reference set came back empty (`M = 0`: look just above it for `Prefab not found` or `Inert copy: ... survived the strip`); `skipped: the component is not the local player's` = the bridge never saw your own animator. Ranged weapons and gestures have no creature equivalent and never animated (§ 4.7) |
-| Your right click plays exactly the same animation as your left click | The creature's weapon pool holds a single attack (a boar or a wolf really has no special attack) or could not be read: both buttons play the normal one, by design (§ 3). The `Attack bridge:` line ends with `(normal attack)` in that case, `(special attack)` when a special attack really exists |
+| Your creature stands still while you swing (its attack never plays) | The bridge is sent by **the disguised player's own client** (§ 3): deploy a current build there and restart it (§ 6) - no other client and no server DLL is involved. Then read `Attack bridge: ...` in **that** client's `BepInEx\LogOutput.log`: no line at all = a DLL older than the fix (the bridge never sent anything, § 3); `sent again as <name> (normal attack)` = the creature's basic attack was sent, `... (special attack)` = its heavy one (middle click), `... (block attack)` = the third one was sent for the block key (right click), `... (word match)` = no weapon pool could be read (§ 3); `no creature equivalent (player N, creature M triggers)` = a reference set came back empty (`M = 0`: look just above it for `Prefab not found` or `Inert copy: ... survived the strip`); `skipped: the component is not the local player's` = the bridge never saw your own animator. Ranged weapons and gestures have no creature equivalent and never animated (§ 4.7) |
+| Your secondary attack (middle click by default) plays exactly the same animation as your normal attack | The creature's weapon pool holds a single attack (a boar or a wolf really has no special attack) or could not be read: both attack keys play the normal one, by design (§ 3). The `Attack bridge:` line ends with `(normal attack)` in that case, `(special attack)` when a special attack really exists |
+| Your block (right click by default) animates nothing on the creature | There is no third attack to designate: the pool has two attacks or fewer (a goblin, a greydwarf, a draugr) - or none readable at all (a boar's pool animation `base_attack` is a chain the controller only carries as `base_attack0..3`). `Attack bridge: block -> ...` in the log says `no third attack (...)`, and ends with `(block attack)` on a creature that really has a middle one (a Troll, a wolf). Left and middle click are unaffected |
 | The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |

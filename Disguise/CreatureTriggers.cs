@@ -7,7 +7,8 @@ namespace Disguise;
 
 /// <summary>
 /// Resolves a local player animation trigger into a trigger the disguised creature really
-/// has (read by Patch_SetTrigger).
+/// has (read by Patch_SetTrigger), and the block key into the creature's own third attack
+/// (read by Patch_SetBool).
 ///
 /// ZSyncAnimation.SetTrigger carries nothing in the ZDO: it broadcasts the raw parameter
 /// NAME, and every machine applies it to the animator of the object IT built for that ZDO -
@@ -21,10 +22,15 @@ namespace Disguise;
 ///
 /// So an attack the creature does not know is broadcast a SECOND time, under the name of
 /// one of the creature's own attacks: its NORMAL one for a normal swing, its SPECIAL one
-/// for a secondary attack (right click) - the two designated by CreatureAttacks from the
-/// creature's weapon pool, with the normal one as the fallback when the pool holds no
-/// special attack. Some of those names are viking names too (every player spear throws
-/// under `spear_throw`, which is also the goblin's special attack), so the second name is
+/// for a secondary attack (middle click by default) - the two designated by CreatureAttacks
+/// from the creature's weapon pool, with the normal one as the fallback when the pool holds
+/// no special attack. The THIRD combat key has no trigger to bridge at all: the game
+/// travels a block as the `blocking` BOOL (Humanoid.UpdateBlock), never as a SetTrigger,
+/// so it is Patch_SetBool that watches it and comes here for the creature's middle attack
+/// (ResolveBlock / TraceBlock).
+///
+/// Some of those names are viking names too (every player spear throws under
+/// `spear_throw`, which is also the goblin's special attack), so the second name is
 /// never applied on your own machine: Patch_RPC_SetTrigger drops it there, and only there,
 /// while the clone - your own view - is fed directly by GhostAnimation. Nothing is
 /// rewritten on reception: a machine rendering the creature plays the name it already has,
@@ -104,14 +110,18 @@ internal static class CreatureTriggers
     private static HashSet<string> s_creatureTriggers = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// The two attack roles of the current creature, designated from its weapon pool
-    /// (CreatureAttacks): what a normal swing plays, what a secondary attack plays. The
-    /// special one is null when the pool has only one attack - both buttons then play the
-    /// normal one, which is exactly what a creature with a single attack can do.
+    /// The three attack roles of the current creature, designated from its weapon pool
+    /// (CreatureAttacks): what a normal swing plays, what a secondary attack plays and what
+    /// the block key plays. The special one is null when the pool has only one attack -
+    /// both attack keys then play the normal one, which is exactly what a creature with a
+    /// single attack can do - and the block one is null as soon as the pool has no middle
+    /// attack left to designate, which is most creatures (a third key without animation).
     /// </summary>
     private static string? s_normalAttack;
 
     private static string? s_specialAttack;
+
+    private static string? s_blockAttack;
 
     private static HashSet<string> s_playerTriggers = new(StringComparer.Ordinal);
 
@@ -151,6 +161,28 @@ internal static class CreatureTriggers
             outcome =
                 kind != null ? $"sent again as {resolved} ({kind})" : $"sent again as {resolved}";
         }
+        Report(name, outcome);
+    }
+
+    /// <summary>
+    /// The block key's own line of that same trace: there is no SOURCE name to report here -
+    /// blocking travels as a bool and never reaches ZSyncAnimation.SetTrigger - so the
+    /// outcome is written straight from what the weapon pool designated. "block" is only a
+    /// label for the deduplication key, it is not a parameter name.
+    /// </summary>
+    internal static void TraceBlock(string? resolved)
+    {
+        Report(
+            "block",
+            resolved != null
+                ? $"sent again as {resolved} (block attack)"
+                : "no third attack (one or two attacks in the weapon pool, or none readable)"
+        );
+    }
+
+    /// <summary>Writes one outcome per distinct name, so a session stays at a handful of lines.</summary>
+    private static void Report(string name, string outcome)
+    {
         if (s_traced.TryGetValue(name, out string? previous) && previous == outcome)
         {
             return;
@@ -189,9 +221,9 @@ internal static class CreatureTriggers
         {
             return (null, null);
         }
-        // Which of the two attacks the viking just used: a secondary attack (right click)
-        // plays the creature's special one, a normal swing its basic one - and the basic one
-        // again when the pool holds no special attack (a boar, a wolf).
+        // Which of the two attacks the viking just used: a secondary attack (middle click
+        // by default) plays the creature's special one, a normal swing its basic one - and
+        // the basic one again when the pool holds no special attack (a boar, a wolf).
         if (IsSecondaryAttack(name) && s_specialAttack != null)
         {
             return (s_specialAttack, "special attack");
@@ -207,11 +239,39 @@ internal static class CreatureTriggers
     }
 
     /// <summary>
+    /// The creature's third attack, for the BLOCK key (right click by default): the middle
+    /// attack of its weapon pool, or null when the pool has nothing left to designate (a
+    /// pool of two attacks or fewer, or no readable pool - see CreatureAttacks).
+    ///
+    /// There is no source name to resolve here: a block never becomes a SetTrigger, it
+    /// travels as the `blocking` bool, which is why Patch_SetBool asks for the creature's
+    /// own attack directly. The name therefore already comes from the creature's controller,
+    /// restricted to the triggers that controller really has - nothing to compare with
+    /// Player_animator - and, unlike the two attack roles, it has no word-match fallback:
+    /// when the pool designates nothing, the third key simply plays nothing.
+    /// </summary>
+    internal static string? ResolveBlock(ZDO? zdo)
+    {
+        if (zdo == null)
+        {
+            return null;
+        }
+        int hash = zdo.GetPrefab();
+        if (hash == 0 || hash == PrefabResolver.PlayerPrefabHash)
+        {
+            return null; // not disguised: a vanilla machine renders a Player here
+        }
+        ReadCreatureTriggers(hash);
+        return s_blockAttack;
+    }
+
+    /// <summary>
     /// True when the local player's current weapon produces <paramref name="name"/> with its
-    /// SECONDARY attack (right click). The name is compared with the animation the game
-    /// itself starts (`Humanoid.StartAttack` picks m_secondaryAttack when secondaryAttack is
-    /// set), suffix digits included: Attack.Start appends the chain level and the random
-    /// variant to it. Reading it from the weapon is what covers the secondaries that are not
+    /// SECONDARY attack (middle click by default). The name is compared with the animation
+    /// the game itself starts (`Humanoid.StartAttack` picks m_secondaryAttack when
+    /// secondaryAttack is set), suffix digits included: Attack.Start appends the chain level
+    /// and the random variant to it. Reading it from the weapon is what covers the
+    /// secondaries that are not
     /// called *_secondary at all - every player spear throws under `spear_throw`, the fists
     /// kick under `unarmed_kick` - while a weapon whose two clicks share one animation (the
     /// grappling hook) stays a normal attack.
@@ -257,10 +317,11 @@ internal static class CreatureTriggers
         {
             s_normalAttack = null;
             s_specialAttack = null;
+            s_blockAttack = null;
             s_creatureHash = 0; // prefab not resolvable yet: read it again on the next trigger
             return;
         }
-        (s_normalAttack, s_specialAttack) = CreatureAttacks.Read(hash, triggers);
+        (s_normalAttack, s_specialAttack, s_blockAttack) = CreatureAttacks.Read(hash, triggers);
     }
 
     /// <summary>

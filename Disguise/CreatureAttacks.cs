@@ -6,14 +6,15 @@ using UnityEngine;
 namespace Disguise;
 
 /// <summary>
-/// Designates the two attacks a creature really has, read from its weapon pool: the
+/// Designates the three attacks a creature really has, read from its weapon pool: the
 /// Humanoid of its prefab (m_defaultItems / m_randomWeapon / m_randomItems / m_randomSets /
 /// m_unarmedWeapon), which is exactly the list MonsterAI.EquipBestWeapon equips from - a
 /// creature attacks through the item it holds (Humanoid.StartAttack ->
 /// ItemData.m_shared.m_attack), never through a component of its own.
 ///
-/// Nothing in the game calls an attack "special": no creature item carries a secondary
-/// attack, so the two roles are read from the numbers the designer left on those items:
+/// Nothing in the game calls an attack "special", nor a third one "block": no creature item
+/// carries a secondary attack, so the roles are read from the numbers the designer left on
+/// those items:
 ///
 ///   NORMAL - the basic one: a melee primary first (a projectile ranks last), then the
 ///            SHORTEST m_aiAttackInterval (the AI comes back to it fastest), then the
@@ -22,11 +23,19 @@ namespace Disguise;
 ///            LONGEST m_aiAttackInterval (the attack the AI waits longest for), and never
 ///            the same animation as the normal attack. Null when the pool holds a single
 ///            attack: a boar or a wolf simply has no special attack, and the bridge then
-///            plays the normal one for both buttons.
+///            plays the normal one for both attack keys.
+///   BLOCK - the middle one: what is left once the basic and the heaviest attacks are
+///            spoken for, at its LOWER MEDIAN in the same light-to-heavy order, played by
+///            the third combat key - block, right click by default (Patch_SetBool).
+///            Null when nothing is left, i.e. a pool of two attacks or fewer, which is most
+///            creatures: the third key then has no animation at all and the bridge stays
+///            silent rather than repeat one of the two.
 ///
-/// Measured on the real pools: Troll punch (4 s) vs ground slam (20 s), Greydwarf jaws
-/// (2 s) vs thrown stone (8 s), Goblin club (2 s) vs spear (4 s) - and for all of them the
-/// shortest cooldown is also the plain melee swipe a disguise should show by default.
+/// Measured on the real pools: Troll punch (4 s) / swing_logh (6 s) / ground slam (20 s),
+/// Wolf attack1 / attack2 / attack3 (5 s each), Greydwarf jaws (2 s) vs thrown stone (8 s),
+/// Goblin club (2 s) vs spear (4 s) - and for all of them the shortest cooldown is also
+/// the plain melee swipe a disguise should show by default, while the middle one is a real
+/// third animation of its own (a Troll swings its log sideways on the block key).
 ///
 /// The prefab is read, never an instance: those are plain serialized fields, unlike
 /// Animator.parameters which only exists on an object active in the hierarchy - so this
@@ -35,29 +44,33 @@ namespace Disguise;
 internal static class CreatureAttacks
 {
     /// <summary>
-    /// The creature's normal attack and its special attack, restricted to the triggers its
-    /// own controller really has (read by CreatureTriggers.Probe). Either role comes back
-    /// null when the pool cannot fill it - a prefab without Humanoid (an animal without an
-    /// inventory), an empty pool, a name the animator does not carry - and the bridge then
-    /// falls back to its word match.
+    /// The creature's normal attack, special attack and block attack, restricted to the
+    /// triggers its own controller really has (read by CreatureTriggers.Probe). Each role
+    /// comes back null when the pool cannot fill it - a prefab without Humanoid (an animal
+    /// without an inventory), an empty pool, a name the animator does not carry, or simply
+    /// a third animation that does not exist - and the bridge then falls back to its word
+    /// match (for the two attack roles) or plays nothing (for the block key).
     /// </summary>
-    internal static (string? normal, string? special) Read(int prefabHash, HashSet<string> triggers)
+    internal static (string? normal, string? special, string? block) Read(
+        int prefabHash,
+        HashSet<string> triggers
+    )
     {
         if (triggers.Count == 0)
         {
-            return (null, null);
+            return (null, null, null);
         }
         GameObject? prefab = GhostFactory.Prefab(prefabHash);
         if (prefab == null)
         {
-            return (null, null);
+            return (null, null, null);
         }
         // One Humanoid per creature prefab, root or child; the inactive prefab answers
         // GetComponentInChildren like any other object.
         Humanoid? humanoid = prefab.GetComponentInChildren<Humanoid>(true);
         if (humanoid == null)
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         // name / secondary / projectile / cooldown / pool order.
@@ -78,7 +91,7 @@ internal static class CreatureAttacks
 
         if (entries.Count == 0)
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         // The basic one. List.Sort is not stable, so the pool order is part of the key.
@@ -122,7 +135,24 @@ internal static class CreatureAttacks
                 break;
             }
         }
-        return (normal, special);
+
+        // The middle one, for the block key. `entries` is still ordered light-to-heavy (the
+        // heavy copy above never touched it), so what is left after the basic and the
+        // heaviest attacks are spoken for is taken at its LOWER MEDIAN - the middle entry
+        // of an even count is the lighter of the two. Nothing left, that is a pool of two
+        // attacks or fewer, means no third animation exists and the block key then plays
+        // nothing instead of repeating one of the two.
+        List<string> rest = new();
+        for (int i = 0; i < entries.Count; i++)
+        {
+            string name = entries[i].name;
+            if (name != normal && name != special)
+            {
+                rest.Add(name);
+            }
+        }
+        string? block = rest.Count > 0 ? rest[(rest.Count - 1) / 2] : null;
+        return (normal, special, block);
 
         // One entry per animation: the first item carrying it wins (the same animation on
         // a club, a sword and a torch is one attack, not three).
