@@ -8,6 +8,11 @@ namespace Disguise;
 /// Builds the inert visual clone used by SelfView: the creature prefab reduced to its
 /// visuals, with no ZDO, no AI and no collision.
 ///
+/// The same build is what makes CreatureTriggers able to read a creature's animator at all
+/// (BuildInert): Animator.parameters returns an empty array while the animator is not
+/// active in the hierarchy, and a ZNetScene prefab never is - one activated, throwaway copy
+/// is the only way to get the list of triggers a creature really has.
+///
 /// The clone problem: instantiating an ACTIVE prefab runs every Awake inside Instantiate,
 /// and ZNetView.Awake would immediately create a real ZDO for it - a phantom networked
 /// object the whole server would see. The prefab is therefore deactivated for the duration
@@ -34,13 +39,56 @@ internal static class GhostFactory
     /// </summary>
     internal static GameObject? Create(int prefabHash, Vector3 position, Quaternion rotation)
     {
-        ZNetScene? zns = ZNetScene.instance;
-        GameObject? prefab = zns != null ? zns.GetPrefab(prefabHash) : null;
+        GameObject? prefab = Prefab(prefabHash);
         if (prefab == null)
         {
-            Disguise.LogWarning(
-                $"Own view: prefab not found ({PrefabResolver.PrefabName(prefabHash)})."
-            );
+            return null;
+        }
+        // The sync list has to be read HERE: BuildInert strips ZSyncAnimation away. The
+        // prefab's serialized lists are exactly what the copy carries - a plain field read,
+        // unlike Animator.parameters below, which does not exist on an inactive object.
+        GhostAnimation.Capture(
+            prefab.GetComponent<ZSyncAnimation>()
+                ?? prefab.GetComponentInChildren<ZSyncAnimation>(true)
+        );
+
+        GameObject? clone = BuildInert(prefabHash);
+        if (clone == null)
+        {
+            return null;
+        }
+        try
+        {
+            clone.transform.SetPositionAndRotation(position, rotation);
+            clone.SetActive(true);
+            GhostAnimation.Bind(clone.GetComponentInChildren<Animator>(true));
+            return clone;
+        }
+        catch (Exception ex)
+        {
+            Disguise.LogError($"Own view: cannot build the clone of {clone.name}: {ex}");
+            UnityEngine.Object.Destroy(clone);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// An INACTIVE copy of the prefab, reduced to pure visuals: every non-visual component
+    /// is removed while the copy is still inactive, so no Awake has run yet and activating
+    /// it can only wake renderers, lights, particles, LODGroup and the Animator - never a
+    /// ZNetView (which would mint a real ZDO), a Character or an AI.
+    ///
+    /// The caller owns the result. SelfView activates and renders it; CreatureTriggers
+    /// activates it only to read its Animator - Animator.parameters returns an empty array
+    /// while the animator is not active in the hierarchy, and a ZNetScene prefab never is
+    /// (m_prefabs holds asset references, in no scene at all) - and destroys it in the same
+    /// call, once per creature.
+    /// </summary>
+    internal static GameObject? BuildInert(int prefabHash)
+    {
+        GameObject? prefab = Prefab(prefabHash);
+        if (prefab == null)
+        {
             return null;
         }
 
@@ -66,14 +114,7 @@ internal static class GhostFactory
                 }
             }
 
-            clone.name = prefab.name + " (Disguise own view)";
-
-            // The sync list has to be read here: ZSyncAnimation is removed by Strip below,
-            // but its serialized fields are already populated on the inactive clone.
-            GhostAnimation.Capture(
-                clone.GetComponent<ZSyncAnimation>()
-                    ?? clone.GetComponentInChildren<ZSyncAnimation>(true)
-            );
+            clone.name = prefab.name + " (Disguise copy)";
 
             Strip(clone);
             if (!IsInert(clone))
@@ -81,22 +122,28 @@ internal static class GhostFactory
                 UnityEngine.Object.Destroy(clone);
                 return null;
             }
-
-            clone.transform.SetPositionAndRotation(position, rotation);
-
-            clone.SetActive(true);
-            GhostAnimation.Bind(clone.GetComponentInChildren<Animator>(true));
             return clone;
         }
         catch (Exception ex)
         {
-            Disguise.LogError($"Own view: cannot build the clone of {prefab.name}: {ex}");
+            Disguise.LogError($"Cannot build an inert copy of {prefab.name}: {ex}");
             if (clone != null)
             {
                 UnityEngine.Object.Destroy(clone);
             }
             return null;
         }
+    }
+
+    private static GameObject? Prefab(int prefabHash)
+    {
+        ZNetScene? zns = ZNetScene.instance;
+        GameObject? prefab = zns != null ? zns.GetPrefab(prefabHash) : null;
+        if (prefab == null)
+        {
+            Disguise.LogWarning($"Prefab not found ({PrefabResolver.PrefabName(prefabHash)}).");
+        }
+        return prefab;
     }
 
     /// <summary>The strip repeats while it still manages to destroy something (dependency chains).</summary>
@@ -158,7 +205,7 @@ internal static class GhostFactory
                 continue;
             }
             Disguise.LogError(
-                $"Own view: {component.GetType().Name} survived the strip of {clone.name} - discarding it instead of activating a half-alive copy."
+                $"Inert copy: {component.GetType().Name} survived the strip of {clone.name} - discarding it instead of activating a half-alive copy."
             );
             return false;
         }

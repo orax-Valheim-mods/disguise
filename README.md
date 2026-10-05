@@ -208,7 +208,9 @@ The clone is **purely local**: no ZDO, no collision, no AI, no network component
 `GhostFactory` builds it from a prefab deactivated for the duration of the instantiation,
 which defers every `Awake` and lets the mod strip `ZNetView`, `Character`, `BaseAI`,
 `ZSync*` and the colliders **before** the clone is activated (a live `ZNetView.Awake` would
-create a phantom networked ZDO). The strip runs in **several passes**: Unity refuses to
+create a phantom networked ZDO). The very same build is what makes the animation bridge able
+to read a creature's trigger list at all (§ 3): the copy is activated, read, and destroyed in
+the same call. The strip runs in **several passes**: Unity refuses to
 remove a component another one still requires ("Can't remove Humanoid because CharacterDrop
 depends on it"), and a single surviving `Humanoid` would wake up as a live `Character` - its
 animator states call `IsTamed()` on it, `EnemyHud.TestShow()` throws on it from `LateUpdate`,
@@ -298,7 +300,15 @@ Visual synchronisation on vanilla clients:
   creature really has (picked by `CreatureTriggers`, e.g. `swing_longsword` for a goblin) and
   chosen so that `Player_animator` does not know it either: a machine rendering a viking
   drops the second name exactly as the vanilla machine drops the first, nothing is rewritten
-  on reception, and your own character never changes. Everything else is untouched: the
+  on reception, and your own character never changes. Both reference sets are read from
+  **active** objects: `Animator.parameters` returns an empty array while its `GameObject` is
+  not active in the hierarchy, and a `ZNetScene` prefab never is (`m_prefabs` holds assets, in
+  no scene at all) - reading the prefabs is exactly what used to keep this bridge silently
+  dead. The player set comes from your live character, the creature set from one throwaway
+  activated copy built per creature by `GhostFactory`; until both are non-empty **nothing is
+  sent** rather than risk a name the viking also knows. What the bridge decided for each
+  trigger is written once as `Attack bridge: <trigger> -> ...` in the log of your own client
+  (§ 7). Everything else is untouched: the
   parameters both controllers share (movement, `jump`, `stagger`...) arrive as they always
   did, the rest is left to vanilla (§ 4.7).
 - **Name above the head**: no, vanilla clients have no `Player` component for you (the
@@ -454,7 +464,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   before it writes it, always restored right after (§ 2).
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so the companion name can only
-  ever be played by the creature), used by `Patch_SetTrigger`.
+  ever be played by the creature), used by `Patch_SetTrigger`. It reads the player set from
+  the live local player and the creature set from a throwaway activated copy (both reference
+  sets are unreadable on a `ZNetScene` prefab), and owns the one-line `Attack bridge:` trace
+  of its decision, the only place where that decision is visible.
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
@@ -512,7 +525,7 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 | `ArgumentOutOfRangeException` in `FootStep.RPC_Step` in the log of the player **watching you** | That client received a *player* footstep index for a creature: the disguised player's DLL is older than the footstep translation (§ 4.5) → deploy a current build (§ 6) and restart |
 | Your equipment is invisible to the other players although every `Hide*` option is `false` | A relaying server running an **older** DLL masks with its own `[3 - Display]` config (`Hide* = true` by default): deploy the current build on the server and restart it (§ 1.b). Since `cd_hide` your own config is the only one that decides |
 | Your creature keeps the red enemy bar although `ShowAsAlly = true` | `cd_rel` is published by the client running the mod: restart **that** client with the current build (§ 6). An older server DLL is harmless here, it relays the flag exactly as it receives it |
-| Your creature stands still while you swing (its attack never plays) | The bridge is sent by **the disguised player's own client** (§ 3): deploy a current build there and restart it (§ 6) - no other client and no server DLL is involved. Ranged weapons and gestures have no creature equivalent and never animated (§ 4.7) |
+| Your creature stands still while you swing (its attack never plays) | The bridge is sent by **the disguised player's own client** (§ 3): deploy a current build there and restart it (§ 6) - no other client and no server DLL is involved. Then read `Attack bridge: ...` in **that** client's `BepInEx\LogOutput.log`: no line at all = a DLL older than the fix (the bridge never sent anything, § 3); `sent again as ...` = the second broadcast went out; `no creature equivalent (player N, creature M triggers)` = a reference set came back empty (`M = 0`: look just above it for `Prefab not found` or `Inert copy: ... survived the strip`); `skipped: the component is not the local player's` = the bridge never saw your own animator. Ranged weapons and gestures have no creature equivalent and never animated (§ 4.7) |
 | The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |

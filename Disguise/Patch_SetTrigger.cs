@@ -32,10 +32,7 @@ internal static class Patch_SetTrigger
     {
         try
         {
-            if (
-                Player.m_localPlayer == null
-                || __instance.GetComponent<Player>() != Player.m_localPlayer
-            )
+            if (Player.m_localPlayer == null)
             {
                 return;
             }
@@ -43,10 +40,14 @@ internal static class Patch_SetTrigger
             ZDO? zdo = nview != null ? nview.GetZDO() : null;
             if (!DisguiseApplier.HasMarker(zdo))
             {
-                return;
+                return; // not disguised: vanilla behaviour, no reason to log anything
             }
-            string? creatureName = CreatureTriggers.Resolve(zdo, name);
-            if (creatureName == null)
+            // The marker can only sit on our own player ZDO, so anything failing here is
+            // worth one log line (see CreatureTriggers.Trace): it is the whole bridge.
+            bool mine = __instance.GetComponent<Player>() == Player.m_localPlayer;
+            string? creatureName = mine ? CreatureTriggers.Resolve(zdo, name) : null;
+            CreatureTriggers.Trace(name, mine, creatureName);
+            if (!mine || creatureName == null)
             {
                 return; // no creature animation for this one: vanilla behaviour, no extra RPC
             }
