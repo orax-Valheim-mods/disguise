@@ -251,16 +251,26 @@ reports the current height.
 
 | Option | Default | Role |
 |---|---|---|
-| `FlyEnableKey` | `LeftAlt+Home` | Start the flight: the creature is raised for everyone who renders you |
-| `FlyDisableKey` | `LeftAlt+End` | Land it: back on the ground |
-| `FlyUpKey` | `LeftAlt+UpArrow` | Climb while held (only once the flight is on), up to 100 m |
-| `FlyDownKey` | `LeftAlt+DownArrow` | Descend while held, down to the ground and never below it |
+| `FlyEnableKey` | `Home + LeftAlt` | Start the flight: the creature is raised for everyone who renders you |
+| `FlyDisableKey` | `End + LeftAlt` | Land it: back on the ground |
+| `FlyUpKey` | `UpArrow + LeftAlt` | Climb while held (only once the flight is on), up to 100 m |
+| `FlyDownKey` | `DownArrow + LeftAlt` | Descend while held, down to the ground and never below it |
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
 
-Keys are **chords**: every key of the value must be held at once (`LeftAlt+UpArrow`), and
-each one is re-read the moment the `.cfg` changes. They default to `LeftAlt` on purpose -
-never `AltGr`, which is the RightAlt of a French keyboard and types characters all day.
-The climb / descent keys only act **while the flight is on**, so a chord pressed by accident
+The four keys are BepInEx **shortcuts** (`main key + modifiers`), and none of them has to be
+typed: open **ConfigurationManager** (Alt+F10 by default), section `5 - Flight`, click the
+value you want to change and press the new combination - it is recorded straight into
+`BepInEx\config\orax.Disguise.cfg` (the `Clear` button unbinds it). Editing the file by hand
+still works, as long as the format is kept (`Home + LeftAlt`, main key first), and either
+source is read every frame, so a change applies immediately. A value written by an older
+version (`LeftAlt+Home`, main key **last**) would be read reversed: re-record it, or swap the
+two keys.
+
+They default to `LeftAlt` on purpose - never `AltGr`, which is the RightAlt of a French
+keyboard and types characters all day. Every key of a shortcut must be held at once, in
+whatever order, and nothing else is required: the chords are read directly instead of through
+BepInEx's `KeyboardShortcut.IsDown`, which would refuse them while W, A, S or D is held. The
+climb / descent keys only act **while the flight is on**, so a shortcut pressed by accident
 never moves the creature.
 
 **Nothing of it reaches your player.** The height is a value like any other published in
@@ -576,7 +586,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   publishes (`cd_fake` / `cd_fpos`), and the swap the server runs over the player list
   before it writes it, always restored right after (§ 2).
 - `FlightControl.cs` - the flight (`disguise fly`, § 2): the local state (on / off, height),
-  the four key chords and their parsing, the throttled publication of the height (`cd_fly`),
+  the four key shortcuts read straight from their `KeyboardShortcut` entries, the throttled
+  publication of the height (`cd_fly`),
   and the raise the relaying server adds to the outgoing packet header - server only,
   creature only, handed back as a copy so nothing has to be restored (§ 3).
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
@@ -675,7 +686,7 @@ stays 82.
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 | You fly on your own screen but nobody else sees you in the air | The raise is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, a vanilla client receives your creature already raised; without it, only your own view flies (`disguise fly on` then `disguise status` to confirm the height is published). Two older mistakes produce the same symptom, both fixed by deploying the **current** build on the server and restarting it (§ 6): a server whose DLL predates the flight, or one whose DLL raised the position inside `ZDO.Serialize` - the body of a ZDO, which the receiver never reads for a position |
-| The climb / descent keys do nothing | The flight must be **on** first (`disguise fly on` or `FlyEnableKey`): `FlyUpKey` / `FlyDownKey` only act while it is. Then check the four chords in the `[5 - Flight]` section - an unusable value disables that one binding and writes a `Flight: "..." is not a usable key` warning in the log. An invalid chord never throws |
+| The climb / descent keys do nothing | The flight must be **on** first (`disguise fly on` or `FlyEnableKey`): `FlyUpKey` / `FlyDownKey` only act while it is. Then check the four shortcuts in the `[5 - Flight]` section - a value BepInEx cannot read leaves that binding empty and logs `Failed to read keybind from settings: ...` in the log, which needs the format `main key + modifiers` (`UpArrow + LeftAlt`, main key first: `LeftAlt+Home` would be read reversed). Re-record it in ConfigurationManager (Alt+F10) instead of typing it. An unset shortcut (`Not set`) never fires, and nothing of it ever throws |
 | Your own viking stays on the ground while the creature flies | Normal: your body really is on the ground (§ 4.8). Turn `SeeYourDisguise` on (§ 2) to watch the creature fly on your own screen too |
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 

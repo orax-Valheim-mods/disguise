@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using BepInEx.Configuration;
+using UnityEngine;
 
 namespace Disguise;
 
@@ -39,13 +40,13 @@ internal static class DisguiseConfig
     // -- 4 - Own view: what YOU see on your own screen ----------------------------------
     internal static ConfigEntry<bool> ConfigSeeYourDisguise = null!;
 
-    internal static ConfigEntry<string> ConfigFlyEnableKey = null!;
+    internal static ConfigEntry<KeyboardShortcut> ConfigFlyEnableKey = null!;
 
-    internal static ConfigEntry<string> ConfigFlyDisableKey = null!;
+    internal static ConfigEntry<KeyboardShortcut> ConfigFlyDisableKey = null!;
 
-    internal static ConfigEntry<string> ConfigFlyUpKey = null!;
+    internal static ConfigEntry<KeyboardShortcut> ConfigFlyUpKey = null!;
 
-    internal static ConfigEntry<string> ConfigFlyDownKey = null!;
+    internal static ConfigEntry<KeyboardShortcut> ConfigFlyDownKey = null!;
 
     internal static ConfigEntry<float> ConfigFlySpeed = null!;
 
@@ -184,37 +185,48 @@ internal static class DisguiseConfig
         );
 
         // -- 5 - Flight: purely visual, the player never leaves the ground (FlightControl).
-        // The keys are chords (every key held at once) and default to LeftAlt, which never
-        // fires while text is entered (AltGr is the RightAlt of a French keyboard).
+        // The keys are BepInEx KeyboardShortcut values: the .cfg stores them as
+        // "main key + modifiers" (e.g. Home + LeftAlt), and ConfigurationManager (Alt+F10 by
+        // default) records a new one by simply pressing it - no manual text to type. They
+        // default to LeftAlt, which never fires while text is entered (AltGr is the RightAlt
+        // of a French keyboard).
         ConfigFlyEnableKey = config.Bind(
             "5 - Flight",
             "FlyEnableKey",
-            "LeftAlt+Home",
+            new KeyboardShortcut(KeyCode.Home, KeyCode.LeftAlt),
             "Start the flight: the creature is raised for the other machines (your player "
-                + "stays on the ground). Same as \"disguise fly on\"."
+                + "stays on the ground). Same as \"disguise fly on\". "
+                + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
+                + "value, then press the wanted keys."
         );
 
         ConfigFlyDisableKey = config.Bind(
             "5 - Flight",
             "FlyDisableKey",
-            "LeftAlt+End",
-            "End the flight: the creature is back on the ground. Same as \"disguise fly off\"."
+            new KeyboardShortcut(KeyCode.End, KeyCode.LeftAlt),
+            "End the flight: the creature is back on the ground. Same as \"disguise fly off\". "
+                + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
+                + "value, then press the wanted keys."
         );
 
         ConfigFlyUpKey = config.Bind(
             "5 - Flight",
             "FlyUpKey",
-            "LeftAlt+UpArrow",
+            new KeyboardShortcut(KeyCode.UpArrow, KeyCode.LeftAlt),
             "Raise the creature while the flight is on (hold it: the creature climbs "
-                + "continuously at FlySpeed metres per second, up to 100 m)."
+                + "continuously at FlySpeed metres per second, up to 100 m). "
+                + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
+                + "value, then press the wanted keys."
         );
 
         ConfigFlyDownKey = config.Bind(
             "5 - Flight",
             "FlyDownKey",
-            "LeftAlt+DownArrow",
+            new KeyboardShortcut(KeyCode.DownArrow, KeyCode.LeftAlt),
             "Lower the creature while the flight is on (hold it: down to the ground, "
-                + "never below it)."
+                + "never below it). "
+                + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
+                + "value, then press the wanted keys."
         );
 
         ConfigFlySpeed = config.Bind(
@@ -224,11 +236,6 @@ internal static class DisguiseConfig
             "How fast (metres per second) the creature climbs and descends while the "
                 + "corresponding key is held."
         );
-
-        ConfigFlyEnableKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
-        ConfigFlyDisableKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
-        ConfigFlyUpKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
-        ConfigFlyDownKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
     }

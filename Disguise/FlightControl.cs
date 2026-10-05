@@ -1,6 +1,6 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
+using BepInEx.Configuration;
 using UnityEngine;
 
 namespace Disguise;
@@ -41,12 +41,6 @@ internal static class FlightControl
     /// <summary>Smallest gap between two publications of the height (seconds).</summary>
     private const float PublishInterval = 0.1f;
 
-    private static KeyCode[] s_enableChord = Array.Empty<KeyCode>();
-    private static KeyCode[] s_disableChord = Array.Empty<KeyCode>();
-    private static KeyCode[] s_upChord = Array.Empty<KeyCode>();
-    private static KeyCode[] s_downChord = Array.Empty<KeyCode>();
-    private static bool s_chordsLoaded;
-
     private static bool s_flying;
     private static float s_height;
     private static float s_nextPublishTime;
@@ -66,33 +60,21 @@ internal static class FlightControl
 
     // ------------------------------------------------------------------ keys and state
 
-    /// <summary>Re-reads the four chords: called from Disguise.Update, once per frame.</summary>
+    /// <summary>Reads the four key bindings and moves the height: Disguise.Update, once per frame.</summary>
     internal static void Tick()
     {
         try
         {
-            if (!s_chordsLoaded)
-            {
-                s_chordsLoaded = true;
-                s_enableChord = ParseChord("FlyEnableKey", DisguiseConfig.ConfigFlyEnableKey.Value);
-                s_disableChord = ParseChord(
-                    "FlyDisableKey",
-                    DisguiseConfig.ConfigFlyDisableKey.Value
-                );
-                s_upChord = ParseChord("FlyUpKey", DisguiseConfig.ConfigFlyUpKey.Value);
-                s_downChord = ParseChord("FlyDownKey", DisguiseConfig.ConfigFlyDownKey.Value);
-            }
-
             if (Player.m_localPlayer == null)
             {
                 return;
             }
 
-            if (ChordPressed(s_enableChord))
+            if (ChordPressed(DisguiseConfig.ConfigFlyEnableKey))
             {
                 Enable();
             }
-            if (ChordPressed(s_disableChord))
+            if (ChordPressed(DisguiseConfig.ConfigFlyDisableKey))
             {
                 Disable();
             }
@@ -102,11 +84,11 @@ internal static class FlightControl
             if (s_flying)
             {
                 float step = Mathf.Max(0.1f, DisguiseConfig.ConfigFlySpeed.Value) * Time.deltaTime;
-                if (ChordHeld(s_upChord))
+                if (ChordHeld(DisguiseConfig.ConfigFlyUpKey))
                 {
                     s_height = Clamp(s_height + step);
                 }
-                if (ChordHeld(s_downChord))
+                if (ChordHeld(DisguiseConfig.ConfigFlyDownKey))
                 {
                     s_height = Clamp(s_height - step);
                 }
@@ -148,37 +130,63 @@ internal static class FlightControl
         Disguise.LogInfo("Flight: off, the creature is back on the ground.");
     }
 
-    /// <summary>True while <paramref name="chord"/> is held entirely (empty chord: never).</summary>
-    private static bool ChordHeld(KeyCode[] chord)
-    {
-        for (int i = 0; i < chord.Length; i++)
-        {
-            if (!Input.GetKey(chord[i]))
-            {
-                return false;
-            }
-        }
-        return chord.Length > 0;
-    }
-
     /// <summary>
-    /// True when every key of the chord is held and one of them went down this frame, so the
-    /// chord works whatever order the keys were pressed in.
+    /// True while every key of the shortcut is held at once (an unset one, MainKey = None,
+    /// never is). The value is read straight from the config entry, so a binding typed in the
+    /// .cfg or recorded by ConfigurationManager applies without any reload.
+    ///
+    /// BepInEx's own KeyboardShortcut.IsDown / IsPressed is deliberately not used here: it
+    /// refuses the combination while ANY other key is held - walking with W would then block
+    /// the climb - and it wants the main key to be pressed last. Reading the keys ourselves
+    /// keeps every chord order free and usable while moving, which is what was tested.
     /// </summary>
-    private static bool ChordPressed(KeyCode[] chord)
+    private static bool ChordHeld(ConfigEntry<KeyboardShortcut> setting)
     {
-        if (chord.Length == 0)
+        KeyboardShortcut shortcut = setting.Value;
+        KeyCode main = shortcut.MainKey;
+        if (main == KeyCode.None || !Input.GetKey(main))
         {
             return false;
         }
-        bool pressed = false;
-        for (int i = 0; i < chord.Length; i++)
+        foreach (KeyCode modifier in shortcut.Modifiers)
         {
-            if (!Input.GetKey(chord[i]))
+            if (modifier == KeyCode.None)
+            {
+                continue;
+            }
+            if (!Input.GetKey(modifier))
             {
                 return false;
             }
-            if (Input.GetKeyDown(chord[i]))
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// True when every key of the shortcut is held and one of them went down this frame, so
+    /// the chord works whatever order the keys were pressed in (the one-shot keys: start and
+    /// end of the flight).
+    /// </summary>
+    private static bool ChordPressed(ConfigEntry<KeyboardShortcut> setting)
+    {
+        KeyboardShortcut shortcut = setting.Value;
+        KeyCode main = shortcut.MainKey;
+        if (main == KeyCode.None || !Input.GetKey(main))
+        {
+            return false;
+        }
+        bool pressed = Input.GetKeyDown(main);
+        foreach (KeyCode modifier in shortcut.Modifiers)
+        {
+            if (modifier == KeyCode.None)
+            {
+                continue;
+            }
+            if (!Input.GetKey(modifier))
+            {
+                return false;
+            }
+            if (Input.GetKeyDown(modifier))
             {
                 pressed = true;
             }
@@ -186,43 +194,9 @@ internal static class FlightControl
         return pressed;
     }
 
-    /// <summary>
-    /// "LeftAlt+UpArrow" - every key held at once. An unusable value disables that one
-    /// binding and warns (the chords default to LeftAlt, never AltGr: on a French keyboard
-    /// AltGr is what types characters while text is entered).
-    /// </summary>
-    private static KeyCode[] ParseChord(string setting, string text)
-    {
-        List<KeyCode> keys = new();
-        foreach (string part in text.Split('+'))
-        {
-            if (!Enum.TryParse(part.Trim(), true, out KeyCode key))
-            {
-                keys.Clear();
-                break;
-            }
-            keys.Add(key);
-        }
-        if (keys.Count == 0)
-        {
-            Disguise.LogWarning(
-                $"Flight: \"{text}\" is not a usable key for {setting} "
-                    + "(e.g. LeftAlt+UpArrow): that binding is disabled."
-            );
-            return Array.Empty<KeyCode>();
-        }
-        return keys.ToArray();
-    }
-
     private static float Clamp(float height)
     {
         return Mathf.Clamp(height, 0f, MaxHeight);
-    }
-
-    /// <summary>Called by DisguiseConfig when one of the four key settings changes.</summary>
-    internal static void OnSettingChanged()
-    {
-        s_chordsLoaded = false;
     }
 
     // ------------------------------------------------------------------ publication

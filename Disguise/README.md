@@ -43,11 +43,17 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `HideHeldItems` | `false` | Hide the items in your hands and on your back |
 | `ShowAsAlly` | `false` | Show the creature to the others with the green health bar of an ally instead of the red one of an enemy |
 | `SeeYourDisguise` | `false` | Show the creature on your own screen instead of your viking (local only) |
-| `FlyEnableKey` | `LeftAlt+Home` | Start the flight: the creature is raised for everyone who renders you |
-| `FlyDisableKey` | `LeftAlt+End` | Land it: back on the ground |
-| `FlyUpKey` | `LeftAlt+UpArrow` | Climb while held (once the flight is on), up to 100 m |
-| `FlyDownKey` | `LeftAlt+DownArrow` | Descend while held, down to the ground |
+| `FlyEnableKey` | `Home + LeftAlt` | Start the flight: the creature is raised for everyone who renders you |
+| `FlyDisableKey` | `End + LeftAlt` | Land it: back on the ground |
+| `FlyUpKey` | `UpArrow + LeftAlt` | Climb while held (once the flight is on), up to 100 m |
+| `FlyDownKey` | `DownArrow + LeftAlt` | Descend while held, down to the ground |
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
+
+The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
+ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
+combination - no text to type. They default to `LeftAlt`, never `AltGr` (the RightAlt of a
+French keyboard, which types characters), and the climb / descent keys only act while the
+flight is on.
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.
