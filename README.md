@@ -249,6 +249,11 @@ creature is raised by 2 m straight away), `FlyUpKey` / `FlyDownKey` climb and de
 states are reached from the console with `disguise fly [on|off]`, and `disguise status`
 reports the current height.
 
+The **mouse wheel** climbs and descends too while the flight is on (`FlyScrollWheel`, one
+notch = `FlyScrollStep` metres), and the camera then waits: the wheel belongs to the creature
+alone, so it never climbs *and* zooms at once - the zoom comes back the moment the flight
+ends, and the minimap and the build rotation keep their own wheel throughout.
+
 | Option | Default | Role |
 |---|---|---|
 | `FlyEnableKey` | `Home + LeftAlt` | Start the flight: the creature is raised for everyone who renders you |
@@ -256,6 +261,8 @@ reports the current height.
 | `FlyUpKey` | `UpArrow + LeftAlt` | Climb while held (only once the flight is on), up to 100 m |
 | `FlyDownKey` | `DownArrow + LeftAlt` | Descend while held, down to the ground and never below it |
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
+| `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
+| `FlyScrollStep` | `1` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 
 The four keys are BepInEx **shortcuts** (`main key + modifiers`), and none of them has to be
 typed: open **ConfigurationManager** (Alt+F10 by default), section `5 - Flight`, click the
@@ -357,6 +364,13 @@ Visual synchronisation on vanilla clients:
   screen the clone simply gets your height added to your transform once per frame
   (`SelfView`), and a machine running this DLL - which renders you as a real `Player` - sees
   that object fly, since it follows the very same ZDO position.
+  The **wheel** climbs and descends alongside the two keys: `FlightControl.Tick` reads it
+  once per frame (Unity reports one detent as `1`, times `FlyScrollStep` metres), and while
+  the flight owns it the scroll `GameCamera.UpdateCamera` reads inside its own call is handed
+  back as `0` (`Patch_UpdateCamera` opens that window, `Patch_GetMouseScrollWheel` makes the
+  read worth nothing). That cancels exactly the zoom of the frame, because the method writes
+  only `GameCamera.m_distance` with that scroll - and only it: the minimap, the build
+  rotation and the climb itself all read the wheel outside the window.
 - **Animations**: partial, and bridged for melee attacks and for the block key. `ZSyncAnimation.SetTrigger`
   carries no name at all inside the ZDO: it broadcasts the raw **parameter name**, and each
   machine applies it to the animator of the object *it* built for that ZDO - a real `Player`
@@ -586,10 +600,13 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   publishes (`cd_fake` / `cd_fpos`), and the swap the server runs over the player list
   before it writes it, always restored right after (§ 2).
 - `FlightControl.cs` - the flight (`disguise fly`, § 2): the local state (on / off, height),
-  the four key shortcuts read straight from their `KeyboardShortcut` entries, the throttled
+  the four key shortcuts read straight from their `KeyboardShortcut` entries, the scroll
+  wheel while the flight owns it, the throttled
   publication of the height (`cd_fly`),
   and the raise the relaying server adds to the outgoing packet header - server only,
-  creature only, handed back as a copy so nothing has to be restored (§ 3).
+  creature only, handed back as a copy so nothing has to be restored (§ 3). It also carries
+  the two windows: the outgoing packet (`BeginSend` / `EndSend`, `Patch_SendZDOs`) and the
+  camera zoom (`SuspendZoom` / `ResumeZoom`, `Patch_UpdateCamera`).
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
   ever be played by the creature), decides which of the creature's attacks to play (normal
@@ -612,8 +629,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
   `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`, `Patch_SetTrigger.cs`,
   `Patch_SetBool.cs`, `Patch_ZDOGetPosition.cs`,
-  `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the
-  nineteen Harmony patches, one
+  `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs`,
+  `Patch_UpdateCamera.cs`, `Patch_GetMouseScrollWheel.cs` - the
+  twenty-one Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
@@ -621,7 +639,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_CreateDestroyObjects` additionally owns the `s_inCreateDestroy` scope flag read
   by `Patch_FindSectorObjects`, and `Patch_SetTrigger` the `s_applyingCompanion` scope flag
   read by `Patch_RPC_SetTrigger` plus the shared `Send` helper that `Patch_SetBool` also
-  uses to reach every machine with the block key (§ 3).
+  uses to reach every machine with the block key (§ 3). `Patch_UpdateCamera` and
+  `Patch_GetMouseScrollWheel` are the two halves of the camera window: the first opens it
+  around `GameCamera.UpdateCamera`, the second empties the scroll that one call reads (§ 3).
 
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
@@ -688,6 +708,8 @@ stays 82.
 | You fly on your own screen but nobody else sees you in the air | The raise is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, a vanilla client receives your creature already raised; without it, only your own view flies (`disguise fly on` then `disguise status` to confirm the height is published). Two older mistakes produce the same symptom, both fixed by deploying the **current** build on the server and restarting it (§ 6): a server whose DLL predates the flight, or one whose DLL raised the position inside `ZDO.Serialize` - the body of a ZDO, which the receiver never reads for a position |
 | The climb / descent keys do nothing | The flight must be **on** first (`disguise fly on` or `FlyEnableKey`): `FlyUpKey` / `FlyDownKey` only act while it is. Then check the four shortcuts in the `[5 - Flight]` section - a value BepInEx cannot read leaves that binding empty and logs `Failed to read keybind from settings: ...` in the log, which needs the format `main key + modifiers` (`UpArrow + LeftAlt`, main key first: `LeftAlt+Home` would be read reversed). Re-record it in ConfigurationManager (Alt+F10) instead of typing it. An unset shortcut (`Not set`) never fires, and nothing of it ever throws |
 | Your own viking stays on the ground while the creature flies | Normal: your body really is on the ground (§ 4.8). Turn `SeeYourDisguise` on (§ 2) to watch the creature fly on your own screen too |
+| The wheel still zooms instead of climbing (or does nothing at all) | The flight must be **on** first (`FlyEnableKey` / `disguise fly on`), `FlyScrollWheel` must be `true`, and `FlyScrollStep` must not be `0` - a step of `0` hands the wheel back to the camera by design. All three are read every frame, so no restart is needed after a change |
+| The camera does not zoom while you fly | Normal: while the flight is on, the wheel belongs to the creature (`FlyScrollWheel`). Land (`FlyDisableKey`) or set the option to `false` and the zoom is back immediately - the minimap and the build rotation were never affected |
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 
 Log files:

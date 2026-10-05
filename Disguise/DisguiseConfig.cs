@@ -50,6 +50,10 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<float> ConfigFlySpeed = null!;
 
+    internal static ConfigEntry<bool> ConfigFlyScrollWheel = null!;
+
+    internal static ConfigEntry<float> ConfigFlyScrollStep = null!;
+
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
     {
@@ -235,6 +239,25 @@ internal static class DisguiseConfig
             5f,
             "How fast (metres per second) the creature climbs and descends while the "
                 + "corresponding key is held."
+        );
+
+        ConfigFlyScrollWheel = config.Bind(
+            "5 - Flight",
+            "FlyScrollWheel",
+            true,
+            "While the flight is on, the mouse wheel raises / lowers the creature instead of "
+                + "zooming the camera (the zoom comes back the moment the flight ends). The "
+                + "minimap and the build rotation keep their own wheel. Off: the wheel only "
+                + "zooms, and the flight is driven by the keys alone."
+        );
+
+        ConfigFlyScrollStep = config.Bind(
+            "5 - Flight",
+            "FlyScrollStep",
+            1f,
+            "Metres the creature moves per scroll notch while the flight is on (used when "
+                + "FlyScrollWheel is on). A smooth wheel or a trackpad moves proportionally; "
+                + "a negative value reverses climb and descent."
         );
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();

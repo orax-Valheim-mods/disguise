@@ -49,6 +49,11 @@ internal static class FlightControl
     // the packet, the only place a position leaves this machine. Patch_SendZDOs opens it.
     private static bool s_sending;
 
+    // Camera window (any machine that renders): true exactly while GameCamera.UpdateCamera
+    // runs and the flight owns the wheel, so the scroll that call reads is worth nothing
+    // (Patch_GetMouseScrollWheel). Patch_UpdateCamera opens and closes it.
+    private static bool s_zoomSuspended;
+
     /// <summary>Whether the flight is on (the height can still be 0: flying at ground level).</summary>
     internal static bool IsFlying => s_flying;
 
@@ -57,6 +62,19 @@ internal static class FlightControl
 
     /// <summary>What the local creature clone adds to the player position, every frame.</summary>
     internal static Vector3 ViewOffset => Vector3.up * s_height;
+
+    /// <summary>
+    /// True while the scroll wheel belongs to the flight instead of the camera. The wheel is
+    /// then read here (Tick), and while GameCamera.UpdateCamera runs, Patch_UpdateCamera
+    /// makes the scroll it reads worth nothing (Patch_GetMouseScrollWheel) - same condition
+    /// on both sides, so the wheel never climbs and zooms at once, and stops taking over the
+    /// moment the flight ends. A step of 0 gives the wheel back to the camera (it would only
+    /// climb by nothing).
+    /// </summary>
+    internal static bool ScrollTakesOver =>
+        s_flying
+        && DisguiseConfig.ConfigFlyScrollWheel.Value
+        && DisguiseConfig.ConfigFlyScrollStep.Value != 0f;
 
     // ------------------------------------------------------------------ keys and state
 
@@ -91,6 +109,22 @@ internal static class FlightControl
                 if (ChordHeld(DisguiseConfig.ConfigFlyDownKey))
                 {
                     s_height = Clamp(s_height - step);
+                }
+
+                // The scroll wheel, while the flight is on: one Unity detent is 1, so the raw
+                // delta times FlyScrollStep is a distance - a free-spinning wheel or a
+                // trackpad therefore moves proportionally instead of one fixed jump per frame.
+                // The camera zoom of the same frame is cancelled by Patch_UpdateCamera, which
+                // empties the scroll GameCamera.UpdateCamera reads inside its own call.
+                if (ScrollTakesOver)
+                {
+                    float wheel = Input.mouseScrollDelta.y;
+                    if (wheel != 0f)
+                    {
+                        s_height = Clamp(
+                            s_height + wheel * DisguiseConfig.ConfigFlyScrollStep.Value
+                        );
+                    }
                 }
             }
 
@@ -278,5 +312,27 @@ internal static class FlightControl
         {
             Disguise.LogError($"Flight raise (outgoing position): {ex}");
         }
+    }
+
+    // ------------------------------------------------------------- camera zoom window
+
+    /// <summary>True while the camera scroll of the current call must be worth nothing.</summary>
+    internal static bool ZoomSuspended => s_zoomSuspended;
+
+    /// <summary>
+    /// Opens the window for one GameCamera.UpdateCamera call: the scroll read inside it is
+    /// then worth nothing, which cancels exactly the zoom of that frame. It opens only while
+    /// the flight owns the wheel, and only over that one call - the minimap and the build
+    /// rotation read the wheel outside it and keep theirs.
+    /// </summary>
+    internal static void SuspendZoom()
+    {
+        s_zoomSuspended = ScrollTakesOver;
+    }
+
+    /// <summary>Closes the window: called by the Finalizer, so it cannot swallow a later wheel.</summary>
+    internal static void ResumeZoom()
+    {
+        s_zoomSuspended = false;
     }
 }

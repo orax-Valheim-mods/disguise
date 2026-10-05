@@ -48,12 +48,19 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `FlyUpKey` | `UpArrow + LeftAlt` | Climb while held (once the flight is on), up to 100 m |
 | `FlyDownKey` | `DownArrow + LeftAlt` | Descend while held, down to the ground |
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
+| `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
+| `FlyScrollStep` | `1` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
 combination - no text to type. They default to `LeftAlt`, never `AltGr` (the RightAlt of a
 French keyboard, which types characters), and the climb / descent keys only act while the
 flight is on.
+
+The **mouse wheel** climbs and descends too while the flight is on (`FlyScrollWheel`, one
+notch = `FlyScrollStep` metres): the camera then waits, so the wheel never climbs *and* zooms
+at once. The zoom comes back the moment the flight ends, and the minimap and the build
+rotation keep their own wheel throughout.
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.
