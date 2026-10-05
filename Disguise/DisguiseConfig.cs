@@ -18,6 +18,8 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<float> ConfigReassert = null!;
 
+    internal static ConfigEntry<bool> ConfigLogs = null!;
+
     internal static ConfigEntry<bool> ConfigForceRefresh = null!;
 
     internal static ConfigEntry<float> ConfigRefreshHold = null!;
@@ -69,6 +71,16 @@ internal static class DisguiseConfig
             "ReassertSeconds",
             2f,
             "Period (seconds) between checks / re-application of the disguise on your own player."
+        );
+
+        ConfigLogs = config.Bind(
+            "1 - General",
+            "Logs",
+            true,
+            "Write the mod's own informational messages (Info / Debug) to the BepInEx log "
+                + "(BepInEx\\LogOutput.log). Warnings and errors are always written, whatever this "
+                + "value is: they are what tells a broken install from a working one. "
+                + "Console command: disguise logs [on|off]."
         );
 
         ConfigForceRefresh = config.Bind(

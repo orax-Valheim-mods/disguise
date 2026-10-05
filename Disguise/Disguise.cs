@@ -89,9 +89,23 @@ public class Disguise : BaseUnityPlugin
     internal static bool s_loggedSummary;
 
     // -- Logging: the plugin instance stays private, every other class logs through these -
-    internal static void LogDebug(string message) => s_instance?.Logger.LogDebug(message);
+    // Info and Debug follow the Logs option ([1 - General], disguise logs); warnings and
+    // errors are never gated, they are what tells a broken install from a working one.
+    internal static void LogDebug(string message)
+    {
+        if (DisguiseConfig.ConfigLogs.Value)
+        {
+            s_instance?.Logger.LogDebug(message);
+        }
+    }
 
-    internal static void LogInfo(string message) => s_instance?.Logger.LogInfo(message);
+    internal static void LogInfo(string message)
+    {
+        if (DisguiseConfig.ConfigLogs.Value)
+        {
+            s_instance?.Logger.LogInfo(message);
+        }
+    }
 
     internal static void LogWarning(string message) => s_instance?.Logger.LogWarning(message);
 
@@ -131,7 +145,7 @@ public class Disguise : BaseUnityPlugin
 
         DisguiseCommand.RegisterConsoleCommands();
 
-        Logger.LogInfo(
+        LogInfo(
             $"{PluginName} {PluginVersion} loaded - disguise: {DisguiseConfig.ConfigEnabled.Value}, creature: \"{DisguiseConfig.ConfigCreature.Value}\""
         );
     }
@@ -187,14 +201,14 @@ public class Disguise : BaseUnityPlugin
             // adds/overwrites), so the server would keep relaying a fake position.
             zdo.Set(PrefabResolver.RefreshHash, 0);
             GameAccess.BumpDataRevision(zdo);
-            Logger.LogInfo("Cleared a stale cd_refresh flag on your player ZDO.");
+            LogInfo("Cleared a stale cd_refresh flag on your player ZDO.");
         }
 
         if (!s_loggedSummary)
         {
             s_loggedSummary = true;
             bool server = ZNet.instance != null && ZNet.instance.IsServer();
-            Logger.LogInfo(
+            LogInfo(
                 $"Local player (ZDO {zdo.m_uid}) - current prefab: {PrefabResolver.PrefabName(zdo.GetPrefab())}, "
                     + "desired prefab: "
                     + PrefabResolver.PrefabName(PrefabResolver.DesiredPrefabHash())

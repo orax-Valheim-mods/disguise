@@ -93,6 +93,7 @@ In game, open the console with **F5**:
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
 | `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
+| `disguise logs [on|off]` | Write the mod's own **Info** messages to the BepInEx log (toggles without an argument; warnings and errors are always written, § 2) |
 | `disguise setFakePosition [x z \| off]` | Show a **fake position** on the other players' map: no argument records where you stand, `off` shows the real one again (needs the DLL on the server, § 1.b) |
 | `disguise perf` | Frame time of the window since the previous call: avg / min / max in ms and FPS (the window resets at every report) |
 | `disguise help` | List of the available commands (`disguise ?` also works) |
@@ -142,6 +143,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `CreaturePrefab` | `Troll` | Exact name of the creature prefab |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
+| `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log; warnings and errors are always written (`disguise logs [on|off]`, § 7) |
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 | `SeeYourDisguise` | `false` | Show the creature on **your own screen** (`4 - Own view`, local only) |
@@ -565,6 +567,11 @@ existed.
 ---
 
 ## 7. Troubleshooting
+
+> **Before reading any `Info` line quoted below** (`Attack bridge: ...`,
+> `Observer refresh ...`, `Map position spoof ...`, `Local player (ZDO ...)`, ...): those are
+> only written while **`Logs = true`** (default, § 2). Run `disguise logs on` first - or set
+> it in the `.cfg`. Warnings and errors are written whatever that value is.
 
 | Symptom | Check |
 |---|---|

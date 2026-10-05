@@ -18,6 +18,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | `disguise enable` / `disguise disable` | Toggle the disguise |
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
 | `disguise view [on|off]` | Show the creature on your own screen instead of your viking (local only) |
+| `disguise logs [on|off]` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
 | `disguise perf` | Frame time of the last few seconds: avg / min / max in ms and FPS (resets the window) |
 | `disguise status` | Current state (creature, marker, save protection) |
 
@@ -31,6 +32,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `CreaturePrefab` | `Troll` | Exact name of the creature prefab |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save |
 | `ReassertSeconds` | `2` | Re-application period on your player |
+| `Logs` | `true` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
 | `ForceObserverRefresh` | `true` | Other players see a change right away (needs the DLL on the server) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look |
 | `HideHelmet` | `true` | Hide the helmet from the other machines |

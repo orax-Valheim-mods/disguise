@@ -28,7 +28,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | setFakePosition | perf | list [filter] | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | setFakePosition | perf | list [filter] | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -58,6 +58,7 @@ internal static class DisguiseCommand
                 "disable",
                 "refresh",
                 "view",
+                "logs",
                 "setFakePosition",
                 "perf",
                 "list",
@@ -111,6 +112,10 @@ internal static class DisguiseCommand
 
             case "view":
                 SetOwnView(ctx, args.Length > 2 ? args[2] : null);
+                break;
+
+            case "logs":
+                SetLogs(ctx, args.Length > 2 ? args[2] : null);
                 break;
 
             case "setfakeposition":
@@ -180,6 +185,10 @@ internal static class DisguiseCommand
         Say(ctx, "  disguise view [on|off]    show the creature on your own screen (local only)");
         Say(
             ctx,
+            "  disguise logs [on|off]    write the mod's own Info messages to the BepInEx log"
+        );
+        Say(
+            ctx,
             "  disguise setFakePosition  fake the position the others see on their map ([x z] | off)"
         );
         Say(ctx, "  disguise perf             frame time of the last few seconds (resets it)");
@@ -238,22 +247,10 @@ internal static class DisguiseCommand
         {
             ownView = !ownView;
         }
-        else
+        else if (!TryParseOnOff(argument, out ownView))
         {
-            string value = argument.ToLowerInvariant();
-            if (value == "on" || value == "true" || value == "1" || value == "enable")
-            {
-                ownView = true;
-            }
-            else if (value == "off" || value == "false" || value == "0" || value == "disable")
-            {
-                ownView = false;
-            }
-            else
-            {
-                Say(ctx, "Usage: disguise view [on|off]");
-                return;
-            }
+            Say(ctx, "Usage: disguise view [on|off]");
+            return;
         }
         DisguiseConfig.ConfigSeeYourDisguise.Value = ownView;
 
@@ -276,6 +273,54 @@ internal static class DisguiseCommand
         {
             Say(ctx, "[Disguise] Own view OFF: your screen shows your viking again.");
         }
+    }
+
+    /// <summary>
+    /// "disguise logs [on|off]": decides whether the mod writes its own informational
+    /// messages (Info / Debug) to the BepInEx log. Warnings and errors are never gated.
+    /// </summary>
+    private static void SetLogs(Terminal ctx, string? argument)
+    {
+        bool logs = DisguiseConfig.ConfigLogs.Value;
+        if (argument == null)
+        {
+            logs = !logs;
+        }
+        else if (!TryParseOnOff(argument, out logs))
+        {
+            Say(ctx, "Usage: disguise logs [on|off]");
+            return;
+        }
+        DisguiseConfig.ConfigLogs.Value = logs;
+
+        Say(
+            ctx,
+            logs
+                ? "[Disguise] Logs ON: the mod writes its Info messages to the BepInEx log again."
+                : "[Disguise] Logs OFF: no more Info messages from the mod "
+                    + "(warnings and errors are still written)."
+        );
+    }
+
+    /// <summary>
+    /// Every toggle of this command accepts the same words, so they are parsed in one place.
+    /// Returns false for anything else, and the caller then prints its own usage line.
+    /// </summary>
+    private static bool TryParseOnOff(string argument, out bool value)
+    {
+        string word = argument.ToLowerInvariant();
+        if (word == "on" || word == "true" || word == "1" || word == "enable")
+        {
+            value = true;
+            return true;
+        }
+        if (word == "off" || word == "false" || word == "0" || word == "disable")
+        {
+            value = false;
+            return true;
+        }
+        value = false;
+        return false;
     }
 
     /// <summary>
@@ -414,6 +459,15 @@ internal static class DisguiseCommand
         );
         Say(
             ctx,
+            $"  Info logs: {(DisguiseConfig.ConfigLogs.Value ? "on" : "off")} (disguise logs)"
+                + (
+                    DisguiseConfig.ConfigLogs.Value
+                        ? ""
+                        : " - warnings and errors are still written"
+                )
+        );
+        Say(
+            ctx,
             FakePosition.Current is Vector3 fakePosition
                 ? $"  Fake map position: ({fakePosition.x:0.0}, {fakePosition.z:0.0}) - the other maps show you there"
                 : "  Fake map position: off (the other maps show your real position)"
@@ -490,7 +544,9 @@ internal static class DisguiseCommand
         }
         catch (Exception ex)
         {
-            Disguise.LogInfo(text + "  (console display error: " + ex.Message + ")");
+            // A console display failure must stay visible even with Logs off: this is the
+            // only place where the text would otherwise be lost entirely.
+            Disguise.LogWarning(text + "  (console display error: " + ex.Message + ")");
         }
     }
 }
