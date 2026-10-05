@@ -254,7 +254,7 @@ internal static class DisguiseConfig
         ConfigFlyScrollStep = config.Bind(
             "5 - Flight",
             "FlyScrollStep",
-            1f,
+            0.2f,
             "Metres the creature moves per scroll notch while the flight is on (used when "
                 + "FlyScrollWheel is on). A smooth wheel or a trackpad moves proportionally; "
                 + "a negative value reverses climb and descent."

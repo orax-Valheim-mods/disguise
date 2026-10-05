@@ -49,7 +49,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `FlyDownKey` | `DownArrow + LeftAlt` | Descend while held, down to the ground |
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
 | `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
-| `FlyScrollStep` | `1` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
+| `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new

@@ -262,7 +262,7 @@ ends, and the minimap and the build rotation keep their own wheel throughout.
 | `FlyDownKey` | `DownArrow + LeftAlt` | Descend while held, down to the ground and never below it |
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
 | `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
-| `FlyScrollStep` | `1` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
+| `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 
 The four keys are BepInEx **shortcuts** (`main key + modifiers`), and none of them has to be
 typed: open **ConfigurationManager** (Alt+F10 by default), section `5 - Flight`, click the
