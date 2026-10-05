@@ -19,6 +19,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
 | `disguise view [on|off]` | Show the creature on your own screen instead of your viking (local only) |
 | `disguise logs [on|off]` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
+| `disguise fly [on|off]` | Raise the creature above you for the others (visual only: your player stays on the ground) |
 | `disguise perf` | Frame time of the last few seconds: avg / min / max in ms and FPS (resets the window) |
 | `disguise status` | Current state (creature, marker, save protection) |
 
@@ -42,6 +43,11 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `HideHeldItems` | `false` | Hide the items in your hands and on your back |
 | `ShowAsAlly` | `false` | Show the creature to the others with the green health bar of an ally instead of the red one of an enemy |
 | `SeeYourDisguise` | `false` | Show the creature on your own screen instead of your viking (local only) |
+| `FlyEnableKey` | `LeftAlt+Home` | Start the flight: the creature is raised for everyone who renders you |
+| `FlyDisableKey` | `LeftAlt+End` | Land it: back on the ground |
+| `FlyUpKey` | `LeftAlt+UpArrow` | Climb while held (once the flight is on), up to 100 m |
+| `FlyDownKey` | `LeftAlt+DownArrow` | Descend while held, down to the ground |
+| `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.

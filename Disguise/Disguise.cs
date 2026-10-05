@@ -82,6 +82,14 @@ public class Disguise : BaseUnityPlugin
     /// </summary>
     public const string FakePositionKey = "cd_fpos";
 
+    /// <summary>
+    /// Int flag written by the OWNER of a disguised player: the height, in CENTIMETRES, at
+    /// which the other machines must draw it (see FlightControl). The real position never
+    /// moves: the relaying server adds this value to position.y for the duration of the
+    /// outgoing packet only, so it never reaches the game logic nor the save file.
+    /// </summary>
+    public const string FlyKey = "cd_fly";
+
     internal static Harmony? PatchHarmony;
 
     private static Disguise? s_instance;
@@ -167,6 +175,10 @@ public class Disguise : BaseUnityPlugin
         // Runs every frame on both sides: ends the observer-refresh window (owner) and
         // guarantees the fake relay position can never outlive its safety timeout (server).
         ObserverRefresh.TickObserverRefresh();
+
+        // Flight keys (purely visual): raises what the other machines render, and what your
+        // own clone draws - your player itself never moves. Also publishes the height.
+        FlightControl.Tick();
 
         // Own view (purely local): builds / synchronises / removes the creature clone that
         // replaces your own viking on your screen. No-op without a local player, without

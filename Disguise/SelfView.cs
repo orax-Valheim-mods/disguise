@@ -93,7 +93,7 @@ internal static class SelfView
                 }
                 GameObject? ghost = GhostFactory.Create(
                     wanted,
-                    player!.transform.position,
+                    player!.transform.position + FlightControl.ViewOffset,
                     player.transform.rotation
                 );
                 if (ghost == null)
@@ -141,7 +141,7 @@ internal static class SelfView
             }
 
             s_ghost.transform.SetPositionAndRotation(
-                player.transform.position,
+                player.transform.position + FlightControl.ViewOffset,
                 player.transform.rotation
             );
 

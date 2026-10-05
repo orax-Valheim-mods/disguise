@@ -28,7 +28,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | setFakePosition | perf | list [filter] | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | setFakePosition | perf | list [filter] | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -59,6 +59,7 @@ internal static class DisguiseCommand
                 "refresh",
                 "view",
                 "logs",
+                "fly",
                 "setFakePosition",
                 "perf",
                 "list",
@@ -116,6 +117,10 @@ internal static class DisguiseCommand
 
             case "logs":
                 SetLogs(ctx, args.Length > 2 ? args[2] : null);
+                break;
+
+            case "fly":
+                SetFly(ctx, args.Length > 2 ? args[2] : null);
                 break;
 
             case "setfakeposition":
@@ -186,6 +191,10 @@ internal static class DisguiseCommand
         Say(
             ctx,
             "  disguise logs [on|off]    write the mod's own Info messages to the BepInEx log"
+        );
+        Say(
+            ctx,
+            "  disguise fly [on|off]     fly: the creature is raised for the others (visual only)"
         );
         Say(
             ctx,
@@ -300,6 +309,55 @@ internal static class DisguiseCommand
                 : "[Disguise] Logs OFF: no more Info messages from the mod "
                     + "(warnings and errors are still written)."
         );
+    }
+
+    /// <summary>
+    /// "disguise fly [on|off]": raises the creature above you for the other machines (and on
+    /// your own screen with SeeYourDisguise). Your player never moves: the position the
+    /// server keeps, saves and runs the game logic with stays on the ground - only what is
+    /// drawn and what goes out on the wire is raised (FlightControl).
+    /// </summary>
+    private static void SetFly(Terminal ctx, string? argument)
+    {
+        bool flying = FlightControl.IsFlying;
+        if (argument == null)
+        {
+            flying = !flying;
+        }
+        else if (!TryParseOnOff(argument, out flying))
+        {
+            Say(ctx, "Usage: disguise fly [on|off]");
+            return;
+        }
+
+        if (flying)
+        {
+            FlightControl.Enable();
+        }
+        else
+        {
+            FlightControl.Disable();
+        }
+
+        if (FlightControl.IsFlying)
+        {
+            Say(
+                ctx,
+                $"[Disguise] Flight ON: the creature is drawn +{FlightControl.Height:0.0} m above you, "
+                    + "your own player stays on the ground."
+            );
+            if (ZNet.instance != null && !ZNet.instance.IsServer())
+            {
+                Say(
+                    ctx,
+                    "Note: the others see it only while the dedicated server runs this DLL (section 1.b)."
+                );
+            }
+        }
+        else
+        {
+            Say(ctx, "[Disguise] Flight OFF: the creature is back on the ground.");
+        }
     }
 
     /// <summary>
@@ -465,6 +523,10 @@ internal static class DisguiseCommand
                         ? ""
                         : " - warnings and errors are still written"
                 )
+        );
+        Say(
+            ctx,
+            $"  Flight: {(FlightControl.IsFlying ? $"on, +{FlightControl.Height:0.0} m" : "off")} (disguise fly, keys in [5 - Flight])"
         );
         Say(
             ctx,

@@ -39,6 +39,16 @@ internal static class DisguiseConfig
     // -- 4 - Own view: what YOU see on your own screen ----------------------------------
     internal static ConfigEntry<bool> ConfigSeeYourDisguise = null!;
 
+    internal static ConfigEntry<string> ConfigFlyEnableKey = null!;
+
+    internal static ConfigEntry<string> ConfigFlyDisableKey = null!;
+
+    internal static ConfigEntry<string> ConfigFlyUpKey = null!;
+
+    internal static ConfigEntry<string> ConfigFlyDownKey = null!;
+
+    internal static ConfigEntry<float> ConfigFlySpeed = null!;
+
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
     {
@@ -172,6 +182,53 @@ internal static class DisguiseConfig
                 + "your place, exactly like the other clients see you. Local visuals only - it never "
                 + "changes what the other machines receive. Console command: disguise view [on|off]."
         );
+
+        // -- 5 - Flight: purely visual, the player never leaves the ground (FlightControl).
+        // The keys are chords (every key held at once) and default to LeftAlt, which never
+        // fires while text is entered (AltGr is the RightAlt of a French keyboard).
+        ConfigFlyEnableKey = config.Bind(
+            "5 - Flight",
+            "FlyEnableKey",
+            "LeftAlt+Home",
+            "Start the flight: the creature is raised for the other machines (your player "
+                + "stays on the ground). Same as \"disguise fly on\"."
+        );
+
+        ConfigFlyDisableKey = config.Bind(
+            "5 - Flight",
+            "FlyDisableKey",
+            "LeftAlt+End",
+            "End the flight: the creature is back on the ground. Same as \"disguise fly off\"."
+        );
+
+        ConfigFlyUpKey = config.Bind(
+            "5 - Flight",
+            "FlyUpKey",
+            "LeftAlt+UpArrow",
+            "Raise the creature while the flight is on (hold it: the creature climbs "
+                + "continuously at FlySpeed metres per second, up to 100 m)."
+        );
+
+        ConfigFlyDownKey = config.Bind(
+            "5 - Flight",
+            "FlyDownKey",
+            "LeftAlt+DownArrow",
+            "Lower the creature while the flight is on (hold it: down to the ground, "
+                + "never below it)."
+        );
+
+        ConfigFlySpeed = config.Bind(
+            "5 - Flight",
+            "FlySpeed",
+            5f,
+            "How fast (metres per second) the creature climbs and descends while the "
+                + "corresponding key is held."
+        );
+
+        ConfigFlyEnableKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
+        ConfigFlyDisableKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
+        ConfigFlyUpKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
+        ConfigFlyDownKey.SettingChanged += (_, _) => FlightControl.OnSettingChanged();
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
     }

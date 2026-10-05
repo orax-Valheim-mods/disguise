@@ -43,6 +43,7 @@ no mod). What the server DLL adds:
 | `ProtectSaveFile` (§ 2): the world save stores `Player` | yes | **no**: the server is what writes the save, so it stores the creature |
 | Real `Player` object on the server (the `cd_disguise` marker patch) | yes | no: the server instantiates the creature prefab for your player |
 | Fake map position (`disguise setFakePosition`, § 2) | **yes**: the server writes it into the player list it broadcasts | **no**: the other maps keep showing your real position |
+| Flight seen by the others (`disguise fly`, § 2) | **yes**: the server raises the outgoing position only | **no**: only your own view flies, everyone else keeps you on the ground |
 
 > ⚠️ Without the server DLL, run **`disguise disable` before stopping / saving the server**
 > (§ 5): `ProtectSaveFile` does not exist there, so the creature would be written to the
@@ -94,6 +95,7 @@ In game, open the console with **F5**:
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
 | `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
 | `disguise logs [on|off]` | Write the mod's own **Info** messages to the BepInEx log (toggles without an argument; warnings and errors are always written, § 2) |
+| `disguise fly [on|off]` | **Raise the creature above you** for the other machines (toggles without an argument, § 2). Purely visual: your player never leaves the ground |
 | `disguise setFakePosition [x z \| off]` | Show a **fake position** on the other players' map: no argument records where you stand, `off` shows the real one again (needs the DLL on the server, § 1.b) |
 | `disguise perf` | Frame time of the window since the previous call: avg / min / max in ms and FPS (the window resets at every report) |
 | `disguise help` | List of the available commands (`disguise ?` also works) |
@@ -240,6 +242,37 @@ running, no clone, nothing hidden), then `disguise view on` with `disguise set <
 difference between the third and the second is what the clone costs on your screen, which is
 exactly what the other machines pay to render you.
 
+**Flight section** (`5 - Flight`) - making the **creature** rise, while your player never
+leaves the ground (§ 3, and § 4.8 for what it means in game). `FlyEnableKey` starts it (the
+creature is raised by 2 m straight away), `FlyUpKey` / `FlyDownKey` climb and descend
+**while held**, at `FlySpeed` metres per second, and `FlyDisableKey` lands it. The same two
+states are reached from the console with `disguise fly [on|off]`, and `disguise status`
+reports the current height.
+
+| Option | Default | Role |
+|---|---|---|
+| `FlyEnableKey` | `LeftAlt+Home` | Start the flight: the creature is raised for everyone who renders you |
+| `FlyDisableKey` | `LeftAlt+End` | Land it: back on the ground |
+| `FlyUpKey` | `LeftAlt+UpArrow` | Climb while held (only once the flight is on), up to 100 m |
+| `FlyDownKey` | `LeftAlt+DownArrow` | Descend while held, down to the ground and never below it |
+| `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
+
+Keys are **chords**: every key of the value must be held at once (`LeftAlt+UpArrow`), and
+each one is re-read the moment the `.cfg` changes. They default to `LeftAlt` on purpose -
+never `AltGr`, which is the RightAlt of a French keyboard and types characters all day.
+The climb / descent keys only act **while the flight is on**, so a chord pressed by accident
+never moves the creature.
+
+**Nothing of it reaches your player.** The height is a value like any other published in
+your own ZDO (`cd_fly`, in centimetres so that no float has to be written), and what your
+body, the server, the AI, the combat and the save file work with stays exactly where it
+was. Only two renderings change: your own clone (with `SeeYourDisguise`, § 2), and the
+packet the server writes for everyone else (§ 3). Consequences worth knowing (§ 4.8): a mob
+attacks the *ground* position the server simulates, your own attacks and landings are the
+ones of a standing player, and **the others only see the flight while the DLL runs on the
+server** (§ 1.b) - without it your own view still flies and everybody else keeps you on the
+ground.
+
 ---
 
 ## 3. How it works (technical summary)
@@ -291,6 +324,23 @@ save file (`ZDO.Save`). The chosen prefab determines **what each client instanti
 Visual synchronisation on vanilla clients:
 
 - **Position**: yes, through `ZSyncTransform` (the creature follows you everywhere).
+- **Flight** (`cd_fly`, `FlightControl`): your own client writes the requested height into
+  your ZDO - in **centimetres**, because `ZDO.Set` has no float overload in the original
+  assembly - and that write is throttled to one per 100 ms so a held key cannot bump the
+  DataRevision every frame. Your body itself never moves: the position the server holds, the
+  AI and the combat run on, and the save file writes is the grounded one. The raise happens
+  in the only place that can produce it, the machine relaying your packets, while
+  `ZDO.Serialize` writes them (`Patch_ZDOSerializeFlight`): it adds the height to
+  `position.y` for the duration of that single call and restores the real value right after,
+  exactly like the equipment and the ally flag windows beside it - so the fake lives only as
+  long as one packet is being written and can never reach the game logic or the file. Two
+  gates keep it honest: it runs **only when that machine is the server** (a client sending a
+  raised position would have the server store it), and **only while your prefab really is
+  the creature**, so a viking is never drawn in the air. Without the DLL on the server no
+  machine relays the raise and everybody but you stays on the ground (§ 1.b); on your own
+  screen the clone simply gets your height added to your transform once per frame
+  (`SelfView`), and a machine running this DLL - which renders you as a real `Player` - sees
+  that object fly, since it follows the very same ZDO position.
 - **Animations**: partial, and bridged for melee attacks and for the block key. `ZSyncAnimation.SetTrigger`
   carries no name at all inside the ZDO: it broadcasts the raw **parameter name**, and each
   machine applies it to the animator of the object *it* built for that ZDO - a real `Player`
@@ -424,6 +474,23 @@ Visual synchronisation on vanilla clients:
      player's own client, so only *that* client has to run a current build (§ 6). No
      vanilla client and no server DLL is involved.
 
+8. **Flying is a rendering, not a movement** (`disguise fly`, § 2 and § 3).
+   - Your player stays on the ground on purpose: the position the server runs the world
+     with never changes, so nothing about it can be used to reach, chase or drop on
+     anything from above. Your attacks, your collisions and your landings are the ones of a
+     player standing where you actually are.
+   - Which means the two views can disagree **while you are up there**: on another machine a
+     creature hovering over a mob is still simulated on the ground below, so that mob bites
+     the air, and what you hit is decided from the position the server knows. Landing
+     (`disguise fly off`, or `FlyDisableKey`) puts both back in agreement instantly.
+   - On **your own screen** the viking stays grounded unless `SeeYourDisguise` is on: with
+     the option off you watch your own character, exactly as the server simulates it, while
+     everybody else watches the creature fly.
+   - **Only machines relaying with this DLL can raise it** (§ 1.b): your own view always
+     flies, the others only do while the dedicated server runs the current build. A machine
+     running this DLL renders you as a real `Player`, so what it raises is your viking - it
+     has no creature of yours to draw (§ 4.7 always applied there too).
+
 ---
 
 ## 5. Clean uninstall (IMPORTANT)
@@ -502,6 +569,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `FakePosition.cs` - the fake map position (`disguise setFakePosition`): what the owner
   publishes (`cd_fake` / `cd_fpos`), and the swap the server runs over the player list
   before it writes it, always restored right after (§ 2).
+- `FlightControl.cs` - the flight (`disguise fly`, § 2): the local state (on / off, height),
+  the four key chords and their parsing, the throttled publication of the height (`cd_fly`),
+  and the position swap the relaying server opens around `ZDO.Serialize` - restored right
+  after, server only, creature only (§ 3).
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
   ever be played by the creature), decides which of the creature's attacks to play (normal
@@ -523,9 +594,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
   `Patch_ZDOSerialize.cs`, `Patch_ZDOSerializeRelation.cs`, `Patch_ZDOSaveEquipment.cs`,
   `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`, `Patch_SetTrigger.cs`,
-  `Patch_SetBool.cs`,
+  `Patch_SetBool.cs`, `Patch_ZDOSerializeFlight.cs`,
   `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs` - the
-  eighteen Harmony patches, one
+  nineteen Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
@@ -562,7 +633,11 @@ outgoing packet is patched through `ZDOMan.SendZDOs` without any of its paramete
 `Humanoid.s_blocking` (private) is not used either: `Patch_SetBool` compares the parameter
 against `Animator.StringToHash("blocking")`, the very expression the game uses to define
 that constant, so the block key adds no game member at all: still 82, exactly as before it
-existed.
+existed. The flight is written the same way: `cd_fly` travels as an **int** (the `ZDO.Set` /
+`GetInt` overloads the mod already used - `ZDO.Set` has no float overload it could reach
+for free), `position` is swapped through the very `FieldInfo` of `Patch_SendZDOs`, and
+`ZNet.IsServer()` was already referenced - so it adds no game member either, and the count
+stays 82.
 
 ---
 
@@ -593,6 +668,10 @@ existed.
 | The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
+| You fly on your own screen but nobody else sees you in the air | The raise is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, a vanilla client receives your creature already raised; without it, only your own view flies (`disguise fly on` then `disguise status` to confirm the height is published). An older server DLL simply has no `Patch_ZDOSerializeFlight` yet: deploy the current build and restart it (§ 6) |
+| The climb / descent keys do nothing | The flight must be **on** first (`disguise fly on` or `FlyEnableKey`): `FlyUpKey` / `FlyDownKey` only act while it is. Then check the four chords in the `[5 - Flight]` section - an unusable value disables that one binding and writes a `Flight: "..." is not a usable key` warning in the log. An invalid chord never throws |
+| Your own viking stays on the ground while the creature flies | Normal: your body really is on the ground (§ 4.8). Turn `SeeYourDisguise` on (§ 2) to watch the creature fly on your own screen too |
+| A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 
 Log files:
 
