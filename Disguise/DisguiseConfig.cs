@@ -56,7 +56,7 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<KeyboardShortcut> ConfigGuiKey = null!;
 
-    internal static ConfigEntry<float> ConfigGuiScrollStep = null!;
+    internal static ConfigEntry<int> ConfigGuiScrollStep = null!;
 
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
@@ -276,10 +276,13 @@ internal static class DisguiseConfig
         ConfigGuiScrollStep = config.Bind(
             "6 - GUI",
             "GuiScrollStep",
-            60f,
-            "Pixels the creature list of the Disguise window moves per mouse wheel notch. "
+            3000,
+            "Pixels the creature list of the Disguise window travels per mouse wheel notch. "
+                + "Valheim's UI canvas is 1 unit = 1 screen pixel, so this really is pixels. "
                 + "Read every frame while the window is open, so a change takes effect "
-                + "immediately. Bigger is faster (60 is about two rows), 0 keeps the list "
+                + "immediately. The list stops at both ends: it grows by 34 pixels per "
+                + "creature - 162 of them scroll 5208 pixels behind the 300 visible - so the "
+                + "3000 default crosses more than half the list per notch. 0 holds the list "
                 + "still, and a negative value inverts the wheel."
         );
 

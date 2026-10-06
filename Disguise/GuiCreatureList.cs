@@ -53,6 +53,9 @@ internal static class GuiCreatureList
 
     private static string s_syncedCreature = string.Empty;
 
+    /// <summary>Last GuiScrollStep pushed to the scroll view, so the write is skipped when unchanged.</summary>
+    private static int? s_lastGuiScrollStep;
+
     /// <summary>
     /// True while the player types in the filter: the frame then belongs to the UI whether
     /// the pointer is on the window or not - read by DisguiseGui.BlocksInput.
@@ -131,10 +134,24 @@ internal static class GuiCreatureList
         box.anchoredPosition = new Vector2(x, listY);
         s_scroll = scroll.GetComponentInChildren<ScrollRect>();
 
+        // Clamped instead of Unity's default Elastic: with Elastic, one notch past the top
+        // puts the content OUT of the valid range (the list dips and a gap opens above the
+        // first row) and LateUpdate then springs it back - the "it goes down and comes right
+        // back up" flash at both ends. Clamped corrects the position inside the very scroll
+        // that asked for too much, so an impossible move simply does not happen. It is also
+        // what XPortalNetworks achieves by forcing the normalised position and killing the
+        // velocity after every scroll of its own dropdown.
+        ScrollRect? view = s_scroll;
+        if (view != null)
+        {
+            view.movementType = ScrollRect.MovementType.Clamped;
+        }
+
         // The wheel speed is an option (6 - GUI / GuiScrollStep), so it is pushed into the
         // scroll view right away and again every frame while the window is open: uGUI moves
         // the list by scrollDelta * scrollSensitivity pixels, and its default of 1 would move
-        // it a single pixel per notch - what made the wheel feel stuck.
+        // it a single pixel per notch - what made the wheel feel stuck. The same property is
+        // what XPortalNetworks raises to a floor of 520 pixels per notch.
         ApplyScrollStep();
 
         GameObject noMatch = GuiWindow.Label(
@@ -231,6 +248,10 @@ internal static class GuiCreatureList
         s_scroll = null;
         s_noMatch = null;
         s_syncedCreature = string.Empty;
+
+        // The next window brings a brand new ScrollRect, which starts on Unity's own
+        // sensitivity of 1: the option has to be written to it again whatever the cache says.
+        s_lastGuiScrollStep = null;
     }
 
     // ------------------------------------------------------------------ per frame
@@ -259,14 +280,17 @@ internal static class GuiCreatureList
     /// <summary>
     /// GuiScrollStep (6 - GUI), in pixels per wheel notch: uGUI multiplies the wheel delta by
     /// this value, and its default of 1 moved the list one pixel at a time. 0 holds the list,
-    /// a negative value inverts the wheel - both are read as written, no clamping.
+    /// a negative value inverts the wheel - both are read as written, no clamping. Only the
+    /// changes are written: this runs every frame while the window is open.
     /// </summary>
     private static void ApplyScrollStep()
     {
         ScrollRect? scroll = s_scroll;
-        if (scroll != null)
+        int step = DisguiseConfig.ConfigGuiScrollStep.Value;
+        if (scroll != null && step != s_lastGuiScrollStep)
         {
-            scroll.scrollSensitivity = DisguiseConfig.ConfigGuiScrollStep.Value;
+            scroll.scrollSensitivity = step;
+            s_lastGuiScrollStep = step;
         }
     }
 

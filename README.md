@@ -318,9 +318,11 @@ creature configured right now highlighted in orange, and a click on any row = `d
 <prefab_name>` (config written and applied at once, the line under the title updated). The
 rows read beige and the configured one orange - Jotunn paints the text of all of its buttons
 orange, so the list itself is tinted beige for the difference to be visible - and the wheel
-moves the list by `GuiScrollStep` pixels per notch (60 by default, about two rows; uGUI's
-own default is `1`). The 3D preview and the command buttons are the next steps of the
-branch.
+moves the list by `GuiScrollStep` pixels per notch (3000 by default = about 88 rows of the
+153 the list scrolls through; uGUI's own default is `1`). The list is **clamped at both
+ends**: an extra notch at the top or the bottom simply does nothing, instead of the elastic
+dip-and-spring-back Unity gives by default. The 3D preview and the command buttons are the
+next steps of the branch.
 
 The window is an **overlay**: nothing is paused, and you can still walk around with it open.
 The frames that belong to the UI are the ones where the pointer sits on the window **or**
@@ -340,7 +342,7 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 | Option | Default | Role |
 |---|---|---|
 | `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`) |
-| `GuiScrollStep` | `60` | Pixels the creature list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
+| `GuiScrollStep` | `3000` | Pixels the creature list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
 
 ---
 
