@@ -219,6 +219,10 @@ internal static class GuiCreatureList
             {
                 string creature = name;
                 button.onClick.AddListener(() => Select(creature));
+
+                // Hovering the row shows its creature in the preview of step 3 (and stepping
+                // off any row puts the configured one back) - GuiPreview owns that rule.
+                GuiPreview.WatchRow(body, creature);
             }
 
             s_names.Add(name);

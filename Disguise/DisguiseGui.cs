@@ -65,6 +65,11 @@ internal static class DisguiseGui
                 // views must agree (highlight of the row + line under the title).
                 GuiCreatureList.Sync();
 
+                // What the preview shows (the row under the pointer, else the configured
+                // creature) and the film of it - step 3 of the window.
+                GuiPreview.Tick();
+                CreaturePreview.Render();
+
                 // Two halves, both read by the patches as one plain boolean: the pointer on
                 // the window, or the filter field being typed in (the pointer may well be
                 // somewhere else while typing - Valheim's own build menu search does the
@@ -92,6 +97,8 @@ internal static class DisguiseGui
         s_rect = null;
         s_canvas = null;
         GuiCreatureList.Forget();
+        GuiPreview.Forget();
+        CreaturePreview.Forget();
         ReleaseMouse();
     }
 
@@ -235,6 +242,8 @@ internal static class DisguiseGui
         s_canvas = null;
         BlocksInput = false;
         GuiCreatureList.Forget();
+        GuiPreview.Forget();
+        CreaturePreview.Forget();
         ReleaseMouse();
     }
 }

@@ -10,20 +10,20 @@ namespace Disguise;
 /// panel, AveriaSerif fonts, Valheim buttons). DisguiseGui owns the lifecycle: this class
 /// only builds, it never keeps the window alive and it never talks to the console.
 ///
-/// Step 2 of the window: title, the creature that is configured right now, the creature list
+/// Step 3 of the window: title, the creature that is configured right now, the creature list
 /// with its filter (GuiCreatureList builds that block, this class only tells it where to sit)
-/// and a hint. The 3D preview and the command buttons are built here in the next steps of
-/// the branch, which is why the size is already the final one.
+/// and, on the right, the 3D preview (GuiPreview builds the picture, CreaturePreview films
+/// into it). The command buttons are built here in the last step of the branch, which is why
+/// the size is already the final one.
 /// </summary>
 internal static class GuiWindow
 {
-    /// <summary>Final size of the window: it must not jump when the next steps arrive.</summary>
+    /// <summary>Final size of the window: it must not jump when the last step arrives.</summary>
     internal const float Width = 860f;
 
     internal const float Height = 540f;
 
     // Left half of the window: top-left corner of the filter + list block, and its size.
-    // The right half stays free for the 3D preview of step 3.
     private const float ListX = 24f;
 
     private const float ListY = -132f;
@@ -31,6 +31,16 @@ internal static class GuiWindow
     private const float ListWidth = 400f;
 
     private const float ListHeight = 300f;
+
+    // Right half: upper left corner of the 3D preview, given to GuiPreview as the list
+    // block's corner is given to GuiCreatureList: it starts at the height of the filter, is
+    // as tall as the list, and the line under it fills the space down to the hint.
+    private const float PreviewX = 25f;
+
+    private const float PreviewY = -132f;
+
+    /// <summary>Gap between the bottom of the picture and the line under it.</summary>
+    private const float PreviewGap = 6f;
 
     /// <summary>
     /// The line under the title, kept here so it can be rewritten after a click on a row or a
@@ -101,17 +111,23 @@ internal static class GuiWindow
         // The filter field and the scrollable list, built by GuiCreatureList.
         GuiCreatureList.Build(window.transform, ListX, ListY, ListWidth, ListHeight);
 
+        // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
+        GuiPreview.Build(window.transform, PreviewX, PreviewY);
+
         _ = Label(
             gui,
-            "The 3D preview and the command buttons arrive next on this branch.",
+            "The command buttons arrive next on this branch.",
             window.transform,
             new Vector2(0.5f, 1f),
-            new Vector2(215f, -300f),
+            new Vector2(
+                PreviewX + (CreaturePreview.PictureWidth * 0.5f),
+                PreviewY - CreaturePreview.PictureHeight - PreviewGap - 20f
+            ),
             gui.AveriaSerif,
             16,
             gui.ValheimBeige,
-            380f,
-            100f
+            CreaturePreview.PictureWidth,
+            40f
         );
 
         _ = Label(

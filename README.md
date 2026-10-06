@@ -312,17 +312,40 @@ ground.
 controls (Jotunn is a hard dependency of this mod, § 1). `GuiKey` opens and closes it
 (toggles), and `disguise gui [on|off]` does exactly the same from the console. The window
 shows the creature list, its 3D preview and every command button - this branch adds them one
-step at a time, and this step brings the **creature list**: a filter field over a scrollable
-list of every usable creature (the exact list `disguise list` prints), the row of the
-creature configured right now highlighted in orange, and a click on any row = `disguise set
+step at a time, and this step brings the **3D preview**: the creature of the row the pointer
+is on is shown on the right half of the window, the configured one while the pointer is on no
+row at all. The **creature list** already there: a filter field over a scrollable list of
+every usable creature (the exact list `disguise list` prints), the row of the creature
+configured right now highlighted in orange, and a click on any row = `disguise set
 <prefab_name>` (config written and applied at once, the line under the title updated). The
 rows read beige and the configured one orange - Jotunn paints the text of all of its buttons
 orange, so the list itself is tinted beige for the difference to be visible - and the wheel
 moves the list by `GuiScrollStep` pixels per notch (3000 by default = about 88 rows of the
 153 the list scrolls through; uGUI's own default is `1`). The list is **clamped at both
 ends**: an extra notch at the top or the bottom simply does nothing, instead of the elastic
-dip-and-spring-back Unity gives by default. The 3D preview and the command buttons are the
-next steps of the branch.
+dip-and-spring-back Unity gives by default. The command buttons are the last step of the
+branch.
+
+The **3D preview** (`CreaturePreview`) is not a scene but a texture. On the first creature
+asked for, the stage is built once: a free layer (the highest one no mod named, 31 down to
+8, else one of the three Unity keeps spare), a camera of its own (`enabled = false`,
+`cullingMask` that layer alone, a transparent clear colour) rendering into a `RenderTexture`
+as big as the picture (380 x 300 - the canvas under the window is 1 unit = 1 screen pixel,
+so nothing is ever scaled), and two directional lights on that layer, the key one hung on the
+camera so the side you look at is always lit. The stage stands **20 km under the world**, and
+every camera and every directional light of the game has that layer taken away while the
+stage exists: the cameras would draw the creature into the world, and the lights would light
+the preview with the moment's sun - a picture that turns black at night. The creature itself
+is `GhostFactory.BuildInert`, the inert copy `SeeYourDisguise` already uses (§ 2): no ZDO, no
+AI, no collider, no sound. Its skinned meshes are told to `updateWhenOffscreen` (one outside
+every camera stops being deformed, and the picture would freeze), its animator is evaluated
+**once and switched off** - the pose is the first frame of its own default state - and the
+camera turns around the creature at 25 degrees per second instead of the creature turning, so
+the framing measured once from the bounds stays true. Each film holds the world's fog and
+ambient off the stage and restores them before Unity renders anything else (cameras run after
+every `Update`, and `DisguiseGui.Tick` is one). A hover is held back 0.15 s before its copy
+is built: a pointer sweeping the list would otherwise ask for one inert copy - up to ten strip
+passes over every component of it - per row crossed.
 
 The window is an **overlay**: nothing is paused, and you can still walk around with it open.
 The frames that belong to the UI are the ones where the pointer sits on the window **or**
@@ -695,7 +718,19 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   usable creature built **once** at open (the filter only shows and hides rows with
   `SetActive`, so typing creates nothing), the orange highlight of the configured creature, a
   row click routed to `DisguiseCommand.ApplyCreature`, and `FilterFocused` - the half of
-  `BlocksInput` that hands the frame to the UI while the player types.
+  `BlocksInput` that hands the frame to the UI while the player types. Each row is watched
+  for entering and leaving (`GuiPreview.WatchRow`), which is how the preview knows what to
+  show.
+- `GuiPreview.cs` - the right half of the window: the `RawImage` the preview is drawn into
+  (never a hit target, hidden while there is no texture - a `RawImage` with no texture draws
+  a white plate) and the rule that decides what is in it: the row under the pointer, the
+  configured creature while the pointer is on no row, the change held back 0.15 s so that a
+  pointer sweeping the list builds one copy instead of one per row crossed.
+- `CreaturePreview.cs` - the stage the preview is filmed from: the free layer, the camera of
+  its own and its `RenderTexture`, the two lights, the inert copy of the creature
+  (`GhostFactory.BuildInert`), the framing measured from the bounds of its meshes, the
+  turntable, and `Forget` - texture released, layer given back to the cameras and the lights -
+  called with the window closing.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
