@@ -65,7 +65,9 @@ notch = `FlyScrollStep` metres): the camera then waits, so the wheel never climb
 at once. The zoom comes back the moment the flight ends, and the minimap and the build
 rotation keep their own wheel throughout.
 
-The **Disguise window** (`GuiKey` = `F8 + LeftAlt`, or `disguise gui`) is built with **Jotunn**'s
+The **Disguise window** (opened and closed by `GuiKey` = `F8 + LeftAlt` - the chord is
+written on the title row, next to Close, and always read from the config - or by
+`disguise gui`) is built with **Jotunn**'s
 Valheim-styled controls: the creature list, its 3D preview and four buttons under the
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
 `Own view` and `Flight`, each one running its sub-command like the console would and writing

@@ -1,4 +1,5 @@
 #nullable enable
+using BepInEx.Configuration;
 using Jotunn.Managers;
 using UnityEngine;
 using UnityEngine.Events;
@@ -11,11 +12,12 @@ namespace Disguise;
 /// panel, AveriaSerif fonts, Valheim buttons). DisguiseGui owns the lifecycle: this class
 /// only builds, it never keeps the window alive and it never talks to the console.
 ///
-/// Step 4 of the window: title, the creature that is configured right now, the creature list
-/// with its filter (GuiCreatureList builds that block, this class only tells it where to sit),
-/// on the right the 3D preview (GuiPreview builds the picture, CreaturePreview films into it),
-/// under it the four command buttons, and at the bottom the status line (GuiStatus), which is
-/// the hint while no button has been pressed and the answer of the last one after that.
+/// The window as the branch built it, in four steps: title and the creature configured right
+/// now (with the GuiKey chord on the title row, next to Close), the creature list with its
+/// filter (GuiCreatureList builds that block, this class only tells it where to sit), on the
+/// right the 3D preview (GuiPreview builds the picture, CreaturePreview films into it), under
+/// it the four command buttons, and at the bottom the status line (GuiStatus), which is the
+/// hint while no button has been pressed and the answer of the last one after that.
 /// </summary>
 internal static class GuiWindow
 {
@@ -112,6 +114,33 @@ internal static class GuiWindow
         if (button != null)
         {
             button.onClick.AddListener(DisguiseGui.Hide);
+        }
+
+        // The chord on the title row, between the title and Close: the window shows the keys
+        // that call it back after it is closed, read from the config at every open (the same
+        // value ConfigurationManager records), so it is never a stale guess. Anchored to the
+        // top-right corner like Close, whose centre it keeps: x -240 is 190 right of the
+        // middle of the window, 13 px left of the button.
+        GameObject chord = Label(
+            gui,
+            "Open / close\n" + DescribeChord(),
+            window.transform,
+            new Vector2(1f, 1f),
+            new Vector2(-240f, -34f),
+            gui.AveriaSerif,
+            16,
+            gui.ValheimBeige,
+            200f,
+            44f
+        );
+        Text? chordText = chord.GetComponent<Text>();
+        if (chordText != null)
+        {
+            // A chord of three modifiers is wider than this box: shrink the whole label
+            // instead of clipping its second line (Unity shrinks only when it must).
+            chordText.resizeTextForBestFit = true;
+            chordText.resizeTextMaxSize = 16;
+            chordText.resizeTextMinSize = 10;
         }
 
         GameObject state = Label(
@@ -280,4 +309,27 @@ internal static class GuiWindow
     /// </summary>
     private static string DescribePower() =>
         DisguiseConfig.ConfigEnabled.Value ? "Disable" : "Enable";
+
+    /// <summary>
+    /// The GuiKey chord as the config records it - main key first, then the modifiers, which
+    /// is what the .cfg holds ("F9 + LeftAlt") - or "Not set", the word ConfigurationManager
+    /// shows for an empty one and the reason the chord never fires then.
+    /// </summary>
+    private static string DescribeChord()
+    {
+        KeyboardShortcut shortcut = DisguiseConfig.ConfigGuiKey.Value;
+        if (shortcut.MainKey == KeyCode.None)
+        {
+            return "Not set";
+        }
+        string chord = shortcut.MainKey.ToString();
+        foreach (KeyCode modifier in shortcut.Modifiers)
+        {
+            if (modifier != KeyCode.None)
+            {
+                chord += " + " + modifier.ToString();
+            }
+        }
+        return chord;
+    }
 }

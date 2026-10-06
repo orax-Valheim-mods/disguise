@@ -313,7 +313,10 @@ controls (Jotunn is a hard dependency of this mod, § 1). `GuiKey` opens and clo
 (toggles), `disguise gui [on|off]` does exactly the same from the console, and `Escape`
 closes it like the Close button - the pause menu stays out of that press (`Patch_MenuShow`
 blocks `Menu.Show` for that frame only, or the game would pause on the same key) and the next
-Escape opens it as usual. The window shows the creature list, the 3D preview, the command
+Escape opens it as usual. The title row carries the chord itself, between the title and
+Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
+`Not set` when it is empty), so the window always says how to call it back. The window shows
+the creature list, the 3D preview, the command
 buttons and the status line (the branch added them one step at a time): a row of four buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight` =
@@ -375,7 +378,7 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 
 | Option | Default | Role |
 |---|---|---|
-| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`). `Escape` also closes it, and the pause menu waits for the next press |
+| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press |
 | `GuiScrollStep` | `3000` | Pixels the creature list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
 
 ---
@@ -726,7 +729,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   one `true` per `false`, only inside the `main` scene) and the healing of a window destroyed
   by a scene change, which cannot release that request by itself.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
-  centred labels, the title, the state line (rewritten by `RefreshState` after a change), the
+  title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
+  or `Not set`), the centred labels, the state line (rewritten by `RefreshState` after a
+  change), the
   row of four command buttons under the picture (each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
   label), the status line below them, and the coordinates of the list block. It only builds,
