@@ -74,8 +74,11 @@ internal static class DisguiseGui
             if (IsOpen)
             {
                 // The console can change the creature while the window is on screen: the two
-                // views must agree (highlight of the row + line under the title).
+                // views must agree (highlight of the row + line under the title). The same
+                // for a Show* value typed in ConfigurationManager, which decides with the
+                // category boxes what the list is allowed to show.
                 GuiCreatureList.Sync();
+                GuiCategories.Sync();
 
                 // What the preview shows (the row under the pointer, else the configured
                 // creature) and the film of it - step 3 of the window.
@@ -120,6 +123,7 @@ internal static class DisguiseGui
         s_rect = null;
         s_canvas = null;
         GuiCreatureList.Forget();
+        GuiCategories.Forget();
         GuiPreview.Forget();
         GuiStatus.Forget();
         CreaturePreview.Forget();
@@ -266,6 +270,7 @@ internal static class DisguiseGui
         s_canvas = null;
         BlocksInput = false;
         GuiCreatureList.Forget();
+        GuiCategories.Forget();
         GuiPreview.Forget();
         GuiStatus.Forget();
         CreaturePreview.Forget();

@@ -12,12 +12,14 @@ namespace Disguise;
 /// panel, AveriaSerif fonts, Valheim buttons). DisguiseGui owns the lifecycle: this class
 /// only builds, it never keeps the window alive and it never talks to the console.
 ///
-/// The window as the branch built it, in four steps: title and the creature configured right
-/// now (with the GuiKey chord on the title row, next to Close), the creature list with its
-/// filter (GuiCreatureList builds that block, this class only tells it where to sit), on the
-/// right the 3D preview (GuiPreview builds the picture, CreaturePreview films into it), under
-/// it the four command buttons, and at the bottom the status line (GuiStatus), which is the
-/// hint while no button has been pressed and the answer of the last one after that.
+/// The window as the branch built it, in four steps: title and the prefab configured right
+/// now (with the GuiKey chord on the title row, next to Close), the six category checkboxes
+/// that gate the list (GuiCategories builds them, this class only says where they sit), the
+/// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
+/// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
+/// films into it), under it the four command buttons, and at the bottom the status line
+/// (GuiStatus), which is the hint while no button has been pressed and the answer of the
+/// last one after that.
 /// </summary>
 internal static class GuiWindow
 {
@@ -34,6 +36,13 @@ internal static class GuiWindow
     private const float ListWidth = 400f;
 
     private const float ListHeight = 300f;
+
+    /// <summary>
+    /// Centre of the checkbox row (GuiCategories): the band the layout leaves free between
+    /// the title - whose box ends at -56 - and the state line, which starts at -92. The row
+    /// is left-aligned with the list it filters, and neither of them moves for the other.
+    /// </summary>
+    private const float CategoryY = -73f;
 
     // Right half: upper left corner of the 3D preview, given to GuiPreview as the list
     // block's corner is given to GuiCreatureList: it starts at the height of the filter, is
@@ -156,6 +165,10 @@ internal static class GuiWindow
             40f
         );
         s_state = state.GetComponent<Text>();
+
+        // The six category checkboxes, in the free band above the state line: they decide
+        // which kinds of prefab the list below is allowed to show.
+        GuiCategories.Build(window.transform, ListX, CategoryY);
 
         // The filter field and the scrollable list, built by GuiCreatureList.
         GuiCreatureList.Build(window.transform, ListX, ListY, ListWidth, ListHeight);
@@ -300,7 +313,7 @@ internal static class GuiWindow
     {
         string creature = PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash);
         string state = DisguiseConfig.ConfigEnabled.Value ? "disguise on" : "disguise off";
-        return $"Creature: {creature}   -   {state}";
+        return $"Prefab: {creature}   -   {state}";
     }
 
     /// <summary>

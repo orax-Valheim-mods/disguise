@@ -1,6 +1,8 @@
 # Disguise
 
-Makes **your player appear as a creature** to every other player, **including players who have no mod installed**.
+Makes **your player appear as a creature** - or as **any other prefab of the game**: an
+object, a building piece, a ship, whatever `disguise list` prints - to every other player,
+**including players who have no mod installed**.
 
 - **Only your PC is required**; the dedicated server install is *optional but recommended*
   (§ 1.b - it adds the automatic refresh and the save protection).
@@ -104,9 +106,9 @@ In game, open the console with **F5**:
 
 | Command | Effect |
 |---|---|
-| `disguise status` | Current state (creature, marker, save protection) |
-| `disguise list` | List of usable creature prefabs (`disguise list troll` to filter; the window lists the same creatures, § 2 GUI) |
-| `disguise set Troll` | Change creature and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
+| `disguise status` | Current state (prefab, marker, save protection) |
+| `disguise list` | Every registered prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI) |
+| `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
@@ -160,7 +162,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | Option | Default | Role |
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
-| `CreaturePrefab` | `Troll` | Exact name of the creature prefab |
+| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log; warnings and errors are always written (`disguise logs [on|off]`, § 7) |
@@ -316,7 +318,7 @@ blocks `Menu.Show` for that frame only, or the game would pause on the same key)
 Escape opens it as usual. The title row carries the chord itself, between the title and
 Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
 `Not set` when it is empty), so the window always says how to call it back. The window shows
-the creature list, the 3D preview, the command
+the category checkboxes, the prefab list, the 3D preview, the command
 buttons and the status line (the branch added them one step at a time): a row of four buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight` =
@@ -327,14 +329,19 @@ are rewritten after every click. The status line holds the hint about clicking a
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
 several lines, the console keeps them all, and the first one is the headline - the notes a
-command goes on printing after it stay in the console. The **creature list**: a filter field
-over a scrollable list of every usable creature (the exact list `disguise list` prints), the
-row of the creature configured right now highlighted in orange, and a click on any row =
+command goes on printing after it stay in the console. The **category checkboxes**: six boxes
+in the band the layout leaves free between the title and the state line - `Creatures`,
+`Items`, `Buildings`, `Nature`, `Ships`, `Other` - one per category, each hiding the rows of
+its category in the list below (the state is kept in `6 - GUI` / `Show*`, so a choice
+survives a restart, and `disguise list` prints every category whatever they say). The
+**prefab list**: a filter field over a scrollable list of every registered prefab - the exact
+list `disguise list` prints, minus what the checkboxes have switched off - the row of the
+prefab configured right now highlighted in orange, and a click on any row =
 `disguise set <prefab_name>` (config written and applied at once, the line under the title
 updated). The rows read beige and the configured one orange - Jotunn paints the text of all
 of its buttons orange, so the list itself is tinted beige for the difference to be visible -
 and the wheel moves the list by `GuiScrollStep` pixels per notch (3000 by default = about 88
-rows of the 153 the list scrolls through; uGUI's own default is `1`). The list is **clamped
+rows per notch; uGUI's own default is `1`). The list is **clamped
 at both ends**: an extra notch at the top or the bottom simply does nothing, instead of the
 elastic dip-and-spring-back Unity gives by default. The **3D preview** above the buttons
 shows the creature of the row the pointer is on, the configured one while the pointer is on
@@ -379,7 +386,13 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 | Option | Default | Role |
 |---|---|---|
 | `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press |
-| `GuiScrollStep` | `3000` | Pixels the creature list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
+| `GuiScrollStep` | `3000` | Pixels the prefab list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
+| `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list (section `6 - GUI`). One checkbox per category, one category per prefab: a category switched off only hides rows in the window, and `disguise list` keeps printing every prefab of every category |
+| `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) in the window's list |
+| `ShowBuildings` | `true` | Show the buildable prefabs (a `Piece`: walls, floors, doors, furniture, crafting stations) in the window's list |
+| `ShowNature` | `true` | Show the natural prefabs (trees, plants, pickables, rocks, ore veins) in the window's list |
+| `ShowShips` | `true` | Show the ships in the window's list |
+| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, whatever a world mod adds) in the window's list. Off, the list only holds what the five other checkboxes show - nothing is ever dropped from the catalogue itself |
 
 ---
 
@@ -671,12 +684,21 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
   `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
   share stays `private`.
-- `DisguiseConfig.cs` - the twenty-three settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the twenty-nine settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`).
 - `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the vanilla
   `Player` prefab hash, the configured creature hash) and `PrefabName`.
+- `PrefabKind.cs` - the six categories of the list (`Creature`, `Item`, `Building`, `Nature`,
+  `Ship`, `Other`): one checkbox each in the window, one category per prefab.
+- `PrefabCatalog.cs` - the catalogue both lists read: every prefab registered in `ZNetScene`
+  - the technical limit of a disguise, since a vanilla client rebuilds you from **its own**
+  prefab table by hash - sorted, each tagged with exactly one kind through `KindOf` (the
+  first test that matches wins, every component read on the root like the `Character` test
+  the list shipped with), plus `Names(filter, shown)` and `Counts(filter)`. The console asks
+  for every category, the window passes the six checkboxes of its own: one source, no
+  disagreement.
 - `DisguiseApplier.cs` - `HasMarker` / `ApplyTo` / `InstantiateAs`: writes the marker and
   swaps the network prefab.
 - `EquipmentMask.cs` - the equipment display options (`3 - Display`): swaps the equipment
@@ -713,11 +735,12 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   block (null when the pool holds two or fewer), restricted to the triggers the probe
   really read. Plain serialized fields, so unlike `Animator.parameters` it needs neither an
   activation nor an instantiation.
-- `DisguiseCommand.cs` - the `disguise` console command and its sub-commands, plus the two
-  things the window needs from it so the console and the window can never disagree:
-  `CreatureNames(filter)` (the source of `disguise list` *and* of the window's list) and
+- `DisguiseCommand.cs` - the `disguise` console command and its sub-commands, plus what the
+  window needs from it so the console and the window can never disagree:
   `ApplyCreature(name, reason)` (config + re-application, printing nothing: each side
-  reports its own way on top of it). `Execute` and `Say` both take the `Terminal` behind the
+  reports its own way on top of it). `disguise list` is `PrefabCatalog.Names(filter, null)`
+  plus `PrefabCatalog.Counts(filter)` - every category, whatever the checkboxes of the window
+  have on. `Execute` and `Say` both take the `Terminal` behind the
   command - the one the command was typed in for the console, `null` for a button of the
   window - and `Say` with no terminal writes the line to `GuiStatus` instead: same text,
   only the place where it is read differs. `Run(sub)` is what a button calls.
@@ -730,15 +753,27 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   by a scene change, which cannot release that request by itself.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
-  or `Not set`), the centred labels, the state line (rewritten by `RefreshState` after a
+  or `Not set`), the six category checkboxes in the band above the state line (this class only
+  tells `GuiCategories.Build` where they sit), the centred labels, the state line
+  (`Prefab: <name>   -   <state>`, rewritten by `RefreshState` after a
   change), the
   row of four command buttons under the picture (each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
   label), the status line below them, and the coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
-- `GuiCreatureList.cs` - the creature list: Jotunn's filter field and scroll view, one row per
-  usable creature built **once** at open (the filter only shows and hides rows with
-  `SetActive`, so typing creates nothing), the orange highlight of the configured creature, a
+- `GuiCategories.cs` - the row of six category checkboxes: Jotunn's `CreateToggle` box (the
+  Valheim checkbox, orange marker) with a label measured to its own text
+  (`Text.preferredWidth`, so the air before the next box is the same whatever the word), the
+  `Show*` entry of each kind as the only state - a choice survives a restart, and `Sync`
+  pushes a value typed in ConfigurationManager back into its box without reopening - and
+  `Refilter` on every toggle, which only re-runs the filter: the rows themselves are built
+  once, at the opening.
+- `GuiCreatureList.cs` - the prefab list: Jotunn's filter field and scroll view, one row per
+  registered prefab built **once** at open (both filters only show and hide rows with
+  `SetActive`, so typing or ticking creates nothing), the kind of every row kept in a third
+  parallel list next to the name and the body (which checkbox owns it), `Refilter` - what a
+  checkbox and a changed `Show*` call, re-running the filter over the text already typed -
+  the orange highlight of the configured prefab, a
   row click routed to `DisguiseCommand.ApplyCreature`, and `FilterFocused` - the half of
   `BlocksInput` that hands the frame to the UI while the player types. Each row is given the
   listener of the preview (`GuiPreview.WatchRow`), which is how the picture knows what the
@@ -865,7 +900,8 @@ stays 82.
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 | `disguise gui` says "not opened" (or `GuiKey` does nothing at all) | A dedicated server has no GUI, and before a world is loaded Jotunn's `CustomGUIFront` does not exist yet (`Window: ...` in the log, visible only with `Logs = true`, § 2). An unset `GuiKey` (`Not set`, recorded in ConfigurationManager) never fires. Jotunn itself is a hard dependency (§ 1): without it the mod does not load at all |
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
-| The creature list is empty and reads "the creature list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded |
+| The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the six `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
+| Opening the window takes a noticeable moment | The whole list is built at the opening - one Jotunn button per row, hundreds of rows - and the log says what that cost: `GUI: <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The checkboxes and the filter only show and hide those rows, they never rebuild any, so the price is the same whatever they say |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 
 Log files:

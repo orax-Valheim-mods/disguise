@@ -8,15 +8,19 @@ using UnityEngine.UI;
 namespace Disguise;
 
 /// <summary>
-/// The creature list of the Disguise window: a filter field (Jotunn input) and a scroll view
-/// (Jotunn) holding one row per prefab that carries a Character - exactly the list
-/// "disguise list" prints, through DisguiseCommand.CreatureNames, so the console and the
-/// window can never disagree.
+/// The prefab list of the Disguise window: a filter field (Jotunn input) and a scroll view
+/// (Jotunn) holding one row per registered prefab - exactly the names "disguise list" prints,
+/// through PrefabCatalog.Names, so the console and the window can never disagree about a
+/// name. What the window adds are two filters of its own on top of that shared source: the
+/// text field, and the six category checkboxes (GuiCategories) that decide which kinds of
+/// prefab are shown at all.
 ///
-/// Every row is built ONCE when the window opens, and the filter then only shows and hides
-/// them (SetActive): typing creates nothing and destroys nothing, which is what keeps a
-/// keystroke free on a list of a hundred creatures. The rows live in two parallel lists at
-/// the same index - the name (what gets applied) and the body (what is on screen).
+/// Every row is built ONCE when the window opens - for every kind, so switching a category
+/// back on costs nothing - and the filters then only show and hide them (SetActive): typing
+/// or ticking creates nothing and destroys nothing, which is what keeps either one free on a
+/// list of hundreds of prefabs. The rows live in three parallel lists at the same index - the
+/// name (what gets applied), the kind (which checkbox owns it) and the body (what is on
+/// screen).
 ///
 /// A row click is the console's "disguise set &lt;name&gt;": DisguiseCommand.ApplyCreature writes
 /// the config and re-applies at once, then the highlight and the state line under the title
@@ -45,6 +49,9 @@ internal static class GuiCreatureList
     private const float HandleDistanceToBorder = 2f;
 
     private static readonly List<string> s_names = new();
+
+    private static readonly List<PrefabKind> s_kinds = new();
+
     private static readonly List<GameObject> s_rows = new();
 
     private static InputField? s_filter;
@@ -80,6 +87,7 @@ internal static class GuiCreatureList
     internal static void Build(Transform parent, float x, float y, float width, float listHeight)
     {
         Forget();
+        float startedAt = Time.realtimeSinceStartup;
 
         GUIManager gui = GUIManager.Instance;
 
@@ -156,7 +164,7 @@ internal static class GuiCreatureList
 
         GameObject noMatch = GuiWindow.Label(
             gui,
-            "no creature matches the filter",
+            "no prefab matches the filter",
             parent,
             new Vector2(0f, 1f),
             new Vector2(x + (width * 0.5f), listY - (listHeight * 0.5f)),
@@ -190,10 +198,11 @@ internal static class GuiCreatureList
         }
 
         float rowWidth = width - (2f * HandleDistanceToBorder) - HandleSize;
-        List<string> names = DisguiseCommand.CreatureNames(null);
+        List<string> names = PrefabCatalog.Names(null, null);
         for (int i = 0; i < names.Count; i++)
         {
             string name = names[i];
+            PrefabKind kind = PrefabCatalog.KindOf(name);
             GameObject body = gui.CreateButton(
                 name,
                 content,
@@ -227,8 +236,16 @@ internal static class GuiCreatureList
             }
 
             s_names.Add(name);
+            s_kinds.Add(kind);
             s_rows.Add(body);
         }
+
+        // The list is built once per opening, and with every category shown that is hundreds
+        // of rows of four objects each: one line when Logs is on, so an opening that feels
+        // slow can be read off the log next to its row count instead of guessed at.
+        Disguise.LogDebug(
+            $"GUI: {s_rows.Count} row(s) in {(Time.realtimeSinceStartup - startedAt) * 1000f:0.0} ms."
+        );
 
         if (s_rows.Count == 0)
         {
@@ -236,7 +253,7 @@ internal static class GuiCreatureList
             Text? notice = noMatch.GetComponent<Text>();
             if (notice != null)
             {
-                notice.text = "the creature list is available in game";
+                notice.text = "the prefab list is available in game";
             }
             noMatch.SetActive(true);
         }
@@ -248,6 +265,7 @@ internal static class GuiCreatureList
     internal static void Forget()
     {
         s_names.Clear();
+        s_kinds.Clear();
         s_rows.Clear();
         s_filter = null;
         s_scroll = null;
@@ -302,9 +320,11 @@ internal static class GuiCreatureList
     // ------------------------------------------------------------------ filter and selection
 
     /// <summary>
-    /// Shows the rows containing the text (case-insensitive, like the console's list filter)
-    /// and hides the others. Nothing is created nor destroyed here: only SetActive, plus the
-    /// scroll back to the top so the first match is where the eye already is.
+    /// Shows the rows that belong to a category the window has switched on AND contain the
+    /// text (case-insensitive, like the console's list filter), hides the others. Nothing is
+    /// created nor destroyed here: only SetActive, plus the scroll back to the top so the
+    /// first match is where the eye already is. Typing a letter and ticking a box both end
+    /// up here, which is why the two can never disagree about what is on screen.
     /// </summary>
     private static void SetFilter(string text)
     {
@@ -313,8 +333,11 @@ internal static class GuiCreatureList
         for (int i = 0; i < s_rows.Count; i++)
         {
             bool match =
-                needle.Length == 0
-                || s_names[i].IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
+                GuiCategories.Shown(s_kinds[i])
+                && (
+                    needle.Length == 0
+                    || s_names[i].IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0
+                );
             GameObject body = s_rows[i];
             if (body != null && body.activeSelf != match)
             {
@@ -338,6 +361,17 @@ internal static class GuiCreatureList
         }
 
         RefreshHighlight();
+    }
+
+    /// <summary>
+    /// Re-runs the filter with the text already in the field: what a category box asks for
+    /// (GuiCategories), and what a Show* value changed in ConfigurationManager asks for while
+    /// the window is open. Same work as typing: SetActive only, no row is built nor dropped.
+    /// </summary>
+    internal static void Refilter()
+    {
+        InputField? field = s_filter;
+        SetFilter(field != null ? field.text : string.Empty);
     }
 
     /// <summary>

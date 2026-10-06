@@ -175,7 +175,7 @@ internal static class DisguiseCommand
                 bool applied = ApplyCreature(words[2], "set");
                 Say(
                     ctx,
-                    $"[Disguise] Creature set to \"{DisguiseConfig.ConfigCreature.Value}\" (resolved prefab: {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)})."
+                    $"[Disguise] Prefab set to \"{DisguiseConfig.ConfigCreature.Value}\" (resolved prefab: {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)})."
                 );
                 if (!applied)
                 {
@@ -191,7 +191,7 @@ internal static class DisguiseCommand
                 break;
 
             case "list":
-                ListCreatures(ctx, words.Length > 2 ? words[2] : null);
+                ListPrefabs(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "help":
@@ -215,9 +215,12 @@ internal static class DisguiseCommand
     private static void PrintHelp(Terminal? ctx)
     {
         Say(ctx, "[Disguise] Available commands:");
-        Say(ctx, "  disguise status           current state (creature, marker, save protection)");
-        Say(ctx, "  disguise list [filter]    list creature prefabs (the window lists the same)");
-        Say(ctx, "  disguise set <prefab>     change creature and enable the disguise");
+        Say(ctx, "  disguise status           current state (prefab, marker, save protection)");
+        Say(
+            ctx,
+            "  disguise list [filter]    every prefab you can become (the window shows it too)"
+        );
+        Say(ctx, "  disguise set <prefab>     change the prefab and enable the disguise");
         Say(ctx, "                            (a click on a row of the window does this too)");
         Say(ctx, "  disguise enable           enable the disguise");
         Say(ctx, "  disguise disable          disable it: you become a normal viking again");
@@ -256,36 +259,6 @@ internal static class DisguiseCommand
         DisguiseConfig.ConfigCreature.Value = prefabName;
         DisguiseConfig.ConfigEnabled.Value = true;
         return ApplyNowCore(reason);
-    }
-
-    /// <summary>
-    /// Every usable creature: a prefab that carries a Character, optionally narrowed down by
-    /// a substring, sorted by name. The console list ("disguise list") and the window list
-    /// (GuiCreatureList) both read this, so the two can never disagree. Empty without a
-    /// ZNetScene (main menu), which is where the console prints its own notice.
-    /// </summary>
-    internal static List<string> CreatureNames(string? filter)
-    {
-        List<string> names = new();
-        ZNetScene? zns = ZNetScene.instance;
-        if (zns == null)
-        {
-            return names;
-        }
-        foreach (string name in zns.GetPrefabNames())
-        {
-            if (filter != null && name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                continue;
-            }
-            GameObject? go = zns.GetPrefab(name);
-            if (go != null && go.GetComponent<Character>() != null)
-            {
-                names.Add(name);
-            }
-        }
-        names.Sort(StringComparer.OrdinalIgnoreCase);
-        return names;
     }
 
     /// <summary>
@@ -368,10 +341,7 @@ internal static class DisguiseCommand
             );
             if (PrefabResolver.CreaturePrefabHash == 0)
             {
-                Say(
-                    ctx,
-                    "Warning: the configured creature does not exist here (see disguise list)."
-                );
+                Say(ctx, "Warning: the configured prefab does not exist here (see disguise list).");
             }
         }
         else
@@ -486,7 +456,7 @@ internal static class DisguiseCommand
             }
             Say(
                 ctx,
-                "[Disguise] Window opened: drag it anywhere, filter and click a row to pick a creature, Close (or the key chord) dismisses it."
+                "[Disguise] Window opened: drag it anywhere, filter or untick a category, click a row to pick a prefab; Close (or the key chord) dismisses it."
             );
         }
         else
@@ -643,7 +613,7 @@ internal static class DisguiseCommand
         );
         Say(
             ctx,
-            $"  Configured creature: \"{DisguiseConfig.ConfigCreature.Value}\" -> {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)}"
+            $"  Configured prefab: \"{DisguiseConfig.ConfigCreature.Value}\" -> {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)}"
                 + (PrefabResolver.CreaturePrefabHash == 0 ? "  (NOT FOUND)" : "")
         );
         Say(ctx, $"  Save protection: {(DisguiseConfig.ConfigProtectSave.Value ? "yes" : "no")}");
@@ -696,7 +666,13 @@ internal static class DisguiseCommand
         );
     }
 
-    private static void ListCreatures(Terminal? ctx, string? filter)
+    /// <summary>
+    /// "disguise list [filter]": every registered prefab, in the six categories of
+    /// PrefabCatalog - the complete catalogue, whatever the window's checkboxes have on (they
+    /// only hide rows there). Counts per category first, four names per line after that.
+    /// Empty without a ZNetScene (main menu), which is where the notice above comes from.
+    /// </summary>
+    private static void ListPrefabs(Terminal? ctx, string? filter)
     {
         if (ZNetScene.instance == null)
         {
@@ -706,13 +682,24 @@ internal static class DisguiseCommand
             );
             return;
         }
-        List<string> names = CreatureNames(filter);
+        List<string> names = PrefabCatalog.Names(filter, null);
         Say(
             ctx,
-            $"[Disguise] {names.Count} creature prefab(s)"
+            $"[Disguise] {names.Count} prefab(s)"
                 + (filter != null ? $" containing \"{filter}\"" : "")
                 + ":"
         );
+        int[] counts = PrefabCatalog.Counts(filter);
+        string kinds = string.Empty;
+        for (int i = 0; i < counts.Length; i++)
+        {
+            kinds +=
+                (i > 0 ? ", " : string.Empty)
+                + PrefabCatalog.Label((PrefabKind)i)
+                + " "
+                + counts[i];
+        }
+        Say(ctx, "  kinds: " + kinds);
         for (int i = 0; i < names.Count; i += 4)
         {
             int count = Math.Min(4, names.Count - i);

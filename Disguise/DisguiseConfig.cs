@@ -58,6 +58,22 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<int> ConfigGuiScrollStep = null!;
 
+    // -- 6 - GUI, continued: which categories the window's list shows (the six checkboxes -
+    //    one per kind, read there at every opening and at every frame, so a value typed in
+    //    ConfigurationManager lands without reopening. The console's "disguise list" always
+    //    prints every kind: these hide rows in the window, never names from the catalogue.
+    internal static ConfigEntry<bool> ConfigShowCreatures = null!;
+
+    internal static ConfigEntry<bool> ConfigShowItems = null!;
+
+    internal static ConfigEntry<bool> ConfigShowBuildings = null!;
+
+    internal static ConfigEntry<bool> ConfigShowNature = null!;
+
+    internal static ConfigEntry<bool> ConfigShowShips = null!;
+
+    internal static ConfigEntry<bool> ConfigShowOther = null!;
+
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
     {
@@ -268,7 +284,7 @@ internal static class DisguiseConfig
             "6 - GUI",
             "GuiKey",
             new KeyboardShortcut(KeyCode.F8, KeyCode.LeftAlt),
-            "Open / close the Disguise window: creature list, preview and command buttons. "
+            "Open / close the Disguise window: prefab list, preview and command buttons. "
                 + "To change it: ConfigurationManager (Alt+F10) -> 6 - GUI -> click this "
                 + "value, then press the wanted keys."
         );
@@ -277,13 +293,58 @@ internal static class DisguiseConfig
             "6 - GUI",
             "GuiScrollStep",
             3000,
-            "Pixels the creature list of the Disguise window travels per mouse wheel notch. "
+            "Pixels the prefab list of the Disguise window travels per mouse wheel notch. "
                 + "Valheim's UI canvas is 1 unit = 1 screen pixel, so this really is pixels. "
                 + "Read every frame while the window is open, so a change takes effect "
-                + "immediately. The list stops at both ends: it grows by 34 pixels per "
-                + "creature - 162 of them scroll 5208 pixels behind the 300 visible - so the "
-                + "3000 default crosses more than half the list per notch. 0 holds the list "
-                + "still, and a negative value inverts the wheel."
+                + "immediately. The list stops at both ends: it grows by 34 pixels per row "
+                + "and once every category is shown it is tens of thousands of pixels tall "
+                + "behind the 300 visible, so the 3000 default crosses ten screens of list "
+                + "per notch. 0 holds the list still, and a negative value inverts the wheel."
+        );
+
+        ConfigShowCreatures = config.Bind(
+            "6 - GUI",
+            "ShowCreatures",
+            true,
+            "Show the creature prefabs (one carrying a Character) in the window's list. One "
+                + "checkbox per category, one category per prefab: a category turned off only "
+                + "hides rows in the window, and \"disguise list\" keeps printing every "
+                + "prefab of every category."
+        );
+        ConfigShowItems = config.Bind(
+            "6 - GUI",
+            "ShowItems",
+            true,
+            "Show the dropped-item prefabs (an ItemDrop: materials, weapons, food, trophies) "
+                + "in the window's list."
+        );
+        ConfigShowBuildings = config.Bind(
+            "6 - GUI",
+            "ShowBuildings",
+            true,
+            "Show the buildable prefabs (a Piece: walls, floors, doors, furniture, crafting "
+                + "stations) in the window's list."
+        );
+        ConfigShowNature = config.Bind(
+            "6 - GUI",
+            "ShowNature",
+            true,
+            "Show the natural prefabs (trees, plants, pickables, rocks, ore veins) in the "
+                + "window's list."
+        );
+        ConfigShowShips = config.Bind(
+            "6 - GUI",
+            "ShowShips",
+            true,
+            "Show the ships in the window's list."
+        );
+        ConfigShowOther = config.Bind(
+            "6 - GUI",
+            "ShowOther",
+            true,
+            "Show the prefabs no other category claims (spawners, markers, whatever a world "
+                + "mod adds) in the window's list. Off, the list only holds what the five "
+                + "other checkboxes show - nothing is ever dropped from the catalogue itself."
         );
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();

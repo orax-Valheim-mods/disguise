@@ -131,7 +131,7 @@ internal static class PrefabResolver
         s_creatureFootStep = null;
         s_creatureWarningLogged = false;
         Disguise.s_loggedSummary = false;
-        Disguise.LogInfo($"Configured creature: \"{DisguiseConfig.ConfigCreature.Value}\"");
+        Disguise.LogInfo($"Configured prefab: \"{DisguiseConfig.ConfigCreature.Value}\"");
     }
 
     /// <summary>

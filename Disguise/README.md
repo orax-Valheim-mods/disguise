@@ -1,6 +1,8 @@
 # Disguise
 
-Makes **your player appear as a creature** to every other player - **including players who
+Makes **your player appear as a creature** - or as **any other prefab of the game**: an
+object, a building piece, a ship, whatever `disguise list` prints - to every other player -
+**including players who
 have no mod installed**. You keep seeing and playing your own normal viking (unless you
 switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 
@@ -13,8 +15,8 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 
 | Command | Effect |
 |---|---|
-| `disguise list` | List the usable creature prefabs (`disguise list troll` to filter) |
-| `disguise set Troll` | Change creature and enable the disguise |
+| `disguise list` | Every registered prefab you can become, with a count per category (`disguise list troll` to filter) |
+| `disguise set Troll` | Change the prefab and enable the disguise |
 | `disguise enable` / `disguise disable` | Toggle the disguise |
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
 | `disguise view [on|off]` | Show the creature on your own screen instead of your viking (local only) |
@@ -22,7 +24,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | `disguise fly [on|off]` | Raise the creature above you for the others (visual only: your player stays on the ground) |
 | `disguise gui [on|off]` | Open / close the Disguise window (`GuiKey`) |
 | `disguise perf` | Frame time of the last few seconds: avg / min / max in ms and FPS (resets the window) |
-| `disguise status` | Current state (creature, marker, save protection) |
+| `disguise status` | Current state (prefab, marker, save protection) |
 
 ## Configuration
 
@@ -31,7 +33,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | Option | Default | Role |
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
-| `CreaturePrefab` | `Troll` | Exact name of the creature prefab |
+| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `true` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
@@ -52,7 +54,13 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
 | `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 | `GuiKey` | `F8 + LeftAlt` | Open / close the Disguise window (same as `disguise gui`) |
-| `GuiScrollStep` | `3000` | Pixels the creature list moves per scroll notch; `0` holds the list still, a negative value inverts the wheel |
+| `GuiScrollStep` | `3000` | Pixels the prefab list moves per scroll notch; `0` holds the list still, a negative value inverts the wheel |
+| `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list - one checkbox per category; `disguise list` always prints every category |
+| `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) |
+| `ShowBuildings` | `true` | Show the buildable prefabs (a `Piece`: walls, floors, doors, furniture, crafting stations) |
+| `ShowNature` | `true` | Show the natural prefabs (trees, plants, pickables, rocks, ore veins) |
+| `ShowShips` | `true` | Show the ships |
+| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, whatever a world mod adds) |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
@@ -68,15 +76,19 @@ rotation keep their own wheel throughout.
 The **Disguise window** (opened and closed by `GuiKey` = `F8 + LeftAlt` - the chord is
 written on the title row, next to Close, and always read from the config - or by
 `disguise gui`) is built with **Jotunn**'s
-Valheim-styled controls: the creature list, its 3D preview and four buttons under the
+Valheim-styled controls: the six category checkboxes, the prefab list, its 3D preview and
+four buttons under the
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
 `Own view` and `Flight`, each one running its sub-command like the console would and writing
 its answer on the status line at the bottom, which holds the "click a row" hint before the
 first press (the branch added them one step at a time; the preview there shows the creature
 of the row the pointer is on, filmed
 by a camera of its own into a texture, and the configured one while the pointer is on no row
-at all, and the list is a filter field over a scrollable list of every usable creature, the
-row of the creature configured right now in orange on beige rows, a click on any row =
+at all, and the list is a filter field over a scrollable list of every registered prefab -
+minus what the six checkboxes have switched off (`Creatures`, `Items`, `Buildings`, `Nature`,
+`Ships`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice survives a
+restart) - the row of the prefab configured right now in orange on beige rows, a click on any
+row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
 `GuiScrollStep` pixels per notch, clamped at both ends so an extra notch never makes it dip
 and spring back). **Escape** closes it like the Close button - and it is this key, never the
