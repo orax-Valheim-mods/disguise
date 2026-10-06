@@ -49,21 +49,20 @@ internal static class DisguiseCommand
 
     private static List<string> DisguiseOptions()
     {
-        List<string> options =
-            new()
-            {
-                "status",
-                "help",
-                "enable",
-                "disable",
-                "refresh",
-                "view",
-                "logs",
-                "fly",
-                "setFakePosition",
-                "perf",
-                "list",
-            };
+        List<string> options = new()
+        {
+            "status",
+            "help",
+            "enable",
+            "disable",
+            "refresh",
+            "view",
+            "logs",
+            "fly",
+            "setFakePosition",
+            "perf",
+            "list",
+        };
         try
         {
             string current = DisguiseConfig.ConfigCreature.Value;
