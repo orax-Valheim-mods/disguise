@@ -52,6 +52,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
 | `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 | `GuiKey` | `F8 + LeftAlt` | Open / close the Disguise window (same as `disguise gui`) |
+| `GuiScrollStep` | `60` | Pixels the creature list moves per scroll notch; `0` holds the list still, a negative value inverts the wheel |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
@@ -68,8 +69,9 @@ The **Disguise window** (`GuiKey` = `F8 + LeftAlt`, or `disguise gui`) is built 
 Valheim-styled controls: the creature list, its 3D preview and a button for every command of
 the table above (the branch adds them one step at a time - this step brings the **creature
 list**: a filter field over a scrollable list of every usable creature, the row of the
-creature configured right now highlighted in orange, and a click on any row = `disguise set
-<prefab_name>`, written and applied at once). The window is an **overlay**: nothing is paused,
+creature configured right now in orange on beige rows, a click on any row = `disguise set
+<prefab_name>` written and applied at once, and a wheel that moves the list by
+`GuiScrollStep` pixels per notch). The window is an **overlay**: nothing is paused,
 you can still walk around with it open, and a frame belongs to the UI only while the pointer
 is on the window **or** the filter field is focused - a click on a row never reaches your
 character, the camera waits instead of spinning behind the window, and typing a filter never

@@ -51,9 +51,6 @@ internal static class GuiCreatureList
     private static ScrollRect? s_scroll;
     private static GameObject? s_noMatch;
 
-    /// <summary>Colour of an unselected row, taken from the first button Jotunn styles.</summary>
-    private static Color s_baseColor;
-
     private static string s_syncedCreature = string.Empty;
 
     /// <summary>
@@ -100,6 +97,15 @@ internal static class GuiCreatureList
             s_filter.onValueChanged.AddListener(SetFilter);
         }
 
+        // Jotunn sets the position BEFORE the anchors and never touches the pivot, which stays
+        // in the middle: the corner asked for above would be the CENTRE of the field, and a
+        // 400 px field centred 24 px from the left edge would hang out of the window. The
+        // pivot is moved to the upper left corner and the position applied again - the same
+        // correction the scroll view box gets below.
+        RectTransform fieldRect = field.GetComponent<RectTransform>();
+        fieldRect.pivot = new Vector2(0f, 1f);
+        fieldRect.anchoredPosition = new Vector2(x, y);
+
         float listY = y - FilterHeight - Spacing;
         GameObject scroll = gui.CreateScrollView(
             parent,
@@ -124,6 +130,12 @@ internal static class GuiCreatureList
         box.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, listHeight);
         box.anchoredPosition = new Vector2(x, listY);
         s_scroll = scroll.GetComponentInChildren<ScrollRect>();
+
+        // The wheel speed is an option (6 - GUI / GuiScrollStep), so it is pushed into the
+        // scroll view right away and again every frame while the window is open: uGUI moves
+        // the list by scrollDelta * scrollSensitivity pixels, and its default of 1 would move
+        // it a single pixel per notch - what made the wheel feel stuck.
+        ApplyScrollStep();
 
         GameObject noMatch = GuiWindow.Label(
             gui,
@@ -177,11 +189,12 @@ internal static class GuiCreatureList
             Text? label = body.GetComponentInChildren<Text>();
             if (label != null)
             {
-                if (i == 0)
-                {
-                    s_baseColor = label.color;
-                }
-                label.alignment = TextAnchor.MiddleLeft;
+                // Jotunn already aligns the text of a button to the left, and paints it
+                // ValheimOrange (ApplyButtonStyle): "the selected row turns orange" showed
+                // nothing at first because every row was orange. The list now reads beige,
+                // with the configured creature in orange - the colours the title and the
+                // state line already use.
+                label.color = gui.ValheimBeige;
             }
 
             Button? button = body.GetComponent<Button>();
@@ -223,12 +236,16 @@ internal static class GuiCreatureList
     // ------------------------------------------------------------------ per frame
 
     /// <summary>
-    /// Brings the highlight and the state line back to what the config says, once per frame
-    /// while the window is open (DisguiseGui.Tick): the console can change the creature with
-    /// the window open, and the two views must agree.
+    /// What DisguiseGui.Tick runs once per frame while the window is on screen: the wheel
+    /// speed option is pushed to the scroll view (a change in ConfigurationManager then needs
+    /// no reopening), and the highlight + the state line are brought back to what the config
+    /// says - the console can change the creature with the window open, and the two views
+    /// must agree.
     /// </summary>
     internal static void Sync()
     {
+        ApplyScrollStep();
+
         string current = DisguiseConfig.ConfigCreature.Value ?? string.Empty;
         if (string.Equals(current, s_syncedCreature, StringComparison.Ordinal))
         {
@@ -237,6 +254,20 @@ internal static class GuiCreatureList
         s_syncedCreature = current;
         RefreshHighlight();
         GuiWindow.RefreshState();
+    }
+
+    /// <summary>
+    /// GuiScrollStep (6 - GUI), in pixels per wheel notch: uGUI multiplies the wheel delta by
+    /// this value, and its default of 1 moved the list one pixel at a time. 0 holds the list,
+    /// a negative value inverts the wheel - both are read as written, no clamping.
+    /// </summary>
+    private static void ApplyScrollStep()
+    {
+        ScrollRect? scroll = s_scroll;
+        if (scroll != null)
+        {
+            scroll.scrollSensitivity = DisguiseConfig.ConfigGuiScrollStep.Value;
+        }
     }
 
     // ------------------------------------------------------------------ filter and selection
@@ -294,9 +325,10 @@ internal static class GuiCreatureList
     }
 
     /// <summary>
-    /// Colours the row of the configured creature (orange) and puts every other visible one
-    /// back to the colour Jotunn gave its buttons. Hidden rows are skipped on purpose: they
-    /// are recoloured by the next filter change, which is the moment they can be seen.
+    /// Colours the row of the configured creature ValheimOrange and every other visible one
+    /// ValheimBeige - Jotunn paints all of its button texts orange, so the base colour cannot
+    /// be the selected one. Hidden rows are skipped on purpose: they are recoloured by the
+    /// next filter change, which is the moment they can be seen.
     /// </summary>
     private static void RefreshHighlight()
     {
@@ -316,7 +348,7 @@ internal static class GuiCreatureList
             }
             label.color = string.Equals(s_names[i], current, StringComparison.OrdinalIgnoreCase)
                 ? gui.ValheimOrange
-                : s_baseColor;
+                : gui.ValheimBeige;
         }
     }
 }

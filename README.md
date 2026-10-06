@@ -316,7 +316,11 @@ step at a time, and this step brings the **creature list**: a filter field over 
 list of every usable creature (the exact list `disguise list` prints), the row of the
 creature configured right now highlighted in orange, and a click on any row = `disguise set
 <prefab_name>` (config written and applied at once, the line under the title updated). The
-3D preview and the command buttons are the next steps of the branch.
+rows read beige and the configured one orange - Jotunn paints the text of all of its buttons
+orange, so the list itself is tinted beige for the difference to be visible - and the wheel
+moves the list by `GuiScrollStep` pixels per notch (60 by default, about two rows; uGUI's
+own default is `1`). The 3D preview and the command buttons are the next steps of the
+branch.
 
 The window is an **overlay**: nothing is paused, and you can still walk around with it open.
 The frames that belong to the UI are the ones where the pointer sits on the window **or**
@@ -336,6 +340,7 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 | Option | Default | Role |
 |---|---|---|
 | `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`) |
+| `GuiScrollStep` | `60` | Pixels the creature list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
 
 ---
 
@@ -627,7 +632,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
   `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
   share stays `private`.
-- `DisguiseConfig.cs` - the twenty-two settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the twenty-three settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`).

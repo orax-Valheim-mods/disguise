@@ -56,6 +56,8 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<KeyboardShortcut> ConfigGuiKey = null!;
 
+    internal static ConfigEntry<float> ConfigGuiScrollStep = null!;
+
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
     {
@@ -269,6 +271,16 @@ internal static class DisguiseConfig
             "Open / close the Disguise window: creature list, preview and command buttons. "
                 + "To change it: ConfigurationManager (Alt+F10) -> 6 - GUI -> click this "
                 + "value, then press the wanted keys."
+        );
+
+        ConfigGuiScrollStep = config.Bind(
+            "6 - GUI",
+            "GuiScrollStep",
+            60f,
+            "Pixels the creature list of the Disguise window moves per mouse wheel notch. "
+                + "Read every frame while the window is open, so a change takes effect "
+                + "immediately. Bigger is faster (60 is about two rows), 0 keeps the list "
+                + "still, and a negative value inverts the wheel."
         );
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
