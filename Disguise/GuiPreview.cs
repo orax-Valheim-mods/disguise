@@ -1,6 +1,5 @@
 #nullable enable
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Disguise;
@@ -9,11 +8,7 @@ namespace Disguise;
 /// The right half of the Disguise window: the picture the 3D preview is drawn into (a
 /// RawImage over the RenderTexture CreaturePreview films), and which creature it shows -
 /// the one the row under the pointer is, or the configured one while the pointer is on no
-/// row at all.
-///
-/// A row is watched for entering AND leaving: leaving fires on the row the pointer came from
-/// before the new row is entered, so the list knows the pointer is on nothing as soon as it
-/// steps out of it (the filter, the scrollbar, out of the window).
+/// row at all. What the pointer is on comes from GuiRowHover, one small component per row.
 ///
 /// Showing a creature builds an inert copy of it (GhostFactory), which is not free: a
 /// pointer sweeping the list would ask for one copy per row crossed. The change is therefore
@@ -77,29 +72,19 @@ internal static class GuiPreview
     /// <summary>Watches a row: on it, its creature; off it, back to the configured one.</summary>
     internal static void WatchRow(GameObject row, string creature)
     {
-        EventTrigger? trigger = row.GetComponent<EventTrigger>();
-        if (trigger == null)
+        GuiRowHover? hover = row.GetComponent<GuiRowHover>();
+        if (hover == null)
         {
-            trigger = row.AddComponent<EventTrigger>();
+            hover = row.AddComponent<GuiRowHover>();
         }
-
-        // Leaving fires on the row the pointer came from before the new row is entered, so
-        // the list sees "on nothing" the moment the pointer steps out of the whole list.
-        string name = creature;
-        EventTrigger.Entry enter = new EventTrigger.Entry
-        {
-            eventID = EventTriggerType.PointerEnter,
-        };
-        enter.callback.AddListener(_ => s_hovered = name);
-        trigger.triggers.Add(enter);
-
-        EventTrigger.Entry leave = new EventTrigger.Entry
-        {
-            eventID = EventTriggerType.PointerExit,
-        };
-        leave.callback.AddListener(_ => s_hovered = string.Empty);
-        trigger.triggers.Add(leave);
+        hover.Creature = creature;
     }
+
+    /// <summary>The pointer stepped on a row (GuiRowHover): show the creature it holds.</summary>
+    internal static void Hover(string creature) => s_hovered = creature;
+
+    /// <summary>The pointer stepped off that row: back to the creature configured right now.</summary>
+    internal static void Leave() => s_hovered = string.Empty;
 
     // ------------------------------------------------------------------ per frame
 

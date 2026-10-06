@@ -718,9 +718,17 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   usable creature built **once** at open (the filter only shows and hides rows with
   `SetActive`, so typing creates nothing), the orange highlight of the configured creature, a
   row click routed to `DisguiseCommand.ApplyCreature`, and `FilterFocused` - the half of
-  `BlocksInput` that hands the frame to the UI while the player types. Each row is watched
-  for entering and leaving (`GuiPreview.WatchRow`), which is how the preview knows what to
-  show.
+  `BlocksInput` that hands the frame to the UI while the player types. Each row is given the
+  listener of the preview (`GuiPreview.WatchRow`), which is how the picture knows what the
+  pointer is on.
+- `GuiRowHover.cs` - the listener on every row: pointer in, show its creature; pointer out,
+  back to the configured one. Two interfaces and no other, on purpose. Unity's `EventTrigger`
+  does the same job with two entries, but it also implements scrolling and dragging - and the
+  event system only walks up to the FIRST object of a hierarchy that handles an event. An
+  `EventTrigger` on a row therefore swallowed the wheel and the dragging of the list (the walk
+  stopped on the row, the `ScrollRect` above it never heard of either, and only the scrollbar
+  - which no row stands over - kept working), while an object without the interface is simply
+  passed over.
 - `GuiPreview.cs` - the right half of the window: the `RawImage` the preview is drawn into
   (never a hit target, hidden while there is no texture - a `RawImage` with no texture draws
   a white plate) and the rule that decides what is in it: the row under the pointer, the
