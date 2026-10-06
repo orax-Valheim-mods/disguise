@@ -9,7 +9,9 @@ namespace Disguise;
 
 /// <summary>
 /// The Disguise window: the GuiKey chord, "disguise gui", the single window that exists at
-/// a time, and the handover of the mouse that makes it clickable.
+/// a time, and the handover of the mouse that makes it clickable. It closes four ways - the
+/// chord, the command, the Close button and Escape - the last one taking the press for
+/// itself (Patch_MenuShow), or the game would pause behind it.
 ///
 /// The window is an OVERLAY: the game keeps running while it is on screen, nothing is
 /// paused. The frames that belong to the UI are the ones where the pointer sits on the
@@ -35,6 +37,16 @@ internal static class DisguiseGui
     internal static bool IsOpen => s_window != null;
 
     /// <summary>
+    /// The frame in which Escape closed the window, -1 when it did not. Patch_MenuShow reads
+    /// it to keep the pause menu off that same press: both Updates run in the same frame, in
+    /// an order nothing pins down, and the patch has to be right either way.
+    /// </summary>
+    private static int s_escapedFrame = -1;
+
+    /// <summary>True for that frame only: the next Escape opens the pause menu as usual.</summary>
+    internal static bool EscapedThisFrame => s_escapedFrame == Time.frameCount;
+
+    /// <summary>
     /// True while the frame belongs to the UI: the pointer is on the window, or the filter
     /// field is focused (GuiCreatureList.FilterFocused). Computed once per frame inside
     /// Tick's try/catch, so the two patches only ever read a plain boolean and can never
@@ -44,7 +56,7 @@ internal static class DisguiseGui
 
     // ------------------------------------------------------------------ per frame
 
-    /// <summary>Reads the key chord and measures the pointer: Disguise.Update, once per frame.</summary>
+    /// <summary>Reads the key chord and Escape, and measures the pointer: Disguise.Update, once per frame.</summary>
     internal static void Tick()
     {
         try
@@ -75,6 +87,17 @@ internal static class DisguiseGui
                 // somewhere else while typing - Valheim's own build menu search does the
                 // same). The game keeps running otherwise: this window is an overlay.
                 BlocksInput = PointerOnWindow() || GuiCreatureList.FilterFocused;
+
+                // Escape closes the window exactly like the Close button, last in the block
+                // because Hide() destroys what the lines above work on. The press is taken
+                // here, or Menu.Update would open the pause menu (and pause the game) on the
+                // same key in the same frame - Valheim's own build menu search closes on
+                // Escape for the same reason. Patch_MenuShow reads EscapedThisFrame.
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    s_escapedFrame = Time.frameCount;
+                    Hide();
+                }
             }
         }
         catch (Exception ex)

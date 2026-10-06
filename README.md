@@ -310,10 +310,12 @@ ground.
 
 **GUI section** (`6 - GUI`) - the Disguise window, built with **Jotunn**'s Valheim-styled
 controls (Jotunn is a hard dependency of this mod, § 1). `GuiKey` opens and closes it
-(toggles), and `disguise gui [on|off]` does exactly the same from the console. The window
-shows the creature list, the 3D preview and the command buttons - this branch added them one
-step at a time, and this step brings the **command buttons** plus the **status line**: a row
-of four buttons under the picture, each one running the sub-command its label stands for
+(toggles), `disguise gui [on|off]` does exactly the same from the console, and `Escape`
+closes it like the Close button - the pause menu stays out of that press (`Patch_MenuShow`
+blocks `Menu.Show` for that frame only, or the game would pause on the same key) and the next
+Escape opens it as usual. The window shows the creature list, the 3D preview, the command
+buttons and the status line (the branch added them one step at a time): a row of four buttons
+under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight` =
 `disguise enable` / `disable`, `refresh`, `view`, `fly`), and reporting its answer on the
 line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
@@ -373,7 +375,7 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 
 | Option | Default | Role |
 |---|---|---|
-| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`) |
+| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`). `Escape` also closes it, and the pause menu waits for the next press |
 | `GuiScrollStep` | `3000` | Pixels the creature list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
 
 ---
@@ -716,10 +718,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   command - the one the command was typed in for the console, `null` for a button of the
   window - and `Say` with no terminal writes the line to `GuiStatus` instead: same text,
   only the place where it is read differs. `Run(sub)` is what a button calls.
-- `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, § 2): the chord read once
-  per frame, the single window that exists at a time, the `BlocksInput` flag both input
-  patches read (pointer on the window **or** filter field focused), the handover of the mouse
-  through Jotunn's `GUIManager.BlockInput` (balanced
+- `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, `Escape`, § 2): the chord
+  read once per frame, the Escape that closes the window and stamps the frame
+  `Patch_MenuShow` reads, the single window that exists at a time, the `BlocksInput` flag both
+  input patches read (pointer on the window **or** filter field focused), the handover of the
+  mouse through Jotunn's `GUIManager.BlockInput` (balanced
   one `true` per `false`, only inside the `main` scene) and the healing of a window destroyed
   by a scene change, which cannot release that request by itself.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
@@ -766,8 +769,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_SetBool.cs`, `Patch_ZDOGetPosition.cs`,
   `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs`,
   `Patch_UpdateCamera.cs`, `Patch_GetMouseScrollWheel.cs`, `Patch_TakeInput.cs`,
-  `Patch_SetMouseLook.cs` - the
-  twenty-three Harmony patches, one
+  `Patch_SetMouseLook.cs`, `Patch_MenuShow.cs` - the
+  twenty-four Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
@@ -782,6 +785,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   (§ 2): the first closes `Player.TakeInput` for the frame, the second hands a zero vector to
   `Player.SetMouseLook` - both only read `DisguiseGui.BlocksInput` and call nothing, so
   neither can throw into `Player.Update` nor into `PlayerController.LateUpdate`.
+  `Patch_MenuShow` is the third patch of that window (§ 2): a prefix on `Menu.Show` that keeps
+  the pause menu off the Escape which closed it, reading `DisguiseGui.IsOpen` and the frame
+  `DisguiseGui.Tick` stamped - it calls nothing either, and so cannot throw into
+  `Menu.Update`.
 
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 

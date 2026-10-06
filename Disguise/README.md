@@ -70,14 +70,16 @@ Valheim-styled controls: the creature list, its 3D preview and four buttons unde
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
 `Own view` and `Flight`, each one running its sub-command like the console would and writing
 its answer on the status line at the bottom, which holds the "click a row" hint before the
-first press (the branch adds them one step at a time - **this step** brings the **buttons and
-the status line**; the preview there shows the creature of the row the pointer is on, filmed
+first press (the branch added them one step at a time; the preview there shows the creature
+of the row the pointer is on, filmed
 by a camera of its own into a texture, and the configured one while the pointer is on no row
 at all, and the list is a filter field over a scrollable list of every usable creature, the
 row of the creature configured right now in orange on beige rows, a click on any row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
 `GuiScrollStep` pixels per notch, clamped at both ends so an extra notch never makes it dip
-and spring back). The window is an **overlay**: nothing is paused,
+and spring back). **Escape** closes it like the Close button - and it is this key, never the
+pause menu's, for the frame it happens (`Patch_MenuShow`); the next Escape opens the pause
+menu as usual. The window is an **overlay**: nothing is paused,
 you can still walk around with it open, and a frame belongs to the UI only while the pointer
 is on the window **or** the filter field is focused - a click on a row never reaches your
 character, the camera waits instead of spinning behind the window, and typing a filter never
