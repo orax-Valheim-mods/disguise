@@ -7,7 +7,9 @@ using UnityEngine;
 namespace Disguise;
 
 /// <summary>
-/// The 'disguise' console command (F5) and all of its sub-commands.
+/// The 'disguise' console command (F5) and all of its sub-commands - also run by the four
+/// buttons of the window (Run), which has no console to print to and hands the answer to
+/// GuiStatus instead (Say).
 /// </summary>
 internal static class DisguiseCommand
 {
@@ -81,8 +83,31 @@ internal static class DisguiseCommand
 
     private static void OnDisguiseCommand(Terminal.ConsoleEventArgs args)
     {
-        Terminal ctx = args.Context;
-        string sub = args.Length > 1 ? args[1].ToLowerInvariant() : "status";
+        string[] words = new string[args.Length];
+        for (int i = 0; i < args.Length; i++)
+        {
+            words[i] = args[i];
+        }
+        Execute(args.Context, words);
+    }
+
+    /// <summary>
+    /// Runs one sub-command with no console behind it: a button of the window (GuiWindow).
+    /// There is no terminal to print to, so Say hands the message to the window's own status
+    /// line (GuiStatus) - the console and the window report their own way, on the same text.
+    /// </summary>
+    internal static void Run(string sub)
+    {
+        // One action = one line on the window: the notes a command goes on printing in the
+        // console after its headline are dropped there.
+        GuiStatus.Clear();
+        Execute(null, new[] { "disguise", sub });
+    }
+
+    /// <summary>The sub-command table: the console passes its terminal, the window none.</summary>
+    private static void Execute(Terminal? ctx, string[] words)
+    {
+        string sub = words.Length > 1 ? words[1].ToLowerInvariant() : "status";
 
         switch (sub)
         {
@@ -112,23 +137,23 @@ internal static class DisguiseCommand
                 break;
 
             case "view":
-                SetOwnView(ctx, args.Length > 2 ? args[2] : null);
+                SetOwnView(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "logs":
-                SetLogs(ctx, args.Length > 2 ? args[2] : null);
+                SetLogs(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "fly":
-                SetFly(ctx, args.Length > 2 ? args[2] : null);
+                SetFly(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "gui":
-                SetGui(ctx, args.Length > 2 ? args[2] : null);
+                SetGui(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "setfakeposition":
-                SetFakePosition(ctx, args);
+                SetFakePosition(ctx, words);
                 break;
 
             case "perf":
@@ -142,12 +167,12 @@ internal static class DisguiseCommand
                 break;
 
             case "set":
-                if (args.Length < 3)
+                if (words.Length < 3)
                 {
                     Say(ctx, "Usage: disguise set <prefab_name>   (disguise list for the names)");
                     break;
                 }
-                bool applied = ApplyCreature(args[2], "set");
+                bool applied = ApplyCreature(words[2], "set");
                 Say(
                     ctx,
                     $"[Disguise] Creature set to \"{DisguiseConfig.ConfigCreature.Value}\" (resolved prefab: {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)})."
@@ -166,7 +191,7 @@ internal static class DisguiseCommand
                 break;
 
             case "list":
-                ListCreatures(ctx, args.Length > 2 ? args[2] : null);
+                ListCreatures(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "help":
@@ -181,13 +206,13 @@ internal static class DisguiseCommand
             default:
                 // sub defaults to "status" when there is no argument, so this branch is only
                 // reached with an unknown word in position 1 -> report it and show the help.
-                Say(ctx, $"[Disguise] Unknown subcommand \"{args[1]}\".");
+                Say(ctx, $"[Disguise] Unknown subcommand \"{words[1]}\".");
                 PrintHelp(ctx);
                 break;
         }
     }
 
-    private static void PrintHelp(Terminal ctx)
+    private static void PrintHelp(Terminal? ctx)
     {
         Say(ctx, "[Disguise] Available commands:");
         Say(ctx, "  disguise status           current state (creature, marker, save protection)");
@@ -278,7 +303,7 @@ internal static class DisguiseCommand
         return true;
     }
 
-    private static void ApplyNow(Terminal ctx, string reason)
+    private static void ApplyNow(Terminal? ctx, string reason)
     {
         if (!ApplyNowCore(reason))
         {
@@ -293,7 +318,7 @@ internal static class DisguiseCommand
     /// "disguise refresh": re-applies the disguise and immediately asks the server for an
     /// observer refresh - the manual fallback when a vanilla client still shows the old look.
     /// </summary>
-    private static void RefreshObservers(Terminal ctx)
+    private static void RefreshObservers(Terminal? ctx)
     {
         ZDO? zdo = GameAccess.GetLocalPlayerZDO();
         if (zdo == null || !zdo.IsValid())
@@ -303,22 +328,24 @@ internal static class DisguiseCommand
         }
         DisguiseApplier.ApplyTo(zdo, "refresh");
         ObserverRefresh.StartObserverRefresh(zdo, force: true);
-        if (!DisguiseConfig.ConfigForceRefresh.Value)
-        {
-            Say(ctx, "Note: ForceObserverRefresh is false, so this refresh was forced manually.");
-        }
+        // Headline first: the console reads it first, and the window's status line, which
+        // keeps one line per action, would otherwise only ever show the note.
         Say(
             ctx,
             $"[Disguise] Observer refresh requested: other players re-create your object "
                 + $"in ~{Mathf.Clamp(DisguiseConfig.ConfigRefreshHold.Value, 0.2f, 3f):0.0} s (this mod is required on the dedicated server)."
         );
+        if (!DisguiseConfig.ConfigForceRefresh.Value)
+        {
+            Say(ctx, "Note: ForceObserverRefresh is false, so this refresh was forced manually.");
+        }
     }
 
     /// <summary>
     /// "disguise view [on|off]": shows or hides your creature on your OWN screen. Purely
     /// local rendering (SelfView): it never changes what the other machines receive.
     /// </summary>
-    private static void SetOwnView(Terminal ctx, string? argument)
+    private static void SetOwnView(Terminal? ctx, string? argument)
     {
         bool ownView = DisguiseConfig.ConfigSeeYourDisguise.Value;
         if (argument == null)
@@ -357,7 +384,7 @@ internal static class DisguiseCommand
     /// "disguise logs [on|off]": decides whether the mod writes its own informational
     /// messages (Info / Debug) to the BepInEx log. Warnings and errors are never gated.
     /// </summary>
-    private static void SetLogs(Terminal ctx, string? argument)
+    private static void SetLogs(Terminal? ctx, string? argument)
     {
         bool logs = DisguiseConfig.ConfigLogs.Value;
         if (argument == null)
@@ -386,7 +413,7 @@ internal static class DisguiseCommand
     /// server keeps, saves and runs the game logic with stays on the ground - only what is
     /// drawn and what goes out on the wire is raised (FlightControl).
     /// </summary>
-    private static void SetFly(Terminal ctx, string? argument)
+    private static void SetFly(Terminal? ctx, string? argument)
     {
         bool flying = FlightControl.IsFlying;
         if (argument == null)
@@ -436,7 +463,7 @@ internal static class DisguiseCommand
     /// filter field focused are handed to the UI (no click reaches the character, the camera
     /// waits, typing never walks it away).
     /// </summary>
-    private static void SetGui(Terminal ctx, string? argument)
+    private static void SetGui(Terminal? ctx, string? argument)
     {
         bool open = DisguiseGui.IsOpen;
         if (argument == null)
@@ -499,9 +526,9 @@ internal static class DisguiseCommand
     /// character, the ZDO, your own screen and the world save stay at the real position,
     /// and the dedicated server needs this DLL to write the fake into that list.
     /// </summary>
-    private static void SetFakePosition(Terminal ctx, Terminal.ConsoleEventArgs args)
+    private static void SetFakePosition(Terminal? ctx, string[] words)
     {
-        if (args.Length >= 3 && IsOffArgument(args[2]))
+        if (words.Length >= 3 && IsOffArgument(words[2]))
         {
             FakePosition.Clear();
             PublishFakePosition(ctx);
@@ -513,11 +540,11 @@ internal static class DisguiseCommand
         }
 
         Vector3 position;
-        if (args.Length >= 4)
+        if (words.Length >= 4)
         {
             if (
-                !TryParseMapCoordinate(args[2], out float x)
-                || !TryParseMapCoordinate(args[3], out float z)
+                !TryParseMapCoordinate(words[2], out float x)
+                || !TryParseMapCoordinate(words[3], out float z)
             )
             {
                 PrintFakePositionUsage(ctx);
@@ -525,7 +552,7 @@ internal static class DisguiseCommand
             }
             position = new Vector3(x, CurrentHeight(), z);
         }
-        else if (args.Length == 2)
+        else if (words.Length == 2)
         {
             if (Player.m_localPlayer == null)
             {
@@ -557,7 +584,7 @@ internal static class DisguiseCommand
         );
     }
 
-    private static void PrintFakePositionUsage(Terminal ctx)
+    private static void PrintFakePositionUsage(Terminal? ctx)
     {
         Say(
             ctx,
@@ -593,7 +620,7 @@ internal static class DisguiseCommand
         return Player.m_localPlayer != null ? Player.m_localPlayer.transform.position.y : 0f;
     }
 
-    private static void PublishFakePosition(Terminal ctx)
+    private static void PublishFakePosition(Terminal? ctx)
     {
         ZDO? zdo = GameAccess.GetLocalPlayerZDO();
         if (zdo == null || !zdo.IsValid())
@@ -604,7 +631,7 @@ internal static class DisguiseCommand
         FakePosition.Publish(zdo);
     }
 
-    private static void PrintStatus(Terminal ctx)
+    private static void PrintStatus(Terminal? ctx)
     {
         ZDO? zdo = GameAccess.GetLocalPlayerZDO();
         bool isServer = ZNet.instance != null && ZNet.instance.IsServer();
@@ -669,7 +696,7 @@ internal static class DisguiseCommand
         );
     }
 
-    private static void ListCreatures(Terminal ctx, string? filter)
+    private static void ListCreatures(Terminal? ctx, string? filter)
     {
         if (ZNetScene.instance == null)
         {
@@ -693,8 +720,20 @@ internal static class DisguiseCommand
         }
     }
 
-    private static void Say(Terminal ctx, string text)
+    /// <summary>
+    /// One line of output, to whichever of the two places has the command in front of it: the
+    /// console when ctx is the terminal the command was typed in, the window's own status
+    /// line when a button ran it (ctx = null). The text is identical, only where it is read
+    /// changes - the console and the window report their own way.
+    /// </summary>
+    private static void Say(Terminal? ctx, string text)
     {
+        if (ctx == null)
+        {
+            GuiStatus.Show(text);
+            return;
+        }
+
         try
         {
             ctx.AddString(text);

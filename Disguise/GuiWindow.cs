@@ -1,6 +1,7 @@
 #nullable enable
 using Jotunn.Managers;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace Disguise;
@@ -10,11 +11,11 @@ namespace Disguise;
 /// panel, AveriaSerif fonts, Valheim buttons). DisguiseGui owns the lifecycle: this class
 /// only builds, it never keeps the window alive and it never talks to the console.
 ///
-/// Step 3 of the window: title, the creature that is configured right now, the creature list
-/// with its filter (GuiCreatureList builds that block, this class only tells it where to sit)
-/// and, on the right, the 3D preview (GuiPreview builds the picture, CreaturePreview films
-/// into it). The command buttons are built here in the last step of the branch, which is why
-/// the size is already the final one.
+/// Step 4 of the window: title, the creature that is configured right now, the creature list
+/// with its filter (GuiCreatureList builds that block, this class only tells it where to sit),
+/// on the right the 3D preview (GuiPreview builds the picture, CreaturePreview films into it),
+/// under it the four command buttons, and at the bottom the status line (GuiStatus), which is
+/// the hint while no button has been pressed and the answer of the last one after that.
 /// </summary>
 internal static class GuiWindow
 {
@@ -34,13 +35,31 @@ internal static class GuiWindow
 
     // Right half: upper left corner of the 3D preview, given to GuiPreview as the list
     // block's corner is given to GuiCreatureList: it starts at the height of the filter, is
-    // as tall as the list, and the line under it fills the space down to the hint.
+    // as tall as the list, and the command row plus the status line fill the space down to
+    // the bottom edge of the window.
     private const float PreviewX = 25f;
 
     private const float PreviewY = -132f;
 
-    /// <summary>Gap between the bottom of the picture and the line under it.</summary>
+    /// <summary>Gap between the bottom of the picture and the row of buttons under it.</summary>
     private const float PreviewGap = 6f;
+
+    // The command row, as wide as the picture above it: four buttons of equal width.
+    private const float ButtonHeight = 40f;
+
+    private const float ButtonGap = 6f;
+
+    private const float ButtonTop = PreviewY - CreaturePreview.PictureHeight - PreviewGap;
+
+    /// <summary>Centre of the row, given to CreateButton as a position of the window.</summary>
+    private const float ButtonY = ButtonTop - (ButtonHeight * 0.5f);
+
+    /// <summary>
+    /// The label of the first command button, kept here because it is a toggle: RefreshState
+    /// rewrites it after every change, the same way it rewrites the state line. Unity-null
+    /// once the window is gone, which is the whole safety of both.
+    /// </summary>
+    private static Text? s_power;
 
     /// <summary>
     /// The line under the title, kept here so it can be rewritten after a click on a row or a
@@ -53,6 +72,7 @@ internal static class GuiWindow
     {
         GUIManager gui = GUIManager.Instance;
         s_state = null;
+        s_power = null;
 
         // Draggable: Jotunn puts its DragWindowCntrl on the panel, and the whole background
         // forwards the gesture, so there is no dedicated title bar to grab.
@@ -114,43 +134,80 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        _ = Label(
-            gui,
-            "The command buttons arrive next on this branch.",
-            window.transform,
-            new Vector2(0.5f, 1f),
-            new Vector2(
-                PreviewX + (CreaturePreview.PictureWidth * 0.5f),
-                PreviewY - CreaturePreview.PictureHeight - PreviewGap - 20f
-            ),
-            gui.AveriaSerif,
-            16,
-            gui.ValheimBeige,
-            CreaturePreview.PictureWidth,
-            40f
-        );
-
-        _ = Label(
-            gui,
-            "Click a row: the creature is set and applied at once - the same as \"disguise set <name>\".",
-            window.transform,
-            new Vector2(0.5f, 0f),
-            new Vector2(0f, 36f),
-            gui.AveriaSerif,
-            16,
-            gui.ValheimBeige,
-            800f,
-            36f
-        );
+        // The four command buttons under the picture, then the line they answer on (which
+        // still holds the hint about clicking a row while no button has been pressed).
+        CommandButtons(gui, window.transform);
+        GuiStatus.Build(window.transform);
 
         return window;
     }
 
     /// <summary>
+    /// The row under the picture: four buttons, each one running its sub-command through
+    /// DisguiseCommand.Run, which has no console here and answers on the status line below.
+    /// The first one is a toggle, so what it says and what it runs both follow the config.
+    /// </summary>
+    private static void CommandButtons(GUIManager gui, Transform parent)
+    {
+        float width = (CreaturePreview.PictureWidth - (3f * ButtonGap)) / 4f;
+        float centre = PreviewX + (width * 0.5f);
+
+        s_power = Command(gui, parent, DescribePower(), centre, width, TogglePower);
+
+        centre += width + ButtonGap;
+        _ = Command(gui, parent, "Refresh", centre, width, () => RunCommand("refresh"));
+
+        centre += width + ButtonGap;
+        _ = Command(gui, parent, "Own view", centre, width, () => RunCommand("view"));
+
+        centre += width + ButtonGap;
+        _ = Command(gui, parent, "Flight", centre, width, () => RunCommand("fly"));
+    }
+
+    /// <summary>One button of the command row; its label Text is returned for the toggle.</summary>
+    private static Text? Command(
+        GUIManager gui,
+        Transform parent,
+        string label,
+        float centreX,
+        float width,
+        UnityAction onClick
+    )
+    {
+        GameObject body = gui.CreateButton(
+            label,
+            parent,
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(centreX, ButtonY),
+            width,
+            ButtonHeight
+        );
+        Button? button = body.GetComponent<Button>();
+        if (button != null)
+        {
+            button.onClick.AddListener(onClick);
+        }
+        return body.GetComponentInChildren<Text>();
+    }
+
+    /// <summary>What every command button does: run its sub-command, then rewrite the state.</summary>
+    private static void RunCommand(string sub)
+    {
+        DisguiseCommand.Run(sub);
+        RefreshState();
+    }
+
+    /// <summary>The toggle: enable when it is off, disable when it is on - the label says which.</summary>
+    private static void TogglePower() =>
+        RunCommand(DisguiseConfig.ConfigEnabled.Value ? "disable" : "enable");
+
+    /// <summary>
     /// Rewrites the line under the title from the config: called by GuiCreatureList after a
-    /// row was clicked (or after a change the console made while the window is open). Does
-    /// nothing without a window, which is every frame it is closed and every frame after a
-    /// scene change destroyed it.
+    /// row was clicked (or after a change the console made while the window is open), and by
+    /// the command buttons after they ran their sub-command. The toggle's label is rewritten
+    /// with it, since both say the same state. Does nothing without a window, which is every
+    /// frame it is closed and every frame after a scene change destroyed it.
     /// </summary>
     internal static void RefreshState()
     {
@@ -158,6 +215,12 @@ internal static class GuiWindow
         if (label != null)
         {
             label.text = DescribeState();
+        }
+
+        Text? power = s_power;
+        if (power != null)
+        {
+            power.text = DescribePower();
         }
     }
 
@@ -210,4 +273,11 @@ internal static class GuiWindow
         string state = DisguiseConfig.ConfigEnabled.Value ? "disguise on" : "disguise off";
         return $"Creature: {creature}   -   {state}";
     }
+
+    /// <summary>
+    /// The label of the toggle button: what pressing it does right now, so the same button
+    /// reads "Disable" while the disguise is on and "Enable" while it is off.
+    /// </summary>
+    private static string DescribePower() =>
+        DisguiseConfig.ConfigEnabled.Value ? "Disable" : "Enable";
 }

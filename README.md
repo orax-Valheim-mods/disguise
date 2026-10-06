@@ -311,20 +311,29 @@ ground.
 **GUI section** (`6 - GUI`) - the Disguise window, built with **Jotunn**'s Valheim-styled
 controls (Jotunn is a hard dependency of this mod, § 1). `GuiKey` opens and closes it
 (toggles), and `disguise gui [on|off]` does exactly the same from the console. The window
-shows the creature list, its 3D preview and every command button - this branch adds them one
-step at a time, and this step brings the **3D preview**: the creature of the row the pointer
-is on is shown on the right half of the window, the configured one while the pointer is on no
-row at all. The **creature list** already there: a filter field over a scrollable list of
-every usable creature (the exact list `disguise list` prints), the row of the creature
-configured right now highlighted in orange, and a click on any row = `disguise set
-<prefab_name>` (config written and applied at once, the line under the title updated). The
-rows read beige and the configured one orange - Jotunn paints the text of all of its buttons
-orange, so the list itself is tinted beige for the difference to be visible - and the wheel
-moves the list by `GuiScrollStep` pixels per notch (3000 by default = about 88 rows of the
-153 the list scrolls through; uGUI's own default is `1`). The list is **clamped at both
-ends**: an extra notch at the top or the bottom simply does nothing, instead of the elastic
-dip-and-spring-back Unity gives by default. The command buttons are the last step of the
-branch.
+shows the creature list, the 3D preview and the command buttons - this branch added them one
+step at a time, and this step brings the **command buttons** plus the **status line**: a row
+of four buttons under the picture, each one running the sub-command its label stands for
+exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight` =
+`disguise enable` / `disable`, `refresh`, `view`, `fly`), and reporting its answer on the
+line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
+disguise is on and "Enable" while it is off, and both that label and the line under the title
+are rewritten after every click. The status line holds the hint about clicking a row while no
+button has been pressed, and then the **first line** of the answer of the last one (it stays
+until the next button, and the hint comes back with the next window): a command can print
+several lines, the console keeps them all, and the first one is the headline - the notes a
+command goes on printing after it stay in the console. The **creature list**: a filter field
+over a scrollable list of every usable creature (the exact list `disguise list` prints), the
+row of the creature configured right now highlighted in orange, and a click on any row =
+`disguise set <prefab_name>` (config written and applied at once, the line under the title
+updated). The rows read beige and the configured one orange - Jotunn paints the text of all
+of its buttons orange, so the list itself is tinted beige for the difference to be visible -
+and the wheel moves the list by `GuiScrollStep` pixels per notch (3000 by default = about 88
+rows of the 153 the list scrolls through; uGUI's own default is `1`). The list is **clamped
+at both ends**: an extra notch at the top or the bottom simply does nothing, instead of the
+elastic dip-and-spring-back Unity gives by default. The **3D preview** above the buttons
+shows the creature of the row the pointer is on, the configured one while the pointer is on
+no row at all.
 
 The **3D preview** (`CreaturePreview`) is not a scene but a texture. On the first creature
 asked for, the stage is built once: a free layer (the highest one no mod named, 31 down to
@@ -703,7 +712,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   things the window needs from it so the console and the window can never disagree:
   `CreatureNames(filter)` (the source of `disguise list` *and* of the window's list) and
   `ApplyCreature(name, reason)` (config + re-application, printing nothing: each side
-  reports its own way on top of it).
+  reports its own way on top of it). `Execute` and `Say` both take the `Terminal` behind the
+  command - the one the command was typed in for the console, `null` for a button of the
+  window - and `Say` with no terminal writes the line to `GuiStatus` instead: same text,
+  only the place where it is read differs. `Run(sub)` is what a button calls.
 - `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, § 2): the chord read once
   per frame, the single window that exists at a time, the `BlocksInput` flag both input
   patches read (pointer on the window **or** filter field focused), the handover of the mouse
@@ -712,8 +724,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   by a scene change, which cannot release that request by itself.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
   centred labels, the title, the state line (rewritten by `RefreshState` after a change), the
-  buttons and the coordinates of the list block. It only builds, it never keeps the window
-  alive nor talks to the console - both stay in `DisguiseGui`.
+  row of four command buttons under the picture (each one runs its sub-command through
+  `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
+  label), the status line below them, and the coordinates of the list block. It only builds,
+  it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
 - `GuiCreatureList.cs` - the creature list: Jotunn's filter field and scroll view, one row per
   usable creature built **once** at open (the filter only shows and hides rows with
   `SetActive`, so typing creates nothing), the orange highlight of the configured creature, a
@@ -729,6 +743,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   stopped on the row, the `ScrollRect` above it never heard of either, and only the scrollbar
   - which no row stands over - kept working), while an object without the interface is simply
   passed over.
+- `GuiStatus.cs` - the line at the bottom of the window: the hint about clicking a row while
+  no button has been pressed, and the answer of the last command button after that. One line
+  holds one message, so `DisguiseCommand.Run` clears it before running and only the first
+  line written after that (the headline) is kept; the console, which has a terminal behind
+  it, keeps every line.
 - `GuiPreview.cs` - the right half of the window: the `RawImage` the preview is drawn into
   (never a hit target, hidden while there is no texture - a `RawImage` with no texture draws
   a white plate) and the rule that decides what is in it: the row under the pointer, the

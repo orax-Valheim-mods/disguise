@@ -66,15 +66,18 @@ at once. The zoom comes back the moment the flight ends, and the minimap and the
 rotation keep their own wheel throughout.
 
 The **Disguise window** (`GuiKey` = `F8 + LeftAlt`, or `disguise gui`) is built with **Jotunn**'s
-Valheim-styled controls: the creature list, its 3D preview and a button for every command of
-the table above (the branch adds them one step at a time - this step brings the **3D
-preview**: the creature of the row the pointer is on is shown on the right of the window,
-filmed by a camera of its own into a texture, and the configured one while the pointer is on
-no row at all; the list already there is a filter field over a scrollable list of every
-usable creature, the row of the creature configured right now in orange on beige rows, a
-click on any row = `disguise set <prefab_name>` written and applied at once, and a wheel that
-moves the list by `GuiScrollStep` pixels per notch, clamped at both ends so an extra notch
-never makes it dip and spring back). The window is an **overlay**: nothing is paused,
+Valheim-styled controls: the creature list, its 3D preview and four buttons under the
+picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
+`Own view` and `Flight`, each one running its sub-command like the console would and writing
+its answer on the status line at the bottom, which holds the "click a row" hint before the
+first press (the branch adds them one step at a time - **this step** brings the **buttons and
+the status line**; the preview there shows the creature of the row the pointer is on, filmed
+by a camera of its own into a texture, and the configured one while the pointer is on no row
+at all, and the list is a filter field over a scrollable list of every usable creature, the
+row of the creature configured right now in orange on beige rows, a click on any row =
+`disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
+`GuiScrollStep` pixels per notch, clamped at both ends so an extra notch never makes it dip
+and spring back). The window is an **overlay**: nothing is paused,
 you can still walk around with it open, and a frame belongs to the UI only while the pointer
 is on the window **or** the filter field is focused - a click on a row never reaches your
 character, the camera waits instead of spinning behind the window, and typing a filter never

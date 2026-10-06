@@ -98,6 +98,7 @@ internal static class DisguiseGui
         s_canvas = null;
         GuiCreatureList.Forget();
         GuiPreview.Forget();
+        GuiStatus.Forget();
         CreaturePreview.Forget();
         ReleaseMouse();
     }
@@ -243,6 +244,7 @@ internal static class DisguiseGui
         BlocksInput = false;
         GuiCreatureList.Forget();
         GuiPreview.Forget();
+        GuiStatus.Forget();
         CreaturePreview.Forget();
         ReleaseMouse();
     }
