@@ -147,13 +147,18 @@ internal static class DisguiseCommand
                     Say(ctx, "Usage: disguise set <prefab_name>   (disguise list for the names)");
                     break;
                 }
-                DisguiseConfig.ConfigCreature.Value = args[2];
-                DisguiseConfig.ConfigEnabled.Value = true;
-                ApplyNow(ctx, "set");
+                bool applied = ApplyCreature(args[2], "set");
                 Say(
                     ctx,
                     $"[Disguise] Creature set to \"{DisguiseConfig.ConfigCreature.Value}\" (resolved prefab: {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)})."
                 );
+                if (!applied)
+                {
+                    Say(
+                        ctx,
+                        "[Disguise] No local player (main menu): the change will be applied on the next spawn."
+                    );
+                }
                 if (PrefabResolver.CreaturePrefabHash == 0)
                 {
                     Say(ctx, "Warning: this prefab does not exist here (see disguise list).");
@@ -186,8 +191,9 @@ internal static class DisguiseCommand
     {
         Say(ctx, "[Disguise] Available commands:");
         Say(ctx, "  disguise status           current state (creature, marker, save protection)");
-        Say(ctx, "  disguise list [filter]    list creature prefabs (e.g. disguise list troll)");
+        Say(ctx, "  disguise list [filter]    list creature prefabs (the window lists the same)");
         Say(ctx, "  disguise set <prefab>     change creature and enable the disguise");
+        Say(ctx, "                            (a click on a row of the window does this too)");
         Say(ctx, "  disguise enable           enable the disguise");
         Say(ctx, "  disguise disable          disable it: you become a normal viking again");
         Say(ctx, "  disguise refresh          force other players to re-create your object now");
@@ -211,18 +217,76 @@ internal static class DisguiseCommand
         Say(ctx, "  Install on the dedicated server AND on your PC only, never for other players.");
     }
 
-    private static void ApplyNow(Terminal ctx, string reason)
+    /// <summary>
+    /// The one place that changes the creature: what "disguise set" runs, and what a click on
+    /// a row of the window runs (GuiCreatureList). It writes the config (which invalidates
+    /// the resolved hash through SettingChanged) and re-applies at once - and it prints
+    /// nothing: the console and the window report their own way, on top of it.
+    ///
+    /// Returns false when there is no local player (main menu): the change is stored all the
+    /// same and lands on the next spawn, which is exactly what ApplyNow announces.
+    /// </summary>
+    internal static bool ApplyCreature(string prefabName, string reason)
+    {
+        DisguiseConfig.ConfigCreature.Value = prefabName;
+        DisguiseConfig.ConfigEnabled.Value = true;
+        return ApplyNowCore(reason);
+    }
+
+    /// <summary>
+    /// Every usable creature: a prefab that carries a Character, optionally narrowed down by
+    /// a substring, sorted by name. The console list ("disguise list") and the window list
+    /// (GuiCreatureList) both read this, so the two can never disagree. Empty without a
+    /// ZNetScene (main menu), which is where the console prints its own notice.
+    /// </summary>
+    internal static List<string> CreatureNames(string? filter)
+    {
+        List<string> names = new();
+        ZNetScene? zns = ZNetScene.instance;
+        if (zns == null)
+        {
+            return names;
+        }
+        foreach (string name in zns.GetPrefabNames())
+        {
+            if (filter != null && name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+            GameObject? go = zns.GetPrefab(name);
+            if (go != null && go.GetComponent<Character>() != null)
+            {
+                names.Add(name);
+            }
+        }
+        names.Sort(StringComparer.OrdinalIgnoreCase);
+        return names;
+    }
+
+    /// <summary>
+    /// Re-applies the disguise on the local player right now. Returns false in the main menu
+    /// (no local player), where nothing can be applied yet.
+    /// </summary>
+    private static bool ApplyNowCore(string reason)
     {
         ZDO? zdo = GameAccess.GetLocalPlayerZDO();
         if (zdo == null || !zdo.IsValid())
+        {
+            return false;
+        }
+        DisguiseApplier.ApplyTo(zdo, reason);
+        return true;
+    }
+
+    private static void ApplyNow(Terminal ctx, string reason)
+    {
+        if (!ApplyNowCore(reason))
         {
             Say(
                 ctx,
                 "[Disguise] No local player (main menu): the change will be applied on the next spawn."
             );
-            return;
         }
-        DisguiseApplier.ApplyTo(zdo, reason);
     }
 
     /// <summary>
@@ -368,8 +432,9 @@ internal static class DisguiseCommand
     /// <summary>
     /// "disguise gui [on|off]": opens or closes the window - the same thing as the GuiKey
     /// chord (F8 + LeftAlt by default), for whoever prefers the console. The window is an
-    /// overlay: the game keeps running, only the frames with the pointer on the window are
-    /// handed to the UI (no click reaches the character, the camera waits).
+    /// overlay: the game keeps running, only the frames with the pointer on the window or the
+    /// filter field focused are handed to the UI (no click reaches the character, the camera
+    /// waits, typing never walks it away).
     /// </summary>
     private static void SetGui(Terminal ctx, string? argument)
     {
@@ -394,7 +459,7 @@ internal static class DisguiseCommand
             }
             Say(
                 ctx,
-                "[Disguise] Window opened: drag it anywhere, Close (or the key chord) dismisses it."
+                "[Disguise] Window opened: drag it anywhere, filter and click a row to pick a creature, Close (or the key chord) dismisses it."
             );
         }
         else
@@ -606,8 +671,7 @@ internal static class DisguiseCommand
 
     private static void ListCreatures(Terminal ctx, string? filter)
     {
-        ZNetScene? zns = ZNetScene.instance;
-        if (zns == null)
+        if (ZNetScene.instance == null)
         {
             Say(
                 ctx,
@@ -615,20 +679,7 @@ internal static class DisguiseCommand
             );
             return;
         }
-        List<string> names = new();
-        foreach (string name in zns.GetPrefabNames())
-        {
-            if (filter != null && name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                continue;
-            }
-            GameObject? go = zns.GetPrefab(name);
-            if (go != null && go.GetComponent<Character>() != null)
-            {
-                names.Add(name);
-            }
-        }
-        names.Sort(StringComparer.OrdinalIgnoreCase);
+        List<string> names = CreatureNames(filter);
         Say(
             ctx,
             $"[Disguise] {names.Count} creature prefab(s)"

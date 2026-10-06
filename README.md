@@ -105,8 +105,8 @@ In game, open the console with **F5**:
 | Command | Effect |
 |---|---|
 | `disguise status` | Current state (creature, marker, save protection) |
-| `disguise list` | List of usable creature prefabs (`disguise list troll` to filter) |
-| `disguise set Troll` | Change creature and enable the disguise |
+| `disguise list` | List of usable creature prefabs (`disguise list troll` to filter; the window lists the same creatures, § 2 GUI) |
+| `disguise set Troll` | Change creature and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
@@ -312,16 +312,21 @@ ground.
 controls (Jotunn is a hard dependency of this mod, § 1). `GuiKey` opens and closes it
 (toggles), and `disguise gui [on|off]` does exactly the same from the console. The window
 shows the creature list, its 3D preview and every command button - this branch adds them one
-step at a time, and the first step only brings the frame itself: title, the creature
-configured right now, and a Close button, all of it draggable.
+step at a time, and this step brings the **creature list**: a filter field over a scrollable
+list of every usable creature (the exact list `disguise list` prints), the row of the
+creature configured right now highlighted in orange, and a click on any row = `disguise set
+<prefab_name>` (config written and applied at once, the line under the title updated). The
+3D preview and the command buttons are the next steps of the branch.
 
 The window is an **overlay**: nothing is paused, and you can still walk around with it open.
-Only the frames where the pointer sits on the window belong to the UI, which
-`DisguiseGui.Tick` measures once per frame (`DisguiseGui.BlocksInput`, read by
-`Patch_TakeInput` and `Patch_SetMouseLook`): a click on a button never reaches the
-character, and the camera waits instead of spinning behind the window - the same rule
-Valheim applies to its own panels. Pointer anywhere else, both patches stay silent and the
-game runs as usual. While the window is open, Jotunn's `GUIManager.BlockInput` takes the
+The frames that belong to the UI are the ones where the pointer sits on the window **or**
+where the filter field is being typed in, which `DisguiseGui.Tick` measures once per frame
+(`DisguiseGui.BlocksInput`, read by `Patch_TakeInput` and `Patch_SetMouseLook`): a click on
+a row never reaches the character, the camera waits instead of spinning behind the window,
+and typing a filter never walks the character away nor turns the camera - Valheim does the
+same with `Hud.m_buildUi.SearchFieldFocused` for the build menu search. Pointer anywhere
+else and no filter focused, both patches stay silent and the game runs as usual. While the
+window is open, Jotunn's `GUIManager.BlockInput` takes the
 mouse away from the camera (`GameCamera.m_mouseCapture`, without it
 `GameCamera.UpdateMouseCapture` would lock the cursor again on the next frame) and gives it
 back on close - including after a scene change, which is why `DisguiseGui.Tick` checks the
@@ -664,15 +669,26 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   block (null when the pool holds two or fewer), restricted to the triggers the probe
   really read. Plain serialized fields, so unlike `Animator.parameters` it needs neither an
   activation nor an instantiation.
-- `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
+- `DisguiseCommand.cs` - the `disguise` console command and its sub-commands, plus the two
+  things the window needs from it so the console and the window can never disagree:
+  `CreatureNames(filter)` (the source of `disguise list` *and* of the window's list) and
+  `ApplyCreature(name, reason)` (config + re-application, printing nothing: each side
+  reports its own way on top of it).
 - `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, § 2): the chord read once
   per frame, the single window that exists at a time, the `BlocksInput` flag both input
-  patches read, the handover of the mouse through Jotunn's `GUIManager.BlockInput` (balanced
+  patches read (pointer on the window **or** filter field focused), the handover of the mouse
+  through Jotunn's `GUIManager.BlockInput` (balanced
   one `true` per `false`, only inside the `main` scene) and the healing of a window destroyed
   by a scene change, which cannot release that request by itself.
-- `GuiWindow.cs` - what goes inside the window: Jotunn's wood panel (draggable), the centred
-  labels and the buttons. It only builds, it never keeps the window alive nor talks to the
-  console - both stay in `DisguiseGui`.
+- `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
+  centred labels, the title, the state line (rewritten by `RefreshState` after a change), the
+  buttons and the coordinates of the list block. It only builds, it never keeps the window
+  alive nor talks to the console - both stay in `DisguiseGui`.
+- `GuiCreatureList.cs` - the creature list: Jotunn's filter field and scroll view, one row per
+  usable creature built **once** at open (the filter only shows and hides rows with
+  `SetActive`, so typing creates nothing), the orange highlight of the configured creature, a
+  row click routed to `DisguiseCommand.ApplyCreature`, and `FilterFocused` - the half of
+  `BlocksInput` that hands the frame to the UI while the player types.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
@@ -767,7 +783,8 @@ stays 82.
 | The camera does not zoom while you fly | Normal: while the flight is on, the wheel belongs to the creature (`FlyScrollWheel`). Land (`FlyDisableKey`) or set the option to `false` and the zoom is back immediately - the minimap and the build rotation were never affected |
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 | `disguise gui` says "not opened" (or `GuiKey` does nothing at all) | A dedicated server has no GUI, and before a world is loaded Jotunn's `CustomGUIFront` does not exist yet (`Window: ...` in the log, visible only with `Logs = true`, § 2). An unset `GuiKey` (`Not set`, recorded in ConfigurationManager) never fires. Jotunn itself is a hard dependency (§ 1): without it the mod does not load at all |
-| You click a button and the character swings anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both are normal only when the pointer is *not* on the window: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
+| You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
+| The creature list is empty and reads "the creature list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 
 Log files:

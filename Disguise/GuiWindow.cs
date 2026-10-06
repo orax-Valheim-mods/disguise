@@ -10,9 +10,10 @@ namespace Disguise;
 /// panel, AveriaSerif fonts, Valheim buttons). DisguiseGui owns the lifecycle: this class
 /// only builds, it never keeps the window alive and it never talks to the console.
 ///
-/// Step 1 of the window: title, the creature that is configured right now, a hint and the
-/// Close button. The creature list, its 3D preview and the command buttons are built here in
-/// the next steps of the branch, which is why the size is already the final one.
+/// Step 2 of the window: title, the creature that is configured right now, the creature list
+/// with its filter (GuiCreatureList builds that block, this class only tells it where to sit)
+/// and a hint. The 3D preview and the command buttons are built here in the next steps of
+/// the branch, which is why the size is already the final one.
 /// </summary>
 internal static class GuiWindow
 {
@@ -21,9 +22,27 @@ internal static class GuiWindow
 
     internal const float Height = 540f;
 
+    // Left half of the window: top-left corner of the filter + list block, and its size.
+    // The right half stays free for the 3D preview of step 3.
+    private const float ListX = 24f;
+
+    private const float ListY = -132f;
+
+    private const float ListWidth = 400f;
+
+    private const float ListHeight = 300f;
+
+    /// <summary>
+    /// The line under the title, kept here so it can be rewritten after a click on a row or a
+    /// change made by the console while the window is open. Unity-null once the window is
+    /// gone, which is the whole safety of RefreshState.
+    /// </summary>
+    private static Text? s_state;
+
     internal static GameObject Build(Transform parent)
     {
         GUIManager gui = GUIManager.Instance;
+        s_state = null;
 
         // Draggable: Jotunn puts its DragWindowCntrl on the panel, and the whole background
         // forwards the gesture, so there is no dedicated title bar to grab.
@@ -65,7 +84,7 @@ internal static class GuiWindow
             button.onClick.AddListener(DisguiseGui.Hide);
         }
 
-        _ = Label(
+        GameObject state = Label(
             gui,
             DescribeState(),
             window.transform,
@@ -77,10 +96,27 @@ internal static class GuiWindow
             800f,
             40f
         );
+        s_state = state.GetComponent<Text>();
+
+        // The filter field and the scrollable list, built by GuiCreatureList.
+        GuiCreatureList.Build(window.transform, ListX, ListY, ListWidth, ListHeight);
 
         _ = Label(
             gui,
-            "The creature list, its 3D preview and the command buttons arrive next on this branch.",
+            "The 3D preview and the command buttons arrive next on this branch.",
+            window.transform,
+            new Vector2(0.5f, 1f),
+            new Vector2(215f, -300f),
+            gui.AveriaSerif,
+            16,
+            gui.ValheimBeige,
+            380f,
+            100f
+        );
+
+        _ = Label(
+            gui,
+            "Click a row: the creature is set and applied at once - the same as \"disguise set <name>\".",
             window.transform,
             new Vector2(0.5f, 0f),
             new Vector2(0f, 36f),
@@ -95,11 +131,27 @@ internal static class GuiWindow
     }
 
     /// <summary>
+    /// Rewrites the line under the title from the config: called by GuiCreatureList after a
+    /// row was clicked (or after a change the console made while the window is open). Does
+    /// nothing without a window, which is every frame it is closed and every frame after a
+    /// scene change destroyed it.
+    /// </summary>
+    internal static void RefreshState()
+    {
+        Text? label = s_state;
+        if (label != null)
+        {
+            label.text = DescribeState();
+        }
+    }
+
+    /// <summary>
     /// One line of text, centred: Jotunn builds the object, the alignment is then set here
     /// because its helper leaves the Unity default (upper left), which would push every
-    /// centred line into the left half of its box.
+    /// centred line into the left half of its box. Shared with GuiCreatureList, which puts
+    /// the "nothing matches" notice in the middle of the list.
     /// </summary>
-    private static GameObject Label(
+    internal static GameObject Label(
         GUIManager gui,
         string text,
         Transform parent,

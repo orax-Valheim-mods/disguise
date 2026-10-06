@@ -12,10 +12,12 @@ namespace Disguise;
 /// a time, and the handover of the mouse that makes it clickable.
 ///
 /// The window is an OVERLAY: the game keeps running while it is on screen, nothing is
-/// paused. Only the frames where the pointer sits on the window belong to the UI, which is
-/// decided once per frame in BlocksInput and read by Patch_TakeInput and Patch_SetMouseLook
-/// - the same rule Valheim applies to its own panels: a click on a button never turns into
-/// a swing, and the mouse never turns the camera while it points at a window.
+/// paused. The frames that belong to the UI are the ones where the pointer sits on the
+/// window OR where the filter field is being typed in, decided once per frame in
+/// BlocksInput and read by Patch_TakeInput and Patch_SetMouseLook - the same rule Valheim
+/// applies to its own panels: a click on a button never turns into a swing, the mouse never
+/// turns the camera while it points at a window, and typing a filter never walks the
+/// character away (this is what SearchFieldFocused does for the build menu).
 ///
 /// While the window is open, Jotunn's BlockInput takes the mouse away from the camera
 /// (GameCamera.m_mouseCapture): without it, GameCamera.UpdateMouseCapture would lock the
@@ -33,9 +35,10 @@ internal static class DisguiseGui
     internal static bool IsOpen => s_window != null;
 
     /// <summary>
-    /// True while the pointer is on the window: for that frame the player's input and the
-    /// mouse look belong to the UI. Computed once per frame inside Tick's try/catch, so the
-    /// two patches only ever read a plain boolean and can never break the game with a throw.
+    /// True while the frame belongs to the UI: the pointer is on the window, or the filter
+    /// field is focused (GuiCreatureList.FilterFocused). Computed once per frame inside
+    /// Tick's try/catch, so the two patches only ever read a plain boolean and can never
+    /// break the game with a throw.
     /// </summary>
     internal static bool BlocksInput { get; private set; }
 
@@ -56,7 +59,18 @@ internal static class DisguiseGui
             {
                 Toggle();
             }
-            BlocksInput = IsOpen && PointerOnWindow();
+            if (IsOpen)
+            {
+                // The console can change the creature while the window is on screen: the two
+                // views must agree (highlight of the row + line under the title).
+                GuiCreatureList.Sync();
+
+                // Two halves, both read by the patches as one plain boolean: the pointer on
+                // the window, or the filter field being typed in (the pointer may well be
+                // somewhere else while typing - Valheim's own build menu search does the
+                // same). The game keeps running otherwise: this window is an overlay.
+                BlocksInput = PointerOnWindow() || GuiCreatureList.FilterFocused;
+            }
         }
         catch (Exception ex)
         {
@@ -77,6 +91,7 @@ internal static class DisguiseGui
         }
         s_rect = null;
         s_canvas = null;
+        GuiCreatureList.Forget();
         ReleaseMouse();
     }
 
@@ -219,6 +234,7 @@ internal static class DisguiseGui
         s_rect = null;
         s_canvas = null;
         BlocksInput = false;
+        GuiCreatureList.Forget();
         ReleaseMouse();
     }
 }

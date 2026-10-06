@@ -66,11 +66,14 @@ rotation keep their own wheel throughout.
 
 The **Disguise window** (`GuiKey` = `F8 + LeftAlt`, or `disguise gui`) is built with **Jotunn**'s
 Valheim-styled controls: the creature list, its 3D preview and a button for every command of
-the table above (the branch adds them one step at a time - the first step is the frame itself:
-title, the creature configured right now, and Close, all of it draggable). The window is an
-**overlay**: nothing is paused, you can still walk around with it open, and only the frames
-with the pointer on the window belong to the UI - a click on a button never reaches your
-character and the camera waits instead of spinning behind the window.
+the table above (the branch adds them one step at a time - this step brings the **creature
+list**: a filter field over a scrollable list of every usable creature, the row of the
+creature configured right now highlighted in orange, and a click on any row = `disguise set
+<prefab_name>`, written and applied at once). The window is an **overlay**: nothing is paused,
+you can still walk around with it open, and a frame belongs to the UI only while the pointer
+is on the window **or** the filter field is focused - a click on a row never reaches your
+character, the camera waits instead of spinning behind the window, and typing a filter never
+walks your character away nor turns the camera.
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.
