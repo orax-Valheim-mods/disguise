@@ -28,7 +28,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | setFakePosition | perf | list [filter] | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | setFakePosition | perf | list [filter] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -62,6 +62,7 @@ internal static class DisguiseCommand
             "setFakePosition",
             "perf",
             "list",
+            "gui",
         };
         try
         {
@@ -120,6 +121,10 @@ internal static class DisguiseCommand
 
             case "fly":
                 SetFly(ctx, args.Length > 2 ? args[2] : null);
+                break;
+
+            case "gui":
+                SetGui(ctx, args.Length > 2 ? args[2] : null);
                 break;
 
             case "setfakeposition":
@@ -195,6 +200,7 @@ internal static class DisguiseCommand
             ctx,
             "  disguise fly [on|off]     fly: the creature is raised for the others (visual only)"
         );
+        Say(ctx, "  disguise gui [on|off]     open / close the window (same as the GuiKey chord)");
         Say(
             ctx,
             "  disguise setFakePosition  fake the position the others see on their map ([x z] | off)"
@@ -356,6 +362,45 @@ internal static class DisguiseCommand
         else
         {
             Say(ctx, "[Disguise] Flight OFF: the creature is back on the ground.");
+        }
+    }
+
+    /// <summary>
+    /// "disguise gui [on|off]": opens or closes the window - the same thing as the GuiKey
+    /// chord (F8 + LeftAlt by default), for whoever prefers the console. The window is an
+    /// overlay: the game keeps running, only the frames with the pointer on the window are
+    /// handed to the UI (no click reaches the character, the camera waits).
+    /// </summary>
+    private static void SetGui(Terminal ctx, string? argument)
+    {
+        bool open = DisguiseGui.IsOpen;
+        if (argument == null)
+        {
+            open = !open;
+        }
+        else if (!TryParseOnOff(argument, out open))
+        {
+            Say(ctx, "Usage: disguise gui [on|off]");
+            return;
+        }
+
+        if (open)
+        {
+            string? failure = DisguiseGui.Show();
+            if (failure != null)
+            {
+                Say(ctx, $"[Disguise] Window not opened: {failure}");
+                return;
+            }
+            Say(
+                ctx,
+                "[Disguise] Window opened: drag it anywhere, Close (or the key chord) dismisses it."
+            );
+        }
+        else
+        {
+            DisguiseGui.Hide();
+            Say(ctx, "[Disguise] Window closed.");
         }
     }
 

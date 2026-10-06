@@ -20,6 +20,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | `disguise view [on|off]` | Show the creature on your own screen instead of your viking (local only) |
 | `disguise logs [on|off]` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
 | `disguise fly [on|off]` | Raise the creature above you for the others (visual only: your player stays on the ground) |
+| `disguise gui [on|off]` | Open / close the Disguise window (`GuiKey`) |
 | `disguise perf` | Frame time of the last few seconds: avg / min / max in ms and FPS (resets the window) |
 | `disguise status` | Current state (creature, marker, save protection) |
 
@@ -50,6 +51,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
 | `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
 | `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
+| `GuiKey` | `F8 + LeftAlt` | Open / close the Disguise window (same as `disguise gui`) |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
@@ -61,6 +63,14 @@ The **mouse wheel** climbs and descends too while the flight is on (`FlyScrollWh
 notch = `FlyScrollStep` metres): the camera then waits, so the wheel never climbs *and* zooms
 at once. The zoom comes back the moment the flight ends, and the minimap and the build
 rotation keep their own wheel throughout.
+
+The **Disguise window** (`GuiKey` = `F8 + LeftAlt`, or `disguise gui`) is built with **Jotunn**'s
+Valheim-styled controls: the creature list, its 3D preview and a button for every command of
+the table above (the branch adds them one step at a time - the first step is the frame itself:
+title, the creature configured right now, and Close, all of it draggable). The window is an
+**overlay**: nothing is paused, you can still walk around with it open, and only the frames
+with the pointer on the window belong to the UI - a click on a button never reaches your
+character and the camera waits instead of spinning behind the window.
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.
@@ -83,6 +93,9 @@ what the other machines see.
 Copy `Disguise.dll` into:
 
 - `BepInEx\plugins\`
+
+**Jotunn is required** (`BepInEx\plugins\ValheimModding-Jotunn\Jotunn.dll`, 2.30.2): the mod
+cannot be loaded at all without it. Nothing is needed for the other players.
 
 Full documentation (how it works, build & visibility audit, sources) lives in
 `README.md` at the root of the repository.

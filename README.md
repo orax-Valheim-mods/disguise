@@ -30,6 +30,18 @@ C:\Users\a\AppData\Roaming\com.kesomannen.gale\valheim\profiles\dev\BepInEx\scri
 > loaded at startup - visible in the log:
 > `[Info :Script Engine] Loading plugins from ...\BepInEx\scripts\Disguise.dll`.
 
+> ⚠️ **Jotunn is a hard dependency of this mod**: it builds the window of `disguise gui`
+> (§ 2) with Jotunn's Valheim-styled controls.
+>
+> ```
+> ...\profiles\dev\BepInEx\plugins\ValheimModding-Jotunn\Jotunn.dll   (2.30.2)
+> ```
+>
+> Already installed on the `dev` profile (Gale, library `ValheimModding-Jotunn`). Without
+> it the DLL cannot be loaded at all: an error mentioning `Jotunn.dll` appears in the log
+> and the `[Info : BepInEx] Loading [Disguise 0.1.0]` line never does (§ 7). **Nothing of
+> it is needed by the other players.**
+
 ### b) On the dedicated server (r2modmanPlus profile "serveur") - *optional, recommended*
 
 The mod works **with the DLL on your PC alone**: vanilla clients do see the creature, and
@@ -56,6 +68,11 @@ C:\Users\a\AppData\Roaming\r2modmanPlus-local\Valheim\profiles\serveur\BepInEx\p
 ```
 
 This folder is created automatically by the build (see § 6).
+
+The server needs **Jotunn** as well - same folder shape,
+`...\BepInEx\plugins\ValheimModding-Jotunn\Jotunn.dll`, already installed on the `serveur`
+profile (r2modmanPlus). The DLL is loaded whatever the window is used for, so without Jotunn
+it fails to load there too (§ 1.a).
 
 > ⚠️ **Exact locations (1 required + 1 optional, no more)**
 >
@@ -97,6 +114,7 @@ In game, open the console with **F5**:
 | `disguise logs [on|off]` | Write the mod's own **Info** messages to the BepInEx log (toggles without an argument; warnings and errors are always written, § 2) |
 | `disguise fly [on|off]` | **Raise the creature above you** for the other machines (toggles without an argument, § 2). Purely visual: your player never leaves the ground |
 | `disguise setFakePosition [x z \| off]` | Show a **fake position** on the other players' map: no argument records where you stand, `off` shows the real one again (needs the DLL on the server, § 1.b) |
+| `disguise gui [on|off]` | Open / close the Disguise window (`GuiKey`, § 2): same thing as the key chord, for whoever prefers the console |
 | `disguise perf` | Frame time of the window since the previous call: avg / min / max in ms and FPS (the window resets at every report) |
 | `disguise help` | List of the available commands (`disguise ?` also works) |
 
@@ -289,6 +307,30 @@ attacks the *ground* position the server simulates, your own attacks and landing
 ones of a standing player, and **the others only see the flight while the DLL runs on the
 server** (§ 1.b) - without it your own view still flies and everybody else keeps you on the
 ground.
+
+**GUI section** (`6 - GUI`) - the Disguise window, built with **Jotunn**'s Valheim-styled
+controls (Jotunn is a hard dependency of this mod, § 1). `GuiKey` opens and closes it
+(toggles), and `disguise gui [on|off]` does exactly the same from the console. The window
+shows the creature list, its 3D preview and every command button - this branch adds them one
+step at a time, and the first step only brings the frame itself: title, the creature
+configured right now, and a Close button, all of it draggable.
+
+The window is an **overlay**: nothing is paused, and you can still walk around with it open.
+Only the frames where the pointer sits on the window belong to the UI, which
+`DisguiseGui.Tick` measures once per frame (`DisguiseGui.BlocksInput`, read by
+`Patch_TakeInput` and `Patch_SetMouseLook`): a click on a button never reaches the
+character, and the camera waits instead of spinning behind the window - the same rule
+Valheim applies to its own panels. Pointer anywhere else, both patches stay silent and the
+game runs as usual. While the window is open, Jotunn's `GUIManager.BlockInput` takes the
+mouse away from the camera (`GameCamera.m_mouseCapture`, without it
+`GameCamera.UpdateMouseCapture` would lock the cursor again on the next frame) and gives it
+back on close - including after a scene change, which is why `DisguiseGui.Tick` checks the
+window every frame: a window destroyed by a scene change cannot release Jotunn's request
+count on its own, and one exit to the menu would leave the cursor free in every later world.
+
+| Option | Default | Role |
+|---|---|---|
+| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`) |
 
 ---
 
@@ -580,7 +622,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
   `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
   share stays `private`.
-- `DisguiseConfig.cs` - the twelve settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the twenty-two settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`).
@@ -623,6 +665,14 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   really read. Plain serialized fields, so unlike `Animator.parameters` it needs neither an
   activation nor an instantiation.
 - `DisguiseCommand.cs` - the `disguise` console command and its sub-commands.
+- `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, § 2): the chord read once
+  per frame, the single window that exists at a time, the `BlocksInput` flag both input
+  patches read, the handover of the mouse through Jotunn's `GUIManager.BlockInput` (balanced
+  one `true` per `false`, only inside the `main` scene) and the healing of a window destroyed
+  by a scene change, which cannot release that request by itself.
+- `GuiWindow.cs` - what goes inside the window: Jotunn's wood panel (draggable), the centred
+  labels and the buttons. It only builds, it never keeps the window alive nor talks to the
+  console - both stay in `DisguiseGui`.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
@@ -630,8 +680,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_VisEquipment.cs`, `Patch_FootStepFindBestStepEffect.cs`, `Patch_SetTrigger.cs`,
   `Patch_SetBool.cs`, `Patch_ZDOGetPosition.cs`,
   `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs`,
-  `Patch_UpdateCamera.cs`, `Patch_GetMouseScrollWheel.cs` - the
-  twenty-one Harmony patches, one
+  `Patch_UpdateCamera.cs`, `Patch_GetMouseScrollWheel.cs`, `Patch_TakeInput.cs`,
+  `Patch_SetMouseLook.cs` - the
+  twenty-three Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
@@ -642,6 +693,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   uses to reach every machine with the block key (§ 3). `Patch_UpdateCamera` and
   `Patch_GetMouseScrollWheel` are the two halves of the camera window: the first opens it
   around `GameCamera.UpdateCamera`, the second empties the scroll that one call reads (§ 3).
+  `Patch_TakeInput` and `Patch_SetMouseLook` are the two halves of the Disguise window
+  (§ 2): the first closes `Player.TakeInput` for the frame, the second hands a zero vector to
+  `Player.SetMouseLook` - both only read `DisguiseGui.BlocksInput` and call nothing, so
+  neither can throw into `Player.Update` nor into `PlayerController.LateUpdate`.
 
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
@@ -711,6 +766,9 @@ stays 82.
 | The wheel still zooms instead of climbing (or does nothing at all) | The flight must be **on** first (`FlyEnableKey` / `disguise fly on`), `FlyScrollWheel` must be `true`, and `FlyScrollStep` must not be `0` - a step of `0` hands the wheel back to the camera by design. All three are read every frame, so no restart is needed after a change |
 | The camera does not zoom while you fly | Normal: while the flight is on, the wheel belongs to the creature (`FlyScrollWheel`). Land (`FlyDisableKey`) or set the option to `false` and the zoom is back immediately - the minimap and the build rotation were never affected |
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
+| `disguise gui` says "not opened" (or `GuiKey` does nothing at all) | A dedicated server has no GUI, and before a world is loaded Jotunn's `CustomGUIFront` does not exist yet (`Window: ...` in the log, visible only with `Logs = true`, § 2). An unset `GuiKey` (`Not set`, recorded in ConfigurationManager) never fires. Jotunn itself is a hard dependency (§ 1): without it the mod does not load at all |
+| You click a button and the character swings anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both are normal only when the pointer is *not* on the window: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
+| The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 
 Log files:
 

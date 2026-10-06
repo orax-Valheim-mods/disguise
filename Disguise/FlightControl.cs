@@ -174,7 +174,7 @@ internal static class FlightControl
     /// the climb - and it wants the main key to be pressed last. Reading the keys ourselves
     /// keeps every chord order free and usable while moving, which is what was tested.
     /// </summary>
-    private static bool ChordHeld(ConfigEntry<KeyboardShortcut> setting)
+    internal static bool ChordHeld(ConfigEntry<KeyboardShortcut> setting)
     {
         KeyboardShortcut shortcut = setting.Value;
         KeyCode main = shortcut.MainKey;
@@ -201,7 +201,7 @@ internal static class FlightControl
     /// the chord works whatever order the keys were pressed in (the one-shot keys: start and
     /// end of the flight).
     /// </summary>
-    private static bool ChordPressed(ConfigEntry<KeyboardShortcut> setting)
+    internal static bool ChordPressed(ConfigEntry<KeyboardShortcut> setting)
     {
         KeyboardShortcut shortcut = setting.Value;
         KeyCode main = shortcut.MainKey;

@@ -160,6 +160,7 @@ public class Disguise : BaseUnityPlugin
 
     public void OnDestroy()
     {
+        DisguiseGui.Shutdown();
         SelfView.Shutdown();
         PatchHarmony?.UnpatchSelf();
         PatchHarmony = null;
@@ -184,6 +185,11 @@ public class Disguise : BaseUnityPlugin
         // replaces your own viking on your screen. No-op without a local player, without
         // the option, or while your ZDO still carries the Player prefab.
         SelfView.Tick();
+
+        // Disguise window (Jotunn GUI): reads GuiKey, keeps the mouse handover balanced and
+        // measures once per frame whether the pointer is on the window (Patch_TakeInput,
+        // Patch_SetMouseLook read that flag).
+        DisguiseGui.Tick();
 
         // Only the owner of a ZDO can change its prefab reliably, so we re-apply
         // regularly on the LOCAL player (Player.m_localPlayer is null on a dedicated
