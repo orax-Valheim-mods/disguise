@@ -107,7 +107,7 @@ In game, open the console with **F5**:
 | Command | Effect |
 |---|---|
 | `disguise status` | Current state (prefab, marker, save protection) |
-| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds are never listed (§ 6, § 7) |
+| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, and the effect prefabs (`fx_`, `sfx_`, `vfx_`), are never listed (§ 6, § 7) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
@@ -162,7 +162,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | Option | Default | Role |
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
-| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla ones) |
+| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla, non-effect ones) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log; warnings and errors are always written (`disguise logs [on|off]`, § 7) |
@@ -334,7 +334,8 @@ in the band the layout leaves free between the title and the state line - `Creat
 `Items`, `Buildings`, `Nature`, `Ships`, `Other` - one per category, each hiding the rows of
 its category in the list below (the state is kept in `6 - GUI` / `Show*`, so a choice
 survives a restart, and `disguise list` prints every category whatever they say). The
-**prefab list**: a filter field over a scrollable list of every **vanilla** prefab - the exact
+**prefab list**: a filter field over a scrollable list of every **vanilla** prefab (no
+`fx_` / `sfx_` / `vfx_` effect either) - the exact
 list `disguise list` prints, minus what the checkboxes have switched off - the row of the
 prefab configured right now highlighted in orange, and a click on any row =
 `disguise set <prefab_name>` (config written and applied at once, the line under the title
@@ -699,7 +700,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   first test that matches wins, every component read on the root like the `Character` test
   the list shipped with), plus `Names(filter, shown)` and `Counts(filter)`. The console asks
   for every category, the window passes the six checkboxes of its own: one source, no
-  disagreement. A modded name is cut out before anything else, so counts and names agree.
+  disagreement. A modded name and an effect name (`fx_` / `sfx_` / `vfx_`) are both cut out
+  at the top of the walk, before anything is fetched or counted.
 - `VanillaPrefabs.cs` - the vanilla test behind both lists, and the only place that decides
   it: Valheim describes its **own** assets in `valheim_Data\StreamingAssets\SoftRef\manifest`
   and `manifest_extended`, plain text with one `path in bundle: Assets/.../Ghost.prefab` line
@@ -911,6 +913,7 @@ stays 82.
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
 | The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the six `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |
+| An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
 | Opening the window takes a noticeable moment | The whole list is built at the opening - one Jotunn button per row, hundreds of rows - and the log says what that cost: `GUI: <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log). The checkboxes and the filter only show and hide those rows, they never rebuild any, so the price is the same whatever they say |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 

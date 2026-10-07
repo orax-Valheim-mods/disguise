@@ -6,13 +6,17 @@ using UnityEngine;
 namespace Disguise;
 
 /// <summary>
-/// The list behind "disguise list" and behind the window's list: every VANILLA prefab
-/// registered in ZNetScene, sorted by name and tagged with exactly one PrefabKind.
+/// The list behind "disguise list" and behind the window's list: every vanilla prefab you
+/// can actually wear, sorted by name and tagged with exactly one PrefabKind.
 ///
-/// Vanilla means: the name is in the game's own asset manifest, which no mod ever writes to
-/// (VanillaPrefabs holds that test). The two lists stay identical because they come out of
-/// this one class - the window only adds its two filters on top (the text field, then the
-/// six category checkboxes).
+/// Two names never enter: a MODDED one - the name is not in the game's own asset manifest,
+/// which no mod ever writes to (VanillaPrefabs holds that test) - and an EFFECT one - the
+/// name starts with "fx_", "sfx_" or "vfx_" (IsEffect: the sound and the particles a prefab
+/// spawns, not an appearance). Both are cut at the top of the walk, before anything is
+/// fetched or counted, so the counts and the names always describe the same set.
+///
+/// The two lists stay identical because they come out of this one class - the window only
+/// adds its two filters on top (the text field, then the six category checkboxes).
 ///
 /// ZNetScene is the technical limit of any disguise - a vanilla client rebuilds your object
 /// from ITS OWN prefab table, by hash, so only prefabs every installation already carries
@@ -118,11 +122,24 @@ internal static class PrefabCatalog
     }
 
     /// <summary>
+    /// True for an effect prefab: "fx_", "sfx_" and "vfx_" are the game's own name for the
+    /// sound and the particles a prefab spawns rather than something to wear - 1516 of them
+    /// (281 fx_, 748 sfx_, 487 vfx_). Every one of them is spelled in lowercase today; the
+    /// comparison ignores case so a later rename still lands here.
+    /// </summary>
+    private static bool IsEffect(string name)
+    {
+        return name.StartsWith("fx_", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("sfx_", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("vfx_", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// One pass over the registered prefabs: adds the matching names (when a list is given)
-    /// and/or counts every match by kind. Modded prefabs never enter either - they are cut
-    /// before anything else, so the counts and the names agree on the same set. Both callers
-    /// are one-shot (a console command, the opening of the window), so nothing is cached -
-    /// a stale cache would list prefabs a modded world no longer has.
+    /// and/or counts every match by kind. A modded name and an effect name never enter
+    /// either - both are cut before anything else, so the counts and the names agree on the
+    /// same set. Both callers are one-shot (a console command, the opening of the window),
+    /// so nothing is cached - a stale cache would list prefabs a modded world no longer has.
     /// </summary>
     private static void Walk(string? filter, bool[]? shown, List<string>? names, int[]? counts)
     {
@@ -137,7 +154,7 @@ internal static class PrefabCatalog
             {
                 continue;
             }
-            if (!VanillaPrefabs.Contains(name))
+            if (!VanillaPrefabs.Contains(name) || IsEffect(name))
             {
                 continue;
             }

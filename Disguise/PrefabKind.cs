@@ -25,6 +25,9 @@ internal enum PrefabKind
     /// <summary>A Ship.</summary>
     Ship = 4,
 
-    /// <summary>Whatever none of the five above claimed: the list never leaves a prefab out.</summary>
+    /// <summary>
+    /// Whatever none of the five above claimed: spawners, markers, terrain objects. The list
+    /// only ever drops a modded name or an effect one (PrefabCatalog).
+    /// </summary>
     Other = 5,
 }
