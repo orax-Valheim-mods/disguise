@@ -58,10 +58,12 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<int> ConfigGuiScrollStep = null!;
 
-    // -- 6 - GUI, continued: which categories the window's list shows (the six checkboxes -
+    // -- 6 - GUI, continued: which categories the window's list shows (the seven checkboxes -
     //    one per kind, read there at every opening and at every frame, so a value typed in
     //    ConfigurationManager lands without reopening. The console's "disguise list" always
     //    prints every kind: these hide rows in the window, never names from the catalogue.
+    internal static ConfigEntry<bool> ConfigShowStatic = null!;
+
     internal static ConfigEntry<bool> ConfigShowCreatures = null!;
 
     internal static ConfigEntry<bool> ConfigShowItems = null!;
@@ -302,6 +304,18 @@ internal static class DisguiseConfig
                 + "per notch. 0 holds the list still, and a negative value inverts the wheel."
         );
 
+        ConfigShowStatic = config.Bind(
+            "6 - GUI",
+            "ShowStatic",
+            true,
+            "Show the static prefabs in the window's list: every prefab without ZSyncTransform "
+                + "(walls, floors, furniture, trees, rocks - most of what a world is made of). "
+                + "A machine running no DLL of ours - a vanilla client, which is the machine a "
+                + "costume is for - draws them once where their object was created and never "
+                + "moves them again, so a disguise of this kind stays behind while you walk. "
+                + "A category turned off only hides rows in the window, and \"disguise list\" "
+                + "keeps printing every prefab of every category."
+        );
         ConfigShowCreatures = config.Bind(
             "6 - GUI",
             "ShowCreatures",
@@ -343,7 +357,7 @@ internal static class DisguiseConfig
             "ShowOther",
             true,
             "Show the prefabs no other category claims (spawners, markers, whatever a world "
-                + "mod adds) in the window's list. Off, the list only holds what the five "
+                + "mod adds) in the window's list. Off, the list only holds what the six "
                 + "other checkboxes show - nothing is ever dropped from the catalogue itself."
         );
 

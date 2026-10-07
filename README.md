@@ -329,11 +329,18 @@ are rewritten after every click. The status line holds the hint about clicking a
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
 several lines, the console keeps them all, and the first one is the headline - the notes a
-command goes on printing after it stay in the console. The **category checkboxes**: six boxes
-in the band the layout leaves free between the title and the state line - `Creatures`,
-`Items`, `Buildings`, `Nature`, `Ships`, `Other` - one per category, each hiding the rows of
-its category in the list below (the state is kept in `6 - GUI` / `Show*`, so a choice
-survives a restart, and `disguise list` prints every category whatever they say). The
+command goes on printing after it stay in the console. The **category checkboxes**: seven
+boxes in the band the layout leaves free between the title and the state line - `Static`,
+`Creatures`, `Items`, `Buildings`, `Nature`, `Ships`, `Other` - one per category, each
+hiding the rows of its category in the list below (the state is kept in `6 - GUI` / `Show*`,
+so a choice survives a restart, and `disguise list` prints every category whatever they say).
+**`Static` is the only one of them about movement instead of looks**: a prefab **without**
+`ZSyncTransform` - walls, floors, furniture, trees, rocks, most of what a world is made of -
+is drawn by another machine once, where its object happened to be created, and never moved
+again (§ 3), so a costume of that kind stays behind while you walk for anyone watching on a
+vanilla client. This is why a wall has left `Buildings`: every buildable object that does
+not move now lives under `Static`, where you can see what you are picking before it happens.
+The
 **prefab list**: a filter field over a scrollable list of every **vanilla** prefab (no
 `fx_` / `sfx_` / `vfx_` effect either) - the exact
 list `disguise list` prints, minus what the checkboxes have switched off - the row of the
@@ -388,12 +395,13 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 |---|---|---|
 | `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
+| `ShowStatic` | `true` | Show the **static** prefabs in the window's list: every vanilla prefab **without** `ZSyncTransform` (walls, floors, furniture, trees, rocks). A machine with no DLL of ours draws them once where their object was created and never moves them again, so a costume of that kind stays where you changed it for a vanilla client (§ 3) |
 | `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list (section `6 - GUI`). One checkbox per category, one category per prefab: a category switched off only hides rows in the window, and `disguise list` keeps printing every vanilla prefab of every category |
 | `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) in the window's list |
-| `ShowBuildings` | `true` | Show the buildable prefabs (a `Piece`: walls, floors, doors, furniture, crafting stations) in the window's list |
-| `ShowNature` | `true` | Show the natural prefabs (trees, plants, pickables, rocks, ore veins) in the window's list |
+| `ShowBuildings` | `true` | Show the buildable prefabs that **do** move (a `Piece` carrying `ZSyncTransform`: a cart, a raft, a training dummy). Walls, floors and furniture have none of it and are listed under `ShowStatic` |
+| `ShowNature` | `true` | Show the natural prefabs that do move (trees, plants, pickables, rocks, ore veins - the static majority of them is under `ShowStatic`) |
 | `ShowShips` | `true` | Show the ships in the window's list |
-| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) in the window's list. Off, the list only holds what the five other checkboxes show - nothing is ever dropped from the catalogue itself |
+| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) in the window's list. Off, the list only holds what the six other checkboxes show - nothing is ever dropped from the catalogue itself |
 
 ---
 
@@ -445,7 +453,16 @@ save file (`ZDO.Save`). The chosen prefab determines **what each client instanti
 
 Visual synchronisation on vanilla clients:
 
-- **Position**: yes, through `ZSyncTransform` (the creature follows you everywhere).
+- **Position**: yes, but **only for a prefab that carries `ZSyncTransform`** - the one
+  component in the game that writes a ZDO position into a transform on a machine running no
+  DLL of ours (a vanilla client, the machine a costume is for). Creatures, players, ships,
+  carts and dropped items have it: they follow you everywhere. A prefab without it - every
+  `Piece` (wall, floor, furniture), most of the nature - is instantiated at the position your
+  ZDO had **at that moment** and never updated again: on a vanilla client a building costume
+  stays where you changed it, and so does every `Failed to find rpc method` the machine logs
+  about it (§ 7). The `Static` category of the window and the `static` count of
+  `disguise list` are exactly that set of prefabs, so the list tells you what a costume will
+  do before you pick it.
 - **Flight** (`cd_fly`, `FlightControl`): your own client writes the requested height into
   your ZDO - in **centimetres**, because `ZDO.Set` has no float overload in the original
   assembly - and that write is throttled to one per 100 ms so a held key cannot bump the
@@ -691,15 +708,18 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`).
 - `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the vanilla
   `Player` prefab hash, the configured creature hash) and `PrefabName`.
-- `PrefabKind.cs` - the six categories of the list (`Creature`, `Item`, `Building`, `Nature`,
-  `Ship`, `Other`): one checkbox each in the window, one category per prefab.
+- `PrefabKind.cs` - the seven categories of the list (`Static`, `Creature`, `Item`,
+  `Building`, `Nature`, `Ship`, `Other`): one checkbox each in the window, one category per
+  prefab. `Static` is the first test `KindOf` makes and the only one about movement instead
+  of looks: a root without `ZSyncTransform` never gets a position again from anyone (§ 3).
 - `PrefabCatalog.cs` - the catalogue both lists read: every **vanilla** prefab registered in
   `ZNetScene`
   - the technical limit of a disguise, since a vanilla client rebuilds you from **its own**
   prefab table by hash - sorted, each tagged with exactly one kind through `KindOf` (the
-  first test that matches wins, every component read on the root like the `Character` test
-  the list shipped with), plus `Names(filter, shown)` and `Counts(filter)`. The console asks
-  for every category, the window passes the six checkboxes of its own: one source, no
+  first test that matches wins - `ZSyncTransform` first, then every other component read on
+  the root like the `Character` test the list shipped with), plus `Names(filter, shown)` and
+  `Counts(filter)`. The console asks
+  for every category, the window passes the seven checkboxes of its own: one source, no
   disagreement. A modded name and an effect name (`fx_` / `sfx_` / `vfx_`) are both cut out
   at the top of the walk, before anything is fetched or counted.
 - `VanillaPrefabs.cs` - the vanilla test behind both lists, and the only place that decides
@@ -764,7 +784,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   by a scene change, which cannot release that request by itself.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
-  or `Not set`), the six category checkboxes in the band above the state line (this class only
+  or `Not set`), the seven category checkboxes in the band above the state line (this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
   (`Prefab: <name>   -   <state>`, rewritten by `RefreshState` after a
   change), the
@@ -772,7 +792,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
   label), the status line below them, and the coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
-- `GuiCategories.cs` - the row of six category checkboxes: Jotunn's `CreateToggle` box (the
+- `GuiCategories.cs` - the row of seven category checkboxes: Jotunn's `CreateToggle` box (the
   Valheim checkbox, orange marker) with a label measured to its own text
   (`Text.preferredWidth`, so the air before the next box is the same whatever the word), the
   `Show*` entry of each kind as the only state - a choice survives a restart, and `Sync`
@@ -872,7 +892,10 @@ existed. The flight is written the same way: `cd_fly` travels as an **int** (the
 `GetInt` overloads the mod already used - `ZDO.Set` has no float overload it could reach
 for free), `position` is swapped through the very `FieldInfo` of `Patch_SendZDOs`, and
 `ZNet.IsServer()` was already referenced - so it adds no game member either, and the count
-stays 82.
+stays 82. The `Static` category follows the same rule: `ZSyncTransform` is public, but the
+test is `GameObject.GetComponent("ZSyncTransform")` - Unity's own string overload, which
+answers exactly the same question on a prefab asset - so the seventh category adds no game
+member either.
 
 ---
 
@@ -913,7 +936,9 @@ stays 82.
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 | `disguise gui` says "not opened" (or `GuiKey` does nothing at all) | A dedicated server has no GUI, and before a world is loaded Jotunn's `CustomGUIFront` does not exist yet (`Window: ...` in the log, visible only with `Logs = true`, § 2). An unset `GuiKey` (`Not set`, recorded in ConfigurationManager) never fires. Jotunn itself is a hard dependency (§ 1): without it the mod does not load at all |
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
-| The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the six `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
+| The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the seven `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
+| Your building costume does not follow you on the client (it stays where you changed it) | Normal, and it is the prefab and not the sync: on a machine running no DLL of ours the only code that applies a ZDO position to a transform is `ZSyncTransform`, and no `Piece` has one - the client drew your wall once, where your ZDO was, and has nothing left to move it with (§ 3). `disguise set <creature>` follows everywhere; so do ships, carts and dropped items. The `Static` category of the window is precisely the set of prefabs that cannot move, and `disguise list` prints its count (`static <n>`) |
+| The log of the player watching you fills with `Failed to find rpc method 213315071` (or `531685242`) | Harmless, and both hashes are known: `213315071` = `RPC_ResetCloth`, broadcast by the vanilla `Character.ResetCloth()` whenever your body starts moving (and on a jump); `531685242` = `SetTrigger`, the animation trigger broadcast (§ 4.7). A client without the DLL builds your costume, and a wall has neither a `Character` nor a `ZSyncAnimation` to answer with - the machine logs that it knows no such method and does nothing, which is exactly right since there is nothing to reset or to animate. A creature costume logs neither (both components are there), and a client running the DLL never does either (it builds a real `Player`) |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
 | Opening the window takes a noticeable moment | The whole list is built at the opening - one Jotunn button per row, hundreds of rows - and the log says what that cost: `GUI: <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log). The checkboxes and the filter only show and hide those rows, they never rebuild any, so the price is the same whatever they say |

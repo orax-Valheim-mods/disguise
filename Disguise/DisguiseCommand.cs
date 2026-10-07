@@ -667,7 +667,7 @@ internal static class DisguiseCommand
     }
 
     /// <summary>
-    /// "disguise list [filter]": every VANILLA registered prefab, in the six categories of
+    /// "disguise list [filter]": every VANILLA registered prefab, in the seven categories of
     /// PrefabCatalog - the complete catalogue, whatever the window's checkboxes have on (they
     /// only hide rows there). Counts per category first, four names per line after that.
     /// Empty without a ZNetScene (main menu), which is where the notice above comes from.

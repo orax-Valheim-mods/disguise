@@ -55,10 +55,11 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 | `GuiKey` | `F8 + LeftAlt` | Open / close the Disguise window (same as `disguise gui`) |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per scroll notch; `0` holds the list still, a negative value inverts the wheel |
+| `ShowStatic` | `true` | Show the **static** prefabs: every one **without** `ZSyncTransform` (walls, floors, furniture, trees, rocks). A machine with no DLL draws them once where their object was created and never moves them again, so a costume of that kind stays where you changed it for anyone watching on a vanilla client |
 | `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list - one checkbox per category; `disguise list` always prints every category |
 | `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) |
-| `ShowBuildings` | `true` | Show the buildable prefabs (a `Piece`: walls, floors, doors, furniture, crafting stations) |
-| `ShowNature` | `true` | Show the natural prefabs (trees, plants, pickables, rocks, ore veins) |
+| `ShowBuildings` | `true` | Show the buildable prefabs that **do** move (a `Piece` carrying `ZSyncTransform`: a cart, a raft, a training dummy) - walls and floors are under `ShowStatic` |
+| `ShowNature` | `true` | Show the natural prefabs that do move (the static majority of trees, plants, pickables, rocks and ore veins is under `ShowStatic`) |
 | `ShowShips` | `true` | Show the ships |
 | `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) |
 
@@ -76,7 +77,7 @@ rotation keep their own wheel throughout.
 The **Disguise window** (opened and closed by `GuiKey` = `F8 + LeftAlt` - the chord is
 written on the title row, next to Close, and always read from the config - or by
 `disguise gui`) is built with **Jotunn**'s
-Valheim-styled controls: the six category checkboxes, the prefab list, its 3D preview and
+Valheim-styled controls: the seven category checkboxes, the prefab list, its 3D preview and
 four buttons under the
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
 `Own view` and `Flight`, each one running its sub-command like the console would and writing
@@ -85,9 +86,9 @@ first press (the branch added them one step at a time; the preview there shows t
 of the row the pointer is on, filmed
 by a camera of its own into a texture, and the configured one while the pointer is on no row
 at all, and the list is a filter field over a scrollable list of every vanilla prefab -
-minus what the six checkboxes have switched off (`Creatures`, `Items`, `Buildings`, `Nature`,
-`Ships`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice survives a
-restart) - the row of the prefab configured right now in orange on beige rows, a click on any
+minus what the checkboxes have switched off (`Static`, `Creatures`, `Items`, `Buildings`,
+`Nature`, `Ships`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice
+survives a restart) - the row of the prefab configured right now in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
 `GuiScrollStep` pixels per notch, clamped at both ends so an extra notch never makes it dip

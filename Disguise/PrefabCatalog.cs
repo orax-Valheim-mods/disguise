@@ -9,6 +9,11 @@ namespace Disguise;
 /// The list behind "disguise list" and behind the window's list: every vanilla prefab you
 /// can actually wear, sorted by name and tagged with exactly one PrefabKind.
 ///
+/// The first tag of them all is Static - a prefab without ZSyncTransform, which a machine
+/// running no DLL of ours draws once at its creation position and never moves again (see
+/// PrefabKind): it is the difference between a costume that follows you and one that stays
+/// where you put it.
+///
 /// Two names never enter: a MODDED one - the name is not in the game's own asset manifest,
 /// which no mod ever writes to (VanillaPrefabs holds that test) - and an EFFECT one - the
 /// name starts with "fx_", "sfx_" or "vfx_" (IsEffect: the sound and the particles a prefab
@@ -16,7 +21,7 @@ namespace Disguise;
 /// fetched or counted, so the counts and the names always describe the same set.
 ///
 /// The two lists stay identical because they come out of this one class - the window only
-/// adds its two filters on top (the text field, then the six category checkboxes).
+/// adds its two filters on top (the text field, then the seven category checkboxes).
 ///
 /// ZNetScene is the technical limit of any disguise - a vanilla client rebuilds your object
 /// from ITS OWN prefab table, by hash, so only prefabs every installation already carries
@@ -26,16 +31,31 @@ namespace Disguise;
 internal static class PrefabCatalog
 {
     /// <summary>How many kinds PrefabKind holds: the size of every array indexed by it.</summary>
-    internal const int KindCount = 6;
+    internal const int KindCount = 7;
+
+    /// <summary>
+    /// The component that moves an object, looked up by NAME and never as a generic:
+    /// GetComponent("ZSyncTransform") is Unity's own overload, answers the same thing on a
+    /// prefab asset, and keeps audit_visibility.ps1 where it is - a typed
+    /// GetComponent&lt;ZSyncTransform&gt;() would add one more game member to a count that
+    /// has been documented as 82 since the first patch, for a test this answers as well.
+    /// </summary>
+    private const string SyncTransformComponent = "ZSyncTransform";
 
     /// <summary>
     /// The kind of a prefab: the first test that matches wins, in the order of PrefabKind.
-    /// Every component is read on the root, exactly like the Character test the list shipped
-    /// with, so the Creatures checkbox keeps listing the very same names as before - a
-    /// component on a child never qualified, and still does not.
+    /// Static comes first and hangs on that one component: without it nothing on that machine
+    /// will ever write a ZDO position into this object again, whatever the ZDO says.
+    /// Every other component is read on the root, exactly like the Character test the list
+    /// shipped with, so the Creatures checkbox keeps listing the very same names as before -
+    /// a component on a child never qualified, and still does not.
     /// </summary>
     internal static PrefabKind KindOf(GameObject prefab)
     {
+        if (prefab.GetComponent(SyncTransformComponent) == null)
+        {
+            return PrefabKind.Static;
+        }
         if (prefab.GetComponent<Character>() != null)
         {
             return PrefabKind.Creature;
@@ -80,7 +100,7 @@ internal static class PrefabCatalog
     /// <summary>
     /// Every vanilla prefab name matching the optional substring, sorted case-insensitively.
     /// shown is the checkbox state indexed by PrefabKind: null means "every kind", which is
-    /// what the console asks for, and the window passes the six flags of its own.
+    /// what the console asks for, and the window passes the seven flags of its own.
     /// </summary>
     internal static List<string> Names(string? filter, bool[]? shown)
     {
@@ -106,6 +126,8 @@ internal static class PrefabCatalog
     {
         switch (kind)
         {
+            case PrefabKind.Static:
+                return "static";
             case PrefabKind.Creature:
                 return "creatures";
             case PrefabKind.Item:
