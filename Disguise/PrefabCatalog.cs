@@ -40,7 +40,7 @@ internal static class PrefabCatalog
     /// GetComponent&lt;ZSyncTransform&gt;() would add one more game member to a count that
     /// has been documented as 82 since the first patch, for a test this answers as well.
     /// </summary>
-    private const string SyncTransformComponent = "ZSyncTransform";
+    internal const string SyncTransformComponent = "ZSyncTransform";
 
     /// <summary>
     /// The kind of a prefab: the first test that matches wins, in the order of PrefabKind.

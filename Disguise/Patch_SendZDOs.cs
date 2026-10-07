@@ -14,12 +14,14 @@ namespace Disguise;
 /// only the packet is faked, the server's ZDO state - and therefore saves and game logic -
 /// always keeps the real position.
 ///
-/// The same Prefix / Postfix / Finalizer also opens and closes the two windows the outgoing
-/// positions are rewritten in: the flight raise (FlightControl.BeginSend / EndSend) and the
-/// band that keeps a disguised player's relayed position still (PositionHold.BeginSend /
+/// The same Prefix / Postfix / Finalizer also opens and closes the three windows the outgoing
+/// positions are rewritten in: the flight raise (FlightControl.BeginSend / EndSend), the band
+/// that keeps a disguised player's relayed position still (PositionHold.BeginSend / EndSend)
+/// and the lift that keeps its costume from digging into the ground (RestOffset.BeginSend /
 /// EndSend) - for the duration of this call, the positions handed to ZDO.GetPosition may be
-/// raised by cd_fly and held around the last one sent (Patch_ZDOGetPosition). Nothing to
-/// restore there - a raised or held copy is returned, never written into a ZDO.
+/// raised by cd_fly, held around the last one sent, and lifted to where the costume rests
+/// (Patch_ZDOGetPosition). Nothing to restore there - a raised, held or lifted copy is
+/// returned, never written into a ZDO.
 ///
 /// NOTE: no per-peer filtering here (ZDOMan.ZDOPeer is a private type of the game): your own
 /// connection cannot apply the fake anyway, because a ZDO update is only applied when its
@@ -34,11 +36,12 @@ internal static class Patch_SendZDOs
     {
         try
         {
-            // Both windows cover the whole call: from here on, the positions this call
-            // hands to ZDO.GetPosition may be raised (Patch_ZDOGetPosition) and held
-            // inside the band (PositionHold).
+            // All three windows cover the whole call: from here on, the positions this call
+            // hands to ZDO.GetPosition may be raised (Patch_ZDOGetPosition), held inside the
+            // band (PositionHold) and lifted to where the costume rests (RestOffset).
             FlightControl.BeginSend();
             PositionHold.BeginSend();
+            RestOffset.BeginSend();
 
             if (ObserverRefresh.s_savedPosition.HasValue)
             {
@@ -66,6 +69,7 @@ internal static class Patch_SendZDOs
     {
         FlightControl.EndSend();
         PositionHold.EndSend();
+        RestOffset.EndSend();
         RestoreRealPosition();
     }
 
@@ -75,6 +79,7 @@ internal static class Patch_SendZDOs
     {
         FlightControl.EndSend();
         PositionHold.EndSend();
+        RestOffset.EndSend();
         RestoreRealPosition();
         return __exception;
     }

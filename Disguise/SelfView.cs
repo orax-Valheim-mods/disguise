@@ -91,9 +91,12 @@ internal static class SelfView
                 {
                     return;
                 }
+                Vector3 basePosition = player!.transform.position;
                 GameObject? ghost = GhostFactory.Create(
                     wanted,
-                    player!.transform.position + FlightControl.ViewOffset,
+                    basePosition
+                        + RestOffset.ViewOffset(wanted, basePosition)
+                        + FlightControl.ViewOffset,
                     player.transform.rotation
                 );
                 if (ghost == null)
@@ -140,8 +143,11 @@ internal static class SelfView
                 return; // Tick() frees everything on its next call
             }
 
+            Vector3 basePosition = player.transform.position;
             s_ghost.transform.SetPositionAndRotation(
-                player.transform.position + FlightControl.ViewOffset,
+                basePosition
+                    + RestOffset.ViewOffset(s_ghostPrefabHash, basePosition)
+                    + FlightControl.ViewOffset,
                 player.transform.rotation
             );
 

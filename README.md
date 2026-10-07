@@ -482,6 +482,25 @@ Visual synchronisation on vanilla clients:
   into a ZDO - the owner's ZDO, the server's state, the saves and the game logic keep the
   real position - and the observer refresh is excluded, its far-away position being the one
   thing that has to travel.
+  Held still is not the whole story, though: a costume standing where you stand can still
+  **dig into the ground**. The receiving body has gravity and velocity turned off and is
+  dragged back to the relayed position with a `0.2` lerp every frame, so whatever pushes it
+  out of the ground comes straight back - a raft's hull and a cart's wheels hang below your
+  feet, and neither can be tilted, since the costume wears **your upright rotation**: on a
+  slope a raft stays horizontal while its uphill edge is buried. The relaying server
+  therefore raises that same position to where the costume actually **rests**
+  (`RestOffset`): everything it carries below the level your feet stand on, measured once
+  per prefab from its own colliders and meshes (the raft's hull, the cart's wheels), plus
+  the rise of the terrain under that footprint - but only while the terrain is what you
+  stand on: a floor over it, water and thin air are all far below, a roof overhead is far
+  above, and none of them has a slope to correct. What cannot fight back is never measured:
+  no `ZSyncTransform` (nothing pulls it back to the ZDO), a kinematic rigidbody (moved with
+  `MovePosition`, which no contact pushes back), or a `Character` of its own (a creature
+  settles itself - the reason a `Troll` costume never shivered). Same rules as the band:
+  server only, outgoing packet only, handed back as a copy, observer refresh skipped, and
+  the very same lift added on your own screen's clone (`SelfView`) so both views of a
+  costume agree to the centimetre. With `Logs = Enabled` the measurement and the lift a
+  costume really gets are written to the log as `Ground rest: ...`.
 - **Costume health** (`HealthMask`): a machine running no DLL of ours reads the health of
   your costume out of **your** ZDO - `WearNTear` asks for `health` with a fallback on the
   prefab's own maximum - so a piece of furniture wearing you shows 100 hit points against
@@ -792,13 +811,20 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   and the raise the relaying server adds to the outgoing packet header - server only,
   creature only, handed back as a copy so nothing has to be restored (§ 3). It also carries
   its two windows: the outgoing packet (`BeginSend` / `EndSend`, `Patch_SendZDOs`, opened
-  side by side with those of `PositionHold`) and the camera zoom (`SuspendZoom` /
+  side by side with those of `PositionHold` and `RestOffset`) and the camera zoom (`SuspendZoom` /
   `ResumeZoom`, `Patch_UpdateCamera`).
 - `PositionHold.cs` - the band the outgoing position of a disguised player is relayed inside
   (§ 3): the owner's rigidbody jitter would otherwise travel to a vanilla client, where
   `ZSyncTransform.SyncPosition` chases it with a lerp and turns it into a shiver of a few
   millimetres. Server only, packet only, handed back as a copy, and skipped while the
   observer refresh fakes its far-away position.
+- `RestOffset.cs` - the ground rest of a costume (§ 3): the height its own geometry asks
+  for to stop digging into the ground - everything it hangs below the player's feet, plus
+  the rise of the terrain under its footprint while the terrain is what the player stands
+  on. Measured once per prefab (box, sphere, capsule and mesh colliders, then the meshes
+  for the lowest point only), skipped for what cannot fight back, added as a copy to the
+  outgoing position on the relaying server and to the clone of your own screen, recomputed
+  there at most ten times a second.
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
   ever be played by the creature), decides which of the creature's attacks to play (normal
@@ -927,7 +953,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 83   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 85   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -944,12 +970,17 @@ category follows the same rule: `ZSyncTransform` is public, but the
 test is `GameObject.GetComponent("ZSyncTransform")` - Unity's own string overload, which
 answers exactly the same question on a prefab asset - so the seventh category adds no game
 member either.
-The costume's health swap is the one new reference of this fix: it writes through
-`ZDOExtraData.Set(ZDOID, Int32, Single)`, the float twin of the silent int write
-`GameAccess` already used - **+1** over the 82 the count stood at. Everything else of it
-(`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`, `ZNet.IsServer()`,
-`prefab.GetComponent("...")`) was already referenced somewhere else, and it added no
-Harmony patch: it runs inside `Patch_ZDOSerialize`, which existed.
+Those three features cost **nothing**, and so does most of what came after them: the ground
+rest measures geometry with Unity's own `GetComponent` / `Collider` / `Matrix4x4` and reads
+the terrain through `ZoneSystem.instance` and `ZoneSystem.GetGroundHeight(Vector3)`, and the
+health swap writes through `ZDOExtraData.Set(ZDOID, Int32, Single)` - the float twin of the
+silent int write `GameAccess` already used - for **+3** members over the 82 the count stood
+at: `ZoneSystem.instance`, `ZoneSystem.GetGroundHeight` and that float overload. Everything
+else of the two fixes (`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`,
+`ZNet.IsServer()`, `prefab.GetComponent("...")`, `prefab.GetComponent<Character>()`) was
+already referenced somewhere else, and neither fix added a Harmony patch: both run inside
+ones that already existed (`Patch_ZDOSerialize`, `Patch_ZDOGetPosition`, `Patch_SendZDOs`),
+so the count of twenty-four stays correct.
 
 ---
 
@@ -992,6 +1023,7 @@ Harmony patch: it runs inside `Patch_ZDOSerialize`, which existed.
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
 | The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the seven `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
 | Your building costume does not follow you on the client (it stays where you changed it) | Normal, and it is the prefab and not the sync: on a machine running no DLL of ours the only code that applies a ZDO position to a transform is `ZSyncTransform`, and no `Piece` has one - the client drew your wall once, where your ZDO was, and has nothing left to move it with (§ 3). `disguise set <creature>` follows everywhere; so do ships, carts and dropped items. The `Static` category of the window is precisely the set of prefabs that cannot move, and `disguise list` prints its count (`static <n>`) |
+| A cart or a raft costume shivers by a few centimetres on the machine of a player watching you | The ground rest is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, the costume is sent to the height where it rests instead of one it has to be pushed out of, and the receiving body stops fighting back. Water and thin air never had that shiver (there is no contact to lose), and neither does your own clone (GhostFactory gives it no physics at all). With `Logs = Enabled` the log says what a costume really gets: `Ground rest: <name> is relayed <n> m above its player.` |
 | A cart or a raft costume looks wrecked on another player's screen (missing planks, a torn sail) | The costume is wearing **your** hit points: `WearNTear` reads the `health` of the ZDO it is attached to, and your ZDO carries yours (§ 3). The relaying server swaps it for the costume's own maximum for the duration of the packet, so the dedicated server must run the current DLL (§ 1.b). Nothing about it changes for you, for the server's own state or for the save file - and the trade-off is that nobody but you and the server can read your health through a disguise any more |
 | The log of the player watching you fills with `Failed to find rpc method 213315071` (or `531685242`) | Harmless, and both hashes are known: `213315071` = `RPC_ResetCloth`, broadcast by the vanilla `Character.ResetCloth()` whenever your body starts moving (and on a jump); `531685242` = `SetTrigger`, the animation trigger broadcast (§ 4.7). A client without the DLL builds your costume, and a wall has neither a `Character` nor a `ZSyncAnimation` to answer with - the machine logs that it knows no such method and does nothing, which is exactly right since there is nothing to reset or to animate. A creature costume logs neither (both components are there), and a client running the DLL never does either (it builds a real `Player`) |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |

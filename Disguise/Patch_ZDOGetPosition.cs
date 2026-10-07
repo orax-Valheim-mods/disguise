@@ -12,14 +12,17 @@ namespace Disguise;
 ///
 /// While that call builds a packet on the relaying machine, this therefore hands back the
 /// position of a disguised player raised by the height published in cd_fly, so every machine
-/// that only renders you - a vanilla client above all - draws the creature in the air, and
-/// held inside a small band around the one already sent (PositionHold), so that the few
-/// millimetres of the owner's physics jitter cannot travel and make the costume shiver.
-/// Both transformations hand back a copy: nothing is written into the ZDO, so the server's
-/// own state, the saves and the game logic keep the grounded player.
+/// that only renders you - a vanilla client above all - draws the creature in the air, held
+/// inside a small band around the one already sent (PositionHold), so that the few
+/// millimetres of the owner's physics jitter cannot travel and make the costume shiver, and
+/// lifted to where the costume rests rather than digs into the ground (RestOffset), which is
+/// what keeps the receiving body from fighting back. All three hand back a copy: nothing is
+/// written into the ZDO, so the server's own state, the saves and the game logic keep the
+/// grounded player.
 ///
 /// The window (server only, creature prefabs only) is opened and closed by Patch_SendZDOs
-/// around that one call; the tests live in PositionHold.Hold and FlightControl.RaiseSentPosition.
+/// around that one call; the tests live in PositionHold.Hold, RestOffset.Raise and
+/// FlightControl.RaiseSentPosition.
 ///
 /// NOTE: SendZDOs also sorts what it is about to send by distance (ServerSortSendZDOS), so
 /// while the window is open a flying player sorts up to 100 m farther than it really is -
@@ -30,9 +33,11 @@ internal static class Patch_ZDOGetPosition
 {
     private static void Postfix(ZDO __instance, ref Vector3 __result)
     {
-        // Two passes over the same copy: hold the real position inside the band first, then
-        // add the height on top of the held value - the band stays the one the owner covers.
+        // Three passes over the same copy: hold the real position inside the band first, then
+        // lift it to where the costume rests, then add the height of cd_fly on top - the band
+        // stays the one the owner covers, and the two lifts never see each other's value.
         PositionHold.Hold(__instance, ref __result);
+        RestOffset.Raise(__instance, ref __result);
         FlightControl.RaiseSentPosition(__instance, ref __result);
     }
 }
