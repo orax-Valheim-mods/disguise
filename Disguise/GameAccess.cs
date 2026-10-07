@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 
 namespace Disguise;
 
@@ -38,6 +39,15 @@ internal static class GameAccess
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
     );
 
+    // ZDO.m_rotation: private in the game, and not a key - it has no ZDO.Set to go through,
+    // so RestOffset reads it and rewrites it (and puts it back) around the one call that
+    // writes it into an outgoing body, ZDO.Serialize. The raw euler angles are swapped, not
+    // a Quaternion rebuilt from them: whatever the game stored comes back byte for byte.
+    internal static readonly FieldInfo? s_zdoRotationField = typeof(ZDO).GetField(
+        "m_rotation",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
     // VisEquipment.m_nview: private in the game. The render patch needs it to reach the ZDO
     // the equipment hashes are read from (EquipmentMask).
     internal static readonly FieldInfo? s_visEquipmentNViewField = typeof(VisEquipment).GetField(
@@ -60,6 +70,29 @@ internal static class GameAccess
         "FindBestStepEffect",
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
     );
+
+    // Heightmap.GetHeight(Vector3, out float): public in the game, but reached through
+    // reflection all the same - the visibility audit counts every member reference to the
+    // game's assemblies, and this one is new to the DLL. It reads the terrain surface
+    // straight from the loaded heightmap, which is what ZoneSystem.GetGroundHeight does NOT
+    // do: that one casts a physics ray and answers with the very height it was given when
+    // nothing was hit, leaving "no ground here" and "perfectly flat ground" as one number.
+    // The type itself is looked up by name on the assembly the game loads, so no new game
+    // type is referenced either.
+    internal static readonly MethodInfo? s_heightmapGetHeight = typeof(ZoneSystem)
+        .Assembly.GetType("Heightmap")
+        ?.GetMethod(
+            "GetHeight",
+            BindingFlags.Static | BindingFlags.Public,
+            null,
+            new[] { typeof(Vector3), typeof(float).MakeByRefType() },
+            null
+        );
+
+    /// <summary>The reused [position, out value] box of that reflection call.</summary>
+    private static readonly object[] s_heightArgs = new object[] { Vector3.zero, 0f };
+
+    private static bool s_heightErrorLogged;
 
     /// <summary>
     /// ZNetView of a character (Character.m_nview is "protected" -&gt; reflection).
@@ -130,6 +163,42 @@ internal static class GameAccess
             Disguise.LogError($"Cannot call FootStep.FindBestStepEffect: {ex.Message}");
             return -1;
         }
+    }
+
+    /// <summary>
+    /// The terrain surface under a point, or false when no heightmap covers it (main menu,
+    /// a zone still unloaded). Reached through reflection: the arguments box above is
+    /// reused, and the game's `out float` comes back inside it. A failure is logged once -
+    /// it happens on every read of the ground, so the report would never end otherwise.
+    /// </summary>
+    internal static bool TryGetTerrainHeight(Vector3 position, out float height)
+    {
+        height = 0f;
+        MethodInfo? method = s_heightmapGetHeight;
+        if (method == null)
+        {
+            return false;
+        }
+        object[] args = s_heightArgs;
+        args[0] = position;
+        try
+        {
+            if (method.Invoke(null, args) is not bool found || !found)
+            {
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!s_heightErrorLogged)
+            {
+                s_heightErrorLogged = true;
+                Disguise.LogError($"Cannot call Heightmap.GetHeight: {ex.Message}");
+            }
+            return false;
+        }
+        height = (float)args[1];
+        return true;
     }
 
     /// <summary>

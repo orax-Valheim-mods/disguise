@@ -1,41 +1,60 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 namespace Disguise;
 
 /// <summary>
 /// Server, outgoing packet only: hands back the position of a disguised player raised to
-/// where its costume actually RESTS, which is what stops that costume shivering on a machine
-/// running no DLL of ours.
+/// where its costume actually RESTS, and lays that costume on the same ground while the
+/// outgoing body is built - which is what stops it shivering on a machine running no DLL of
+/// ours.
 ///
 /// Why the shiver survives the band that freezes the packet (PositionHold): on the receiving
 /// side ZSyncTransform turns gravity and velocity off, puts the body to sleep, and then -
 /// every frame - drags it back to the relayed position with a 0.2 lerp as soon as it has
 /// moved more than a millimetre. Whatever pushes the costume out of the ground therefore
-/// comes straight back, and the two together make a cycle of a few centimetres: the raft the
-/// game cannot tilt (it wears your upright rotation, so its uphill edge is buried in a
-/// slope), the cart whose wheels are separate bodies on joints. Nothing else moves a body
-/// configured that way - which is exactly what your tests showed: no shiver in water, none
-/// in the air, none on your own clone (GhostFactory strips its rigidbody and colliders, so
-/// it has no physics to lose the fight with).
+/// comes straight back, and the two together make a cycle of a few centimetres. The costume
+/// cannot make room by itself either: it wears YOUR upright rotation, so on a slope its
+/// uphill edge is buried however carefully its height was set, and the cart's wheels are
+/// separate bodies on joints the ground keeps lifting against the root. Nothing else moves a
+/// body configured that way - which is exactly what your tests showed: no shiver in water,
+/// none in the air, none on your own clone (GhostFactory strips its rigidbody and colliders,
+/// so it has no physics to lose the fight with).
 ///
-/// The lift is measured from the costume's own geometry, once per prefab: how far below its
-/// pivot anything hangs (the raft's hull, the cart's wheels), and how wide its flat bottom
-/// is. It then adds the rise of the TERRAIN under that footprint - a flat bottom on a slope
-/// is buried at the uphill edge however careful the pivot is - but only when the terrain is
-/// what the player stands on: a floor, water or thin air are far below and a roof far above,
-/// and none of them has a slope to correct.
+/// Both levers are measured once per prefab, from the geometry that can actually collide:
+/// COLLIDERS only, because only the solver's shapes are pushed back against - a mesh whose
+/// bounds hang far below its own hull can ask for a lift no contact ever needed (both
+/// numbers are logged side by side, so the difference is there to read).
+///
+/// The ground under them is read here, and never guessed: the game's own answer is a
+/// physics ray that replies with the very height it was handed when it hits NOTHING, so a
+/// missing collider and a perfectly flat slope come out as one number - which is how a
+/// costume ends up lying flat on a hillside while its log claims the ground was level. The
+/// ray is therefore cast again by hand (hit and miss both known), the loaded heightmap
+/// answers when no collider did, and whichever of the two answered - or that neither could
+/// - is printed by the report along with the height it read against the player's feet.
+///
+/// - The HEIGHT: everything the costume hangs below the level its player stands on, whatever
+///   part of the ground under its footprint the fitted plane cannot explain, and a few
+///   centimetres of clearance. That clearance is what carries the fix when the measurement is
+///   a little off: a costume that touches nothing has nothing to be pushed out of.
+/// - The ROTATION: laid, for the duration of the outgoing body, on the plane fitted under
+///   that footprint - but only for a costume whose ZSyncTransform really applies rotations
+///   (s_upright), since a tilt the rendering machine ignores must not be paid for in height.
+///   A raft then lies ON a slope like a real one, and what is left of the rise afterwards is
+///   only what the plane could not explain.
 ///
 /// Like the flight raise, this hands back a copy: the owner's zdo, the server's own state,
 /// the saves and the game logic always keep the player on the ground. Patch_SendZDOs opens
-/// the window around one ZDOMan.SendZDOs call; the same value is added on your own screen
-/// (SelfView) so that both views of a costume agree to the centimetre.
+/// the window around one ZDOMan.SendZDOs call, and the same two values are rebuilt on your
+/// own screen (SelfView) so that both views of a costume agree to the centimetre.
 /// </summary>
 internal static class RestOffset
 {
-    /// <summary>Ray samples around the costume: the rise of a slope under its footprint.</summary>
+    /// <summary>Ray samples around the costume: the rise and the slope of the ground under its footprint.</summary>
     private const int RingSamples = 8;
 
     /// <summary>
@@ -46,23 +65,54 @@ internal static class RestOffset
     private const float GroundBand = 0.5f;
 
     /// <summary>
-    /// Largest rise the footprint may buy: half a metre of it is already a costume hanging
-    /// over a cliff edge, and past that the float would be worse than the shiver it replaces.
+    /// Largest ground rise the footprint may buy on top of the plane: half a metre of it is
+    /// already a costume hanging over a cliff edge, and past that the float would be worse
+    /// than the shiver it replaces. On an ordinary slope the plane absorbs the rise, so what
+    /// is left for this to cover is only its curvature.
     /// </summary>
     private const float MaxFootprintRise = 0.5f;
+
+    /// <summary>
+    /// Steepest ground a costume is laid on. Past 45 degrees the fitted plane stops
+    /// describing a slope a costume can stand on and starts describing a cliff; the tilt and
+    /// the rise are held to it together so that the height never assumes more than the
+    /// rotation will deliver.
+    /// </summary>
+    private const float MaxSlope = 1f;
 
     /// <summary>A reach under this is a round bottom: the ground there is the ground at the centre.</summary>
     private const float MinReach = 0.05f;
 
     /// <summary>
-    /// Nothing may be lifted by more than this: a costume cannot need a metre to stop digging
-    /// in, and a measurement asking for one has gone wrong (it is logged when it happens).
+    /// Centimetres kept between a costume and the ground it is relayed over: the difference
+    /// between resting exactly on the surface - which the solver keeps resolving - and
+    /// touching nothing at all, and what absorbs the error of a measurement taken on a
+    /// prefab asset while the real body is somewhere else.
     /// </summary>
-    private const float MaxLift = 1f;
+    private const float Clearance = 0.05f;
 
     /// <summary>
-    /// Measured once per costume, by prefab hash: x = its lowest point, never above the
-    /// pivot; y = how far its flat bottom reaches sideways.
+    /// Nothing may be lifted by more than this. A costume really does hang a metre below its
+    /// pivot (a hull, a set of wheels), so this is not a guess at how deep one should sit: it
+    /// is the alarm against a measurement gone wrong, and the log says when it fires.
+    /// </summary>
+    private const float MaxLift = 2.5f;
+
+    /// <summary>
+    /// Where the ground ray starts, and how far it reaches: the same numbers, and the same
+    /// terrain layer, as the game's own ground read - the one difference being that this
+    /// ray reports a miss instead of answering with the height it was given.
+    /// </summary>
+    private const float GroundRayTop = 6000f;
+
+    private const float GroundRayLength = 10000f;
+
+    /// <summary>The only layer read as ground: the terrain itself, never a piece.</summary>
+    private static readonly int s_terrainMask = LayerMask.GetMask("terrain");
+
+    /// <summary>
+    /// Measured once per costume, by prefab hash: x = how far its lowest COLLIDER hangs below
+    /// the pivot (never above it); y = how far its flat bottom reaches sideways.
     /// </summary>
     private static readonly Dictionary<int, Vector2> s_footprints = new Dictionary<int, Vector2>();
 
@@ -72,10 +122,43 @@ internal static class RestOffset
     /// </summary>
     private static readonly HashSet<int> s_leftAlone = new HashSet<int>();
 
+    /// <summary>
+    /// Costumes whose ZSyncTransform carries m_syncRotation = false. Laying one on the ground
+    /// would change nothing where it is rendered, while its height would still be spent
+    /// following a plane it never turns onto: they keep the height rule alone, which is also
+    /// the safe direction for a component we failed to read.
+    /// </summary>
+    private static readonly HashSet<int> s_upright = new HashSet<int>();
+
     /// <summary>True while the positions this call asks for are landing in a packet.</summary>
     private static bool s_sending;
 
-    /// <summary>Own view: the lift recomputed at most ten times a second (it costs rays).</summary>
+    /// <summary>
+    /// The ZDO whose ground is about to be written into its rotation, and that ground's
+    /// normal. Raised by Raise, which runs on the very ZDO a few lines later handed to
+    /// ZDO.Serialize, and consumed there: BeginOutgoingRotation must find exactly this ZDO or
+    /// it touches nothing at all.
+    /// </summary>
+    private static ZDO? s_pendingZdo;
+
+    private static Vector3 s_pendingNormal = Vector3.up;
+
+    /// <summary>
+    /// Rotation swap in progress: the raw euler angles saved for the duration of one
+    /// ZDO.Serialize, put back by EndRotation whatever becomes of that call.
+    /// </summary>
+    private static ZDO? s_activeZdo;
+
+    private static Vector3 s_savedRotation;
+
+    /// <summary>Ring of the last ground fit, kept here so that Rest never allocates.</summary>
+    private static readonly float[] s_sampleX = new float[RingSamples];
+
+    private static readonly float[] s_sampleZ = new float[RingSamples];
+
+    private static readonly float[] s_sampleH = new float[RingSamples];
+
+    /// <summary>Own view: the lift and the normal recomputed at most ten times a second (it costs rays).</summary>
     private static bool s_hasView;
 
     private static int s_viewHash;
@@ -86,10 +169,26 @@ internal static class RestOffset
 
     private static float s_viewLift;
 
-    /// <summary>Own view logging: the last lift reported and the earliest next report.</summary>
-    private static float s_reportedLift = float.NaN;
+    private static Vector3 s_viewNormal = Vector3.up;
+
+    /// <summary>
+    /// Ground logging: the last line reported, and the earliest next one. The line is
+    /// compared as a WHOLE, because a tilt moves the lift by less than the two centimetres
+    /// this used to compare on - reporting on the height alone would never mention a slope,
+    /// and a costume lying flat on one looks exactly like one standing on level ground.
+    /// </summary>
+    private static string? s_lastReport;
 
     private static float s_nextReport;
+
+    /// <summary>
+    /// Rotation logging: the angle last written into an outgoing body (NaN until the first
+    /// one), and the earliest next line about the swap in either direction. Computed and
+    /// sent are two different answers; only this one reaches the machine that shivers.
+    /// </summary>
+    private static float s_writtenDegrees = float.NaN;
+
+    private static float s_nextSwapLog;
 
     /// <summary>
     /// Opens the window for one ZDOMan.SendZDOs call. Only the relaying machine opens it: a
@@ -98,21 +197,32 @@ internal static class RestOffset
     internal static void BeginSend()
     {
         s_sending = ZNet.instance != null && ZNet.instance.IsServer();
+        s_pendingZdo = null;
+        s_pendingNormal = Vector3.up;
     }
 
     /// <summary>Closes the window: called by the Postfix and by the Finalizer.</summary>
     internal static void EndSend()
     {
         s_sending = false;
+        s_pendingZdo = null;
+        s_pendingNormal = Vector3.up;
     }
 
     /// <summary>
     /// Raises the copy ZDO.GetPosition is about to hand to the packet builder by what its
-    /// costume needs to stop digging in. No-op outside the window, for a viking, and while
-    /// the observer refresh fakes its far-away position - that one has to arrive as faked.
+    /// costume needs to stop digging in, and remembers the ground under that very ZDO for the
+    /// rotation of the body built from it right after. No-op outside the window, for a
+    /// viking, for anything without the marker of a disguised player (a world object is
+    /// relayed exactly as the game has it), and while the observer refresh fakes its
+    /// far-away position - that one has to arrive as faked.
     /// </summary>
     internal static void Raise(ZDO zdo, ref Vector3 position)
     {
+        // Whichever ZDO asked last: a rotation is only ever rewritten for the one whose
+        // ground is in here right now, so forget the previous answer before anything else.
+        s_pendingZdo = null;
+        s_pendingNormal = Vector3.up;
         if (!s_sending)
         {
             return;
@@ -124,16 +234,119 @@ internal static class RestOffset
             {
                 return;
             }
-            float lift = Lift(hash, position);
+            if (!DisguiseApplier.HasMarker(zdo))
+            {
+                return; // not one of ours: hold nothing, lift nothing, tilt nothing
+            }
+            Rest(
+                hash,
+                position,
+                out float lift,
+                out Vector3 normal,
+                out float rise,
+                out float groundDelta,
+                out bool viaHeightmap
+            );
+            s_pendingZdo = zdo;
+            s_pendingNormal = normal;
             if (lift > 0f)
             {
-                Report(hash, lift);
+                Report(hash, lift, normal, rise, groundDelta, viaHeightmap);
                 position.y += lift;
             }
         }
         catch (Exception ex)
         {
             Disguise.LogError($"Ground rest (outgoing position): {ex}");
+        }
+    }
+
+    /// <summary>
+    /// ZDO.Serialize: lays the costume on the ground Raise measured for it, for the duration
+    /// of the outgoing body only, and leaves nothing behind. Only the relaying machine ever
+    /// swaps (an owner rewriting its own rotation would have the server STORE it), and only
+    /// for the exact ZDO that Raise measured - so a Serialize outside the window, or one for
+    /// anything else, changes nothing. Returns true when a swap really happened: the caller
+    /// must then call EndRotation, which is harmless when nothing was opened.
+    ///
+    /// The body decides whether to write a rotation AT ALL from the value it finds, and that
+    /// code runs after this prefix: a costume whose tilt makes its euler angles non-zero has
+    /// its rotation written, while one resting on flat ground is handed over exactly as the
+    /// game has it.
+    /// </summary>
+    internal static bool BeginOutgoingRotation(ZDO? zdo)
+    {
+        if (
+            s_activeZdo != null
+            || zdo == null
+            || !zdo.IsValid()
+            || GameAccess.s_zdoRotationField == null
+        )
+        {
+            return false;
+        }
+        ZDO? measured = s_pendingZdo;
+        if (measured != zdo)
+        {
+            // A ground measured and then never laid down: the body being built right now
+            // belongs to another ZDO than the one Raise lifted, so the tilt is dropped with
+            // nothing to show for it. Rare enough to be worth a line - it is the failure a
+            // flat report cannot tell apart from real flat ground.
+            if (
+                measured != null
+                && DisguiseConfig.ConfigLogs.Value
+                && Time.realtimeSinceStartup >= s_nextSwapLog
+            )
+            {
+                s_nextSwapLog = Time.realtimeSinceStartup + 1f;
+                Disguise.LogInfo(
+                    $"Ground rest: tilt measured for {PrefabResolver.PrefabName(measured.GetPrefab())} "
+                        + "was dropped: ZDO.Serialize ran for another ZDO."
+                );
+            }
+            return false;
+        }
+        // Consumed: the same body must never be laid on the ground twice.
+        s_pendingZdo = null;
+        if (s_pendingNormal == Vector3.up)
+        {
+            return false; // flat ground: there is nothing to lay down onto
+        }
+        if (ZNet.instance == null || !ZNet.instance.IsServer())
+        {
+            return false;
+        }
+        Vector3 saved = (Vector3)GameAccess.s_zdoRotationField.GetValue(zdo);
+        Quaternion current = Quaternion.Euler(saved);
+        Quaternion tilt = Quaternion.FromToRotation(current * Vector3.up, s_pendingNormal);
+        if (tilt == Quaternion.identity)
+        {
+            return false;
+        }
+        s_activeZdo = zdo;
+        s_savedRotation = saved;
+        GameAccess.s_zdoRotationField.SetValue(zdo, (tilt * current).eulerAngles);
+        ReportWritten(zdo, Vector3.Angle(current * Vector3.up, s_pendingNormal));
+        return true;
+    }
+
+    /// <summary>Puts the rotation back: called by the Finalizer even when the swap never happened.</summary>
+    internal static void EndRotation()
+    {
+        ZDO? zdo = s_activeZdo;
+        Vector3 saved = s_savedRotation;
+        s_activeZdo = null;
+        if (zdo == null || GameAccess.s_zdoRotationField == null)
+        {
+            return;
+        }
+        try
+        {
+            GameAccess.s_zdoRotationField.SetValue(zdo, saved);
+        }
+        catch (Exception ex)
+        {
+            Disguise.LogError($"Ground rest (rotation restore): {ex}");
         }
     }
 
@@ -146,20 +359,7 @@ internal static class RestOffset
     {
         try
         {
-            if (
-                s_hasView
-                && prefabHash == s_viewHash
-                && Time.unscaledTime < s_viewNext
-                && (position - s_viewPosition).sqrMagnitude < 0.04f
-            )
-            {
-                return Vector3.up * s_viewLift;
-            }
-            s_hasView = true;
-            s_viewHash = prefabHash;
-            s_viewPosition = position;
-            s_viewNext = Time.unscaledTime + 0.1f;
-            s_viewLift = Lift(prefabHash, position);
+            RefreshView(prefabHash, position);
             return Vector3.up * s_viewLift;
         }
         catch (Exception ex)
@@ -169,46 +369,228 @@ internal static class RestOffset
         }
     }
 
+    /// <summary>
+    /// The same lay-on-the-ground rotation the packet carries, rebuilt for the clone your own
+    /// screen draws from the normal and the rotation it is about to be given. Nothing is
+    /// transmitted between the two machines: they measure the same ground over the same
+    /// footprint and reach the same pose.
+    /// </summary>
+    internal static Quaternion ViewRotation(int prefabHash, Vector3 position, Quaternion rotation)
+    {
+        try
+        {
+            RefreshView(prefabHash, position);
+            return Quaternion.FromToRotation(rotation * Vector3.up, s_viewNormal) * rotation;
+        }
+        catch (Exception ex)
+        {
+            Disguise.LogError($"Ground rest (own view rotation): {ex}");
+            return rotation;
+        }
+    }
+
     // ------------------------------------------------------------------ internals
 
-    /// <summary>
-    /// How much higher than its player this costume must be relayed: everything it hangs
-    /// below the level the player stands on, plus the rise of the terrain under its footprint
-    /// while the terrain is what they stand on.
-    /// </summary>
-    private static float Lift(int prefabHash, Vector3 position)
+    private static void RefreshView(int prefabHash, Vector3 position)
     {
+        if (
+            s_hasView
+            && prefabHash == s_viewHash
+            && Time.unscaledTime < s_viewNext
+            && (position - s_viewPosition).sqrMagnitude < 0.04f
+        )
+        {
+            return;
+        }
+        s_hasView = true;
+        s_viewHash = prefabHash;
+        s_viewPosition = position;
+        s_viewNext = Time.unscaledTime + 0.1f;
+        Rest(prefabHash, position, out s_viewLift, out s_viewNormal, out _, out _, out _);
+    }
+
+    /// <summary>
+    /// How much higher than its player this costume must be relayed, the normal of the
+    /// ground it should be laid on, and the two numbers behind them: the part of the ground
+    /// the fitted plane could not explain, and the height read under the player's own feet
+    /// with the source it came from (NaN when nothing at all could be read).
+    ///
+    /// The TILT needs the terrain to be what the costume rests on - a floor, water or thin
+    /// air lie far below, a roof far above, and neither has a slope worth following. The
+    /// RISE does not ask that much: it can only raise a costume, never lower it, and only
+    /// over ground rising above the feet, which is exactly what buries a costume on a
+    /// hillside while its player stands a plank higher than the terrain. The clearance is
+    /// spent either way, since a costume on a deck rests on something the ray never finds.
+    /// </summary>
+    private static void Rest(
+        int prefabHash,
+        Vector3 position,
+        out float lift,
+        out Vector3 normal,
+        out float rise,
+        out float groundDelta,
+        out bool viaHeightmap
+    )
+    {
+        normal = Vector3.up;
+        lift = 0f;
+        rise = 0f;
+        groundDelta = float.NaN;
+        viaHeightmap = false;
         if (!Footprint(prefabHash, out Vector2 footprint))
         {
-            return 0f;
+            return;
         }
 
-        float lift = Mathf.Max(0f, -footprint.x);
-
-        ZoneSystem? zone = ZoneSystem.instance;
-        if (zone != null && footprint.y > MinReach)
+        float best = position.y;
+        if (footprint.y > MinReach && TryGround(position, out float ground, out viaHeightmap))
         {
-            float ground = zone.GetGroundHeight(position);
-            if (Mathf.Abs(ground - position.y) <= GroundBand)
+            // Kept even when it turns the fit down: a costume relayed flat on a slope must
+            // be traceable to this test rather than guessed at.
+            groundDelta = ground - position.y;
+            if (groundDelta <= GroundBand)
             {
-                float high = ground;
-                for (int i = 0; i < RingSamples; i++)
-                {
-                    float angle = i * (2f * Mathf.PI / RingSamples);
-                    Vector3 sample = position;
-                    sample.x += Mathf.Cos(angle) * footprint.y;
-                    sample.z += Mathf.Sin(angle) * footprint.y;
-                    float height = zone.GetGroundHeight(sample);
-                    if (height > high)
-                    {
-                        high = height;
-                    }
-                }
-                lift += Mathf.Clamp(high - position.y, 0f, MaxFootprintRise);
+                bool tilt = Mathf.Abs(groundDelta) <= GroundBand && !s_upright.Contains(prefabHash);
+                best = Fit(position, footprint.y, ground, !tilt, out normal);
             }
         }
 
-        return lift > MaxLift ? MaxLift : lift;
+        // What the fitted plane, laid across the costume, still has to be lifted over: with
+        // the tilt applied the slope is already carried by the plane, and only what it cannot
+        // explain is left for the height. Outside the band there is nothing to lift over at
+        // all, and the answer is the hang plus the clearance.
+        float above = best - position.y;
+        if (above < 0f)
+        {
+            above = 0f;
+        }
+        else if (above > MaxFootprintRise)
+        {
+            above = MaxFootprintRise;
+        }
+        rise = above;
+
+        // The costume's lowest collider, measured along its own tilted up: laying a costume
+        // down lowers the point that used to hang straight under the pivot.
+        float hang = Mathf.Max(0f, -footprint.x * normal.y);
+        lift = (hang > MaxLift ? MaxLift : hang) + above + Clearance;
+    }
+
+    /// <summary>
+    /// The terrain surface under a point, and whether it came from the heightmap instead of
+    /// the ray: the ray first - it is exact and it follows whatever the terrain was
+    /// sculpted into - and the loaded heightmap when no collider answered. False only when
+    /// neither has anything to say, a case the report prints rather than letting it pass
+    /// for flat ground.
+    /// </summary>
+    private static bool TryGround(Vector3 position, out float height, out bool viaHeightmap)
+    {
+        Vector3 origin = position;
+        origin.y = GroundRayTop;
+        if (
+            Physics.Raycast(
+                origin,
+                Vector3.down,
+                out RaycastHit hit,
+                GroundRayLength,
+                s_terrainMask
+            )
+        )
+        {
+            height = hit.point.y;
+            viaHeightmap = false;
+            return true;
+        }
+        if (GameAccess.TryGetTerrainHeight(position, out height))
+        {
+            viaHeightmap = true;
+            return true;
+        }
+        height = 0f;
+        viaHeightmap = false;
+        return false;
+    }
+
+    /// <summary>
+    /// Samples the ground around the costume, lays a plane over those samples and returns the
+    /// highest value the plane reaches over them - what is left for the height once the
+    /// costume lies on it. That plane is capped to MaxSlope BEFORE being returned, so the
+    /// normal handed back and the number computed here always describe the same ground: a
+    /// costume whose rotation will not follow a cliff must not pay for one in height either.
+    /// A costume kept upright is simply measured with a flat plane (slope zero).
+    /// </summary>
+    private static float Fit(
+        Vector3 position,
+        float reach,
+        float ground,
+        bool upright,
+        out Vector3 normal
+    )
+    {
+        normal = Vector3.up;
+        float sumXX = 0f;
+        float sumZZ = 0f;
+        float sumXH = 0f;
+        float sumZH = 0f;
+        for (int i = 0; i < RingSamples; i++)
+        {
+            float angle = i * (2f * Mathf.PI / RingSamples);
+            float dx = Mathf.Cos(angle) * reach;
+            float dz = Mathf.Sin(angle) * reach;
+            Vector3 sample = position;
+            sample.x += dx;
+            sample.z += dz;
+            // A ring point with nothing to read under it (a zone edge, a missing collider)
+            // is answered with the centre's own ground: it must not invent a rise, nor a
+            // slope to explain one.
+            if (!TryGround(sample, out float height, out _))
+            {
+                height = ground;
+            }
+            s_sampleX[i] = dx;
+            s_sampleZ[i] = dz;
+            s_sampleH[i] = height;
+            sumXX += dx * dx;
+            sumZZ += dz * dz;
+            sumXH += dx * (height - ground);
+            sumZH += dz * (height - ground);
+        }
+
+        float slopeX = 0f;
+        float slopeZ = 0f;
+        if (!upright)
+        {
+            // The ring is evenly spaced about the centre, so the two directions solve
+            // independently: one division each, no system to invert.
+            slopeX = sumXX > 0f ? sumXH / sumXX : 0f;
+            slopeZ = sumZZ > 0f ? sumZH / sumZZ : 0f;
+            float slope = Mathf.Sqrt(slopeX * slopeX + slopeZ * slopeZ);
+            if (slope > 0.0001f)
+            {
+                if (slope > MaxSlope)
+                {
+                    slopeX *= MaxSlope / slope;
+                    slopeZ *= MaxSlope / slope;
+                }
+                normal = new Vector3(-slopeX, 1f, -slopeZ).normalized;
+            }
+            else
+            {
+                slopeX = 0f;
+                slopeZ = 0f;
+            }
+        }
+
+        float best = ground;
+        for (int i = 0; i < RingSamples; i++)
+        {
+            float abovePlane = s_sampleH[i] - ((s_sampleX[i] * slopeX) + (s_sampleZ[i] * slopeZ));
+            if (abovePlane > best)
+            {
+                best = abovePlane;
+            }
+        }
+        return best;
     }
 
     /// <summary>
@@ -232,14 +614,50 @@ internal static class RestOffset
             s_leftAlone.Add(prefabHash);
             return false;
         }
-        footprint = Measure(prefab);
+        // Recorded before the measure: a costume that will not be turned stays upright even
+        // if the measurement itself fails below.
+        bool upright = !SyncsRotation(prefab);
+        if (upright)
+        {
+            s_upright.Add(prefabHash);
+        }
+        footprint = Measure(prefab, out float meshLowest);
         s_footprints[prefabHash] = footprint;
+        string name = PrefabResolver.PrefabName(prefabHash);
         Disguise.LogInfo(
-            $"Ground rest: {PrefabResolver.PrefabName(prefabHash)} hangs "
-                + $"{-footprint.x:F3} m below its pivot, flat bottom "
-                + $"{footprint.y:F2} m wide."
+            $"Ground rest: {name} hangs {-footprint.x:F3} m below its colliders, "
+                + $"{-meshLowest:F3} m below its meshes, flat bottom {footprint.y:F2} m wide, "
+                + (upright ? "kept upright." : "laid on the ground.")
         );
+        if (-footprint.x > MaxLift)
+        {
+            Disguise.LogWarning(
+                $"Ground rest: {name} hangs more than {MaxLift:F1} m below its colliders - "
+                    + $"the lift is capped at {MaxLift:F1} m, so it may still dig in."
+            );
+        }
         return true;
+    }
+
+    /// <summary>
+    /// Whether the machines rendering this costume apply the rotation the packet carries:
+    /// ZSyncTransform.m_syncRotation, read through reflection exactly as PrefabCatalog reads
+    /// the component itself. False when it cannot be read, which is the safe direction - a
+    /// costume held upright with the height rule alone looks as it always did.
+    /// </summary>
+    private static bool SyncsRotation(GameObject prefab)
+    {
+        Component? sync = prefab.GetComponent(PrefabCatalog.SyncTransformComponent);
+        if (sync == null)
+        {
+            return false;
+        }
+        FieldInfo? field = sync.GetType().GetField("m_syncRotation");
+        if (field == null || field.FieldType != typeof(bool))
+        {
+            return false;
+        }
+        return field.GetValue(sync) is bool value && value;
     }
 
     /// <summary>
@@ -266,18 +684,22 @@ internal static class RestOffset
 
     /// <summary>
     /// The costume's own geometry, measured on the prefab asset in its own frame: how far
-    /// below its pivot anything hangs, and how far sideways its FLAT bottom reaches - the
+    /// below its pivot its COLLIDERS hang, and how far sideways its FLAT bottom reaches - the
     /// part that can be inside a slope. A sphere or a capsule is not counted as flat: it
     /// touches the ground at one point, and the ground there is the ground at the centre.
     ///
-    /// Meshes are only ever asked for their lowest point, never for their reach: a canopy
-    /// three metres wide is not what the costume rests on. Skinned meshes are left out
-    /// entirely - they carry no MeshFilter, their bounds live in bind space rather than in
-    /// the object's, and what they hang lowest (a sail, a cape) is never the resting point.
+    /// Meshes are measured as well but never used for the lift, only for the log line: a mesh
+    /// is not something the solver pushes a costume out of, and its bounds are not always the
+    /// hull they belong to. The two numbers side by side are what tells a costume that really
+    /// does sit a metre deep from one whose art merely reaches that far down. Skinned meshes
+    /// are left out entirely - they carry no MeshFilter, their bounds live in bind space
+    /// rather than in the object's, and what they hang lowest (a sail, a cape) is never the
+    /// resting point.
     /// </summary>
-    private static Vector2 Measure(GameObject prefab)
+    private static Vector2 Measure(GameObject prefab, out float meshLowest)
     {
         float lowest = 0f;
+        meshLowest = 0f;
         float reach = 0f;
         Transform root = prefab.transform;
         Matrix4x4 toRoot = root.worldToLocalMatrix;
@@ -324,9 +746,9 @@ internal static class RestOffset
                     continue;
                 }
                 float y = Lowest(local, mesh.bounds.center, mesh.bounds.extents);
-                if (y < lowest)
+                if (y < meshLowest)
                 {
-                    lowest = y;
+                    meshLowest = y;
                 }
             }
         }
@@ -437,12 +859,21 @@ internal static class RestOffset
     }
 
     /// <summary>
-    /// One line about the lift a costume is really getting, when it changes by more than two
-    /// centimetres and at most every two seconds: the number to read against the shiver it
-    /// replaces, and the alarm for a measurement going wrong. Nothing is built for this when
-    /// the logs are off.
+    /// One line about the ground a costume is really being relayed over, whenever any part
+    /// of the answer changes and at most every two seconds: the lift, the tilt, the height
+    /// read under the player's own feet with the source it came from, and the part of the
+    /// ground the plane could not explain. Built only after the clock has run out, so that
+    /// switching the logs off - or leaving them on - costs no allocation at all between two
+    /// lines.
     /// </summary>
-    private static void Report(int prefabHash, float lift)
+    private static void Report(
+        int prefabHash,
+        float lift,
+        Vector3 normal,
+        float rise,
+        float groundDelta,
+        bool viaHeightmap
+    )
     {
         if (!DisguiseConfig.ConfigLogs.Value)
         {
@@ -452,14 +883,46 @@ internal static class RestOffset
         {
             return;
         }
-        if (!float.IsNaN(s_reportedLift) && Mathf.Abs(lift - s_reportedLift) < 0.02f)
+        // The clock is spent whether or not anything is new: the line is built at most every
+        // two seconds, never once per packet while nothing changes.
+        s_nextReport = Time.realtimeSinceStartup + 2f;
+        float tilt = Vector3.Angle(Vector3.up, normal);
+        string sign = groundDelta >= 0f ? "+" : "";
+        string ground = float.IsNaN(groundDelta)
+            ? "no terrain read"
+            : $"ground {sign}{groundDelta:F2} m vs feet ({(viaHeightmap ? "heightmap" : "ray")})";
+        string message =
+            $"Ground rest: {PrefabResolver.PrefabName(prefabHash)} is relayed {lift:F3} m above "
+            + $"its player, laid {tilt:F1} degrees off upright | {ground}, rise {rise:F2} m";
+        if (message == s_lastReport)
         {
             return;
         }
-        s_reportedLift = lift;
-        s_nextReport = Time.realtimeSinceStartup + 2f;
+        s_lastReport = message;
+        Disguise.LogInfo(message);
+    }
+
+    /// <summary>
+    /// The other half of the record: whether that tilt reached the bytes of the body being
+    /// built. A report showing a slope with no line from here means the swap was refused
+    /// (or measured for a ZDO that was never serialized), which a flat report would hide
+    /// just as well as real flat ground. Logged when the angle changes, first time always.
+    /// </summary>
+    private static void ReportWritten(ZDO zdo, float degrees)
+    {
+        if (!DisguiseConfig.ConfigLogs.Value || Time.realtimeSinceStartup < s_nextSwapLog)
+        {
+            return;
+        }
+        if (!float.IsNaN(s_writtenDegrees) && Mathf.Abs(degrees - s_writtenDegrees) < 0.05f)
+        {
+            return;
+        }
+        s_writtenDegrees = degrees;
+        s_nextSwapLog = Time.realtimeSinceStartup + 1f;
         Disguise.LogInfo(
-            $"Ground rest: {PrefabResolver.PrefabName(prefabHash)} is relayed {lift:F3} m above its player."
+            $"Ground rest: {PrefabResolver.PrefabName(zdo.GetPrefab())} rotation written into "
+                + $"the packet: {degrees:F1} degrees off upright."
         );
     }
 }
