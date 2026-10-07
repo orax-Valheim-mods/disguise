@@ -6,17 +6,18 @@ using UnityEngine;
 namespace Disguise;
 
 /// <summary>
-/// The list behind "disguise list" and behind the window's list: every prefab registered in
-/// ZNetScene, sorted by name and tagged with exactly one PrefabKind.
+/// The list behind "disguise list" and behind the window's list: every VANILLA prefab
+/// registered in ZNetScene, sorted by name and tagged with exactly one PrefabKind.
+///
+/// Vanilla means: the name is in the game's own asset manifest, which no mod ever writes to
+/// (VanillaPrefabs holds that test). The two lists stay identical because they come out of
+/// this one class - the window only adds its two filters on top (the text field, then the
+/// six category checkboxes).
 ///
 /// ZNetScene is the technical limit of any disguise - a vanilla client rebuilds your object
 /// from ITS OWN prefab table, by hash, so only prefabs every installation already carries
 /// can ever be shown. An asset that is not a network prefab (terrain, scene-only objects)
 /// never can, whatever the config says.
-///
-/// The console asks for every kind; the window adds its own two filters on top (the text
-/// field, then the six category checkboxes). Both come out of this one class, which is what
-/// keeps the console and the window from ever disagreeing about a name.
 /// </summary>
 internal static class PrefabCatalog
 {
@@ -73,7 +74,7 @@ internal static class PrefabCatalog
     }
 
     /// <summary>
-    /// Every prefab name matching the optional substring, sorted case-insensitively.
+    /// Every vanilla prefab name matching the optional substring, sorted case-insensitively.
     /// shown is the checkbox state indexed by PrefabKind: null means "every kind", which is
     /// what the console asks for, and the window passes the six flags of its own.
     /// </summary>
@@ -118,9 +119,10 @@ internal static class PrefabCatalog
 
     /// <summary>
     /// One pass over the registered prefabs: adds the matching names (when a list is given)
-    /// and/or counts every match by kind. Both callers are one-shot (a console command, the
-    /// opening of the window), so nothing is cached - a stale cache would list prefabs a
-    /// modded world no longer has.
+    /// and/or counts every match by kind. Modded prefabs never enter either - they are cut
+    /// before anything else, so the counts and the names agree on the same set. Both callers
+    /// are one-shot (a console command, the opening of the window), so nothing is cached -
+    /// a stale cache would list prefabs a modded world no longer has.
     /// </summary>
     private static void Walk(string? filter, bool[]? shown, List<string>? names, int[]? counts)
     {
@@ -132,6 +134,10 @@ internal static class PrefabCatalog
         foreach (string name in zns.GetPrefabNames())
         {
             if (filter != null && name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+            if (!VanillaPrefabs.Contains(name))
             {
                 continue;
             }

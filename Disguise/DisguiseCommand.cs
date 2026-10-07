@@ -218,7 +218,7 @@ internal static class DisguiseCommand
         Say(ctx, "  disguise status           current state (prefab, marker, save protection)");
         Say(
             ctx,
-            "  disguise list [filter]    every prefab you can become (the window shows it too)"
+            "  disguise list [filter]    every vanilla prefab you can become (the window too)"
         );
         Say(ctx, "  disguise set <prefab>     change the prefab and enable the disguise");
         Say(ctx, "                            (a click on a row of the window does this too)");
@@ -667,7 +667,7 @@ internal static class DisguiseCommand
     }
 
     /// <summary>
-    /// "disguise list [filter]": every registered prefab, in the six categories of
+    /// "disguise list [filter]": every VANILLA registered prefab, in the six categories of
     /// PrefabCatalog - the complete catalogue, whatever the window's checkboxes have on (they
     /// only hide rows there). Counts per category first, four names per line after that.
     /// Empty without a ZNetScene (main menu), which is where the notice above comes from.

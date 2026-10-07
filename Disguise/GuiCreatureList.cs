@@ -9,7 +9,7 @@ namespace Disguise;
 
 /// <summary>
 /// The prefab list of the Disguise window: a filter field (Jotunn input) and a scroll view
-/// (Jotunn) holding one row per registered prefab - exactly the names "disguise list" prints,
+/// (Jotunn) holding one row per vanilla prefab - exactly the names "disguise list" prints,
 /// through PrefabCatalog.Names, so the console and the window can never disagree about a
 /// name. What the window adds are two filters of its own on top of that shared source: the
 /// text field, and the six category checkboxes (GuiCategories) that decide which kinds of

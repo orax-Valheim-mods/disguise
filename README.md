@@ -107,7 +107,7 @@ In game, open the console with **F5**:
 | Command | Effect |
 |---|---|
 | `disguise status` | Current state (prefab, marker, save protection) |
-| `disguise list` | Every registered prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI) |
+| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds are never listed (§ 6, § 7) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
@@ -162,7 +162,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | Option | Default | Role |
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
-| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown) |
+| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla ones) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log; warnings and errors are always written (`disguise logs [on|off]`, § 7) |
@@ -334,7 +334,7 @@ in the band the layout leaves free between the title and the state line - `Creat
 `Items`, `Buildings`, `Nature`, `Ships`, `Other` - one per category, each hiding the rows of
 its category in the list below (the state is kept in `6 - GUI` / `Show*`, so a choice
 survives a restart, and `disguise list` prints every category whatever they say). The
-**prefab list**: a filter field over a scrollable list of every registered prefab - the exact
+**prefab list**: a filter field over a scrollable list of every **vanilla** prefab - the exact
 list `disguise list` prints, minus what the checkboxes have switched off - the row of the
 prefab configured right now highlighted in orange, and a click on any row =
 `disguise set <prefab_name>` (config written and applied at once, the line under the title
@@ -387,12 +387,12 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 |---|---|---|
 | `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
-| `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list (section `6 - GUI`). One checkbox per category, one category per prefab: a category switched off only hides rows in the window, and `disguise list` keeps printing every prefab of every category |
+| `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list (section `6 - GUI`). One checkbox per category, one category per prefab: a category switched off only hides rows in the window, and `disguise list` keeps printing every vanilla prefab of every category |
 | `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) in the window's list |
 | `ShowBuildings` | `true` | Show the buildable prefabs (a `Piece`: walls, floors, doors, furniture, crafting stations) in the window's list |
 | `ShowNature` | `true` | Show the natural prefabs (trees, plants, pickables, rocks, ore veins) in the window's list |
 | `ShowShips` | `true` | Show the ships in the window's list |
-| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, whatever a world mod adds) in the window's list. Off, the list only holds what the five other checkboxes show - nothing is ever dropped from the catalogue itself |
+| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) in the window's list. Off, the list only holds what the five other checkboxes show - nothing is ever dropped from the catalogue itself |
 
 ---
 
@@ -692,13 +692,22 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Player` prefab hash, the configured creature hash) and `PrefabName`.
 - `PrefabKind.cs` - the six categories of the list (`Creature`, `Item`, `Building`, `Nature`,
   `Ship`, `Other`): one checkbox each in the window, one category per prefab.
-- `PrefabCatalog.cs` - the catalogue both lists read: every prefab registered in `ZNetScene`
+- `PrefabCatalog.cs` - the catalogue both lists read: every **vanilla** prefab registered in
+  `ZNetScene`
   - the technical limit of a disguise, since a vanilla client rebuilds you from **its own**
   prefab table by hash - sorted, each tagged with exactly one kind through `KindOf` (the
   first test that matches wins, every component read on the root like the `Character` test
   the list shipped with), plus `Names(filter, shown)` and `Counts(filter)`. The console asks
   for every category, the window passes the six checkboxes of its own: one source, no
-  disagreement.
+  disagreement. A modded name is cut out before anything else, so counts and names agree.
+- `VanillaPrefabs.cs` - the vanilla test behind both lists, and the only place that decides
+  it: Valheim describes its **own** assets in `valheim_Data\StreamingAssets\SoftRef\manifest`
+  and `manifest_extended`, plain text with one `path in bundle: Assets/.../Ghost.prefab` line
+  per asset, and a mod never lands in them (a mod loads its bundle from its own plugin folder
+  through `AssetBundle.LoadFromFile`, which the game never indexes). The file names of those
+  lines - a prefab is named after its file - are read once per session into a case-insensitive
+  set, `Contains(name)` answers from it after that, and neither file readable means no
+  filtering at all (one warning says so, the lists stay as complete as before).
 - `DisguiseApplier.cs` - `HasMarker` / `ApplyTo` / `InstantiateAs`: writes the marker and
   swaps the network prefab.
 - `EquipmentMask.cs` - the equipment display options (`3 - Display`): swaps the equipment
@@ -769,7 +778,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Refilter` on every toggle, which only re-runs the filter: the rows themselves are built
   once, at the opening.
 - `GuiCreatureList.cs` - the prefab list: Jotunn's filter field and scroll view, one row per
-  registered prefab built **once** at open (both filters only show and hide rows with
+  vanilla prefab built **once** at open (both filters only show and hide rows with
   `SetActive`, so typing or ticking creates nothing), the kind of every row kept in a third
   parallel list next to the name and the body (which checkbox owns it), `Refilter` - what a
   checkbox and a changed `Show*` call, re-running the filter over the text already typed -
@@ -901,7 +910,8 @@ stays 82.
 | `disguise gui` says "not opened" (or `GuiKey` does nothing at all) | A dedicated server has no GUI, and before a world is loaded Jotunn's `CustomGUIFront` does not exist yet (`Window: ...` in the log, visible only with `Logs = true`, § 2). An unset `GuiKey` (`Not set`, recorded in ConfigurationManager) never fires. Jotunn itself is a hard dependency (§ 1): without it the mod does not load at all |
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
 | The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the six `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
-| Opening the window takes a noticeable moment | The whole list is built at the opening - one Jotunn button per row, hundreds of rows - and the log says what that cost: `GUI: <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The checkboxes and the filter only show and hide those rows, they never rebuild any, so the price is the same whatever they say |
+| A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |
+| Opening the window takes a noticeable moment | The whole list is built at the opening - one Jotunn button per row, hundreds of rows - and the log says what that cost: `GUI: <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log). The checkboxes and the filter only show and hide those rows, they never rebuild any, so the price is the same whatever they say |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 
 Log files:

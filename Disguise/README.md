@@ -15,7 +15,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 
 | Command | Effect |
 |---|---|
-| `disguise list` | Every registered prefab you can become, with a count per category (`disguise list troll` to filter) |
+| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter); a prefab a mod adds is never listed |
 | `disguise set Troll` | Change the prefab and enable the disguise |
 | `disguise enable` / `disguise disable` | Toggle the disguise |
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
@@ -33,7 +33,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | Option | Default | Role |
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
-| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship |
+| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (the two lists only show the vanilla ones) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `true` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
@@ -60,7 +60,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `ShowBuildings` | `true` | Show the buildable prefabs (a `Piece`: walls, floors, doors, furniture, crafting stations) |
 | `ShowNature` | `true` | Show the natural prefabs (trees, plants, pickables, rocks, ore veins) |
 | `ShowShips` | `true` | Show the ships |
-| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, whatever a world mod adds) |
+| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
@@ -84,7 +84,7 @@ its answer on the status line at the bottom, which holds the "click a row" hint 
 first press (the branch added them one step at a time; the preview there shows the creature
 of the row the pointer is on, filmed
 by a camera of its own into a texture, and the configured one while the pointer is on no row
-at all, and the list is a filter field over a scrollable list of every registered prefab -
+at all, and the list is a filter field over a scrollable list of every vanilla prefab -
 minus what the six checkboxes have switched off (`Creatures`, `Items`, `Buildings`, `Nature`,
 `Ships`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice survives a
 restart) - the row of the prefab configured right now in orange on beige rows, a click on any
