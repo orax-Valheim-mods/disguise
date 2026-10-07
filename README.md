@@ -482,6 +482,23 @@ Visual synchronisation on vanilla clients:
   into a ZDO - the owner's ZDO, the server's state, the saves and the game logic keep the
   real position - and the observer refresh is excluded, its far-away position being the one
   thing that has to travel.
+- **Costume health** (`HealthMask`): a machine running no DLL of ours reads the health of
+  your costume out of **your** ZDO - `WearNTear` asks for `health` with a fallback on the
+  prefab's own maximum - so a piece of furniture wearing you shows 100 hit points against
+  its 500: broken planks on a cart, a torn sail on a raft, where the clone your own screen
+  draws is brand new (a creature reads the same key as a `Humanoid`, and gets your bar at
+  the creature's scale). For the duration of `ZDO.Serialize` the relaying server writes the
+  costume's own maximum into that key and puts yours back the moment the packet exists:
+  the swap does not bump the DataRevision, never touches this machine's own state, and
+  `ZDO.Save` - the path the world file reads - does not go through `Serialize` at all.
+  **Only** the relaying machine swaps: an owner serializing its own ZDO would push the
+  costume's maximum at the server, and `ZDO.Deserialize` stores every key a packet carries,
+  so your real hit points would be replaced for good. Everyone else - vanilla and modded
+  clients alike, there being no per-peer packet - is then shown a whole costume, and nobody
+  but you and the server can tell how hurt you are through a disguise any more. The
+  maximum is measured once per prefab from `WearNTear.m_health` / `Humanoid.m_health`, read
+  by NAME and through reflection so it stays out of the audit's count; a prefab carrying
+  neither (a dropped item, which shows no damage anyway) simply keeps your value.
 - **Flight** (`cd_fly`, `FlightControl`): your own client writes the requested height into
   your ZDO - in **centimetres**, because `ZDO.Set` has no float overload in the original
   assembly - and that write is throttled to one per 100 ms so a held key cannot bump the
@@ -724,7 +741,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `DisguiseConfig.cs` - the twenty-nine settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
-  `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`).
+  `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
+  `SetZdoFloatSilent`).
 - `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the vanilla
   `Player` prefab hash, the configured creature hash) and `PrefabName`.
 - `PrefabKind.cs` - the seven categories of the list (`Static`, `Creature`, `Item`,
@@ -754,6 +772,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `EquipmentMask.cs` - the equipment display options (`3 - Display`): swaps the equipment
   hashes out of the outgoing packet, out of the save file, and back into the frame the
   modded machines render (§ 2).
+- `HealthMask.cs` - the costume's health on the machines that only render it (§ 3): writes
+  the costume's own maximum into the `health` key for the duration of `ZDO.Serialize` and
+  puts the real one back right after, relaying machine only, so a vanilla client draws a
+  whole costume instead of one wearing your hit points as damage. Silently, no DataRevision
+  bump, and never through `ZDO.Save`.
 - `AllyView.cs` - the other half of `3 - Display`: publishes the health-bar relation
   (`cd_rel`) and writes it into `ZDOVars.s_tamed` for the duration of the packet, so a
   vanilla client draws your creature as an ally or as an enemy (§ 2).
@@ -904,7 +927,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 82   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 83   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -912,15 +935,21 @@ mentions it in a signature - Harmony patch targets are only strings (`nameof`), 
 outgoing packet is patched through `ZDOMan.SendZDOs` without any of its parameters.
 `Humanoid.s_blocking` (private) is not used either: `Patch_SetBool` compares the parameter
 against `Animator.StringToHash("blocking")`, the very expression the game uses to define
-that constant, so the block key adds no game member at all: still 82, exactly as before it
-existed. The flight is written the same way: `cd_fly` travels as an **int** (the `ZDO.Set` /
+that constant, so the block key adds no game member at all - the count was unchanged by it.
+The flight is written the same way: `cd_fly` travels as an **int** (the `ZDO.Set` /
 `GetInt` overloads the mod already used - `ZDO.Set` has no float overload it could reach
 for free), `position` is swapped through the very `FieldInfo` of `Patch_SendZDOs`, and
-`ZNet.IsServer()` was already referenced - so it adds no game member either, and the count
-stays 82. The `Static` category follows the same rule: `ZSyncTransform` is public, but the
+`ZNet.IsServer()` was already referenced - so it adds no game member either. The `Static`
+category follows the same rule: `ZSyncTransform` is public, but the
 test is `GameObject.GetComponent("ZSyncTransform")` - Unity's own string overload, which
 answers exactly the same question on a prefab asset - so the seventh category adds no game
 member either.
+The costume's health swap is the one new reference of this fix: it writes through
+`ZDOExtraData.Set(ZDOID, Int32, Single)`, the float twin of the silent int write
+`GameAccess` already used - **+1** over the 82 the count stood at. Everything else of it
+(`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`, `ZNet.IsServer()`,
+`prefab.GetComponent("...")`) was already referenced somewhere else, and it added no
+Harmony patch: it runs inside `Patch_ZDOSerialize`, which existed.
 
 ---
 
@@ -963,6 +992,7 @@ member either.
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
 | The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the seven `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
 | Your building costume does not follow you on the client (it stays where you changed it) | Normal, and it is the prefab and not the sync: on a machine running no DLL of ours the only code that applies a ZDO position to a transform is `ZSyncTransform`, and no `Piece` has one - the client drew your wall once, where your ZDO was, and has nothing left to move it with (§ 3). `disguise set <creature>` follows everywhere; so do ships, carts and dropped items. The `Static` category of the window is precisely the set of prefabs that cannot move, and `disguise list` prints its count (`static <n>`) |
+| A cart or a raft costume looks wrecked on another player's screen (missing planks, a torn sail) | The costume is wearing **your** hit points: `WearNTear` reads the `health` of the ZDO it is attached to, and your ZDO carries yours (§ 3). The relaying server swaps it for the costume's own maximum for the duration of the packet, so the dedicated server must run the current DLL (§ 1.b). Nothing about it changes for you, for the server's own state or for the save file - and the trade-off is that nobody but you and the server can read your health through a disguise any more |
 | The log of the player watching you fills with `Failed to find rpc method 213315071` (or `531685242`) | Harmless, and both hashes are known: `213315071` = `RPC_ResetCloth`, broadcast by the vanilla `Character.ResetCloth()` whenever your body starts moving (and on a jump); `531685242` = `SetTrigger`, the animation trigger broadcast (§ 4.7). A client without the DLL builds your costume, and a wall has neither a `Character` nor a `ZSyncAnimation` to answer with - the machine logs that it knows no such method and does nothing, which is exactly right since there is nothing to reset or to animate. A creature costume logs neither (both components are there), and a client running the DLL never does either (it builds a real `Player`) |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |

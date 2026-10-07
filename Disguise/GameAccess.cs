@@ -145,6 +145,17 @@ internal static class GameAccess
     }
 
     /// <summary>
+    /// Writes a ZDO float WITHOUT bumping the DataRevision, the float twin of the helper
+    /// above: the value only changes in the local copy and only while a packet is being
+    /// built. Used by HealthMask to swap the health of a costume around one Serialize call.
+    /// </summary>
+    internal static void SetZdoFloatSilent(ZDO zdo, int key, float value)
+    {
+        // ZDOExtraData.Set(ZDOID, int, float) is public in the original assembly too.
+        ZDOExtraData.Set(zdo.m_uid, key, value);
+    }
+
+    /// <summary>
     /// Writes an int into the snapshot ZDO.Save reads (the copy cloned by
     /// ZDOExtraData.PrepareSave, not the live values). That snapshot is thrown away by
     /// ClearSave() at the end of the save: no restore is needed, and the live ZDO state -
