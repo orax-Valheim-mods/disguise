@@ -671,24 +671,26 @@ internal static class DisguiseCommand
     /// PrefabCatalog - the complete catalogue, whatever the window's checkboxes have on (they
     /// only hide rows there). Counts per category first, four names per line after that.
     /// Empty without a ZNetScene (main menu), which is where the notice above comes from.
+    ///
+    /// This is the one answer long enough to scroll away in the console, so every line also
+    /// goes to the BepInEx log through SayLogged - which is gated by the Logs option, like
+    /// every Info line of the mod.
     /// </summary>
     private static void ListPrefabs(Terminal? ctx, string? filter)
     {
         if (ZNetScene.instance == null)
         {
-            Say(
-                ctx,
-                "[Disguise] ZNetScene unavailable (main menu): the list is available in game."
-            );
+            const string notice =
+                "ZNetScene unavailable (main menu): the list is available in game.";
+            Say(ctx, "[Disguise] " + notice);
+            Disguise.LogInfo(notice);
             return;
         }
         List<string> names = PrefabCatalog.Names(filter, null);
-        Say(
-            ctx,
-            $"[Disguise] {names.Count} prefab(s)"
-                + (filter != null ? $" containing \"{filter}\"" : "")
-                + ":"
-        );
+        string header =
+            $"{names.Count} prefab(s)" + (filter != null ? $" containing \"{filter}\"" : "") + ":";
+        Say(ctx, "[Disguise] " + header);
+        Disguise.LogInfo(header);
         int[] counts = PrefabCatalog.Counts(filter);
         string kinds = string.Empty;
         for (int i = 0; i < counts.Length; i++)
@@ -699,12 +701,24 @@ internal static class DisguiseCommand
                 + " "
                 + counts[i];
         }
-        Say(ctx, "  kinds: " + kinds);
+        SayLogged(ctx, "  kinds: " + kinds);
         for (int i = 0; i < names.Count; i += 4)
         {
             int count = Math.Min(4, names.Count - i);
-            Say(ctx, "  " + string.Join(", ", names.GetRange(i, count)));
+            SayLogged(ctx, "  " + string.Join(", ", names.GetRange(i, count)));
         }
+    }
+
+    /// <summary>
+    /// One line of "disguise list": into the console like every other line, and into the
+    /// BepInEx log as well. Disguise.LogInfo writes only while the Logs option is on
+    /// ([1 - General]), so a log stays as quiet as that option asks - the headline and the
+    /// notice above take care of their own "[Disguise] " lead, which the log does not need.
+    /// </summary>
+    private static void SayLogged(Terminal? ctx, string text)
+    {
+        Say(ctx, text);
+        Disguise.LogInfo(text);
     }
 
     /// <summary>

@@ -107,7 +107,7 @@ In game, open the console with **F5**:
 | Command | Effect |
 |---|---|
 | `disguise status` | Current state (prefab, marker, save protection) |
-| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, and the effect prefabs (`fx_`, `sfx_`, `vfx_`), are never listed (§ 6, § 7) |
+| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, and the effect prefabs (`fx_`, `sfx_`, `vfx_`), are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
@@ -165,7 +165,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla, non-effect ones) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
-| `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log; warnings and errors are always written (`disguise logs [on|off]`, § 7) |
+| `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log - the whole output of `disguise list` included (§ 7); warnings and errors are always written (`disguise logs [on|off]`, § 7) |
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 | `SeeYourDisguise` | `false` | Show the creature on **your own screen** (`4 - Own view`, local only) |
@@ -879,7 +879,8 @@ stays 82.
 ## 7. Troubleshooting
 
 > **Before reading any `Info` line quoted below** (`Attack bridge: ...`,
-> `Observer refresh ...`, `Map position spoof ...`, `Local player (ZDO ...)`, ...): those are
+> `Observer refresh ...`, `Map position spoof ...`, `Local player (ZDO ...)`, the output of
+> `disguise list`, ...): those are
 > only written while **`Logs = true`** (default, § 2). Run `disguise logs on` first - or set
 > it in the `.cfg`. Warnings and errors are written whatever that value is.
 
@@ -889,6 +890,7 @@ stays 82.
 | `FieldAccessException: Field ... is inaccessible from method ...` | A game member is `private`/`protected`: never access it directly, use reflection, then `audit_visibility.ps1` (§ 6) |
 | Nothing changes for the others | `disguise status` (wrong prefab?), then look for `Loading [Disguise 0.1.0]` in the **PC** log. If they only miss the *change* and not you: no refresh without the server DLL (§ 4.1) |
 | `disguise status` says "NOT FOUND" | Wrong prefab name → `disguise list` |
+| The console scrolls the list away, or you want to keep it | `disguise list` writes the **whole output to the BepInEx log** as well while `Logs = true` (§ 2), where nothing scrolls away - `486 prefab(s):`, then `kinds: ...`, then four names per line, exactly as the console prints them (`disguise logs on` first) |
 | You appear as a viking to others | They already saw you before → run `disguise refresh`, or move ~100 m / reconnect (§ 4.1) |
 | **You are invisible to a vanilla client** | Only possible with the DLL on the server: the relay is stuck on the fake position (the owner never sent `cd_refresh = 0`): the server log must show `Observer refresh flag cleared on ZDO ...` after every change. Restart the dedicated server (the flag is stripped at world load) with the current build. |
 | Others see your new look too late | Normal: ~`RefreshHoldSeconds` (1.5 s); raise it in the `.cfg` on a laggy connection |

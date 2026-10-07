@@ -15,7 +15,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 
 | Command | Effect |
 |---|---|
-| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter); a prefab a mod adds, and an effect prefab (`fx_`, `sfx_`, `vfx_`), are never listed |
+| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter); a prefab a mod adds, and an effect prefab (`fx_`, `sfx_`, `vfx_`), are never listed. The whole output also goes to the BepInEx log while `Logs = true` |
 | `disguise set Troll` | Change the prefab and enable the disguise |
 | `disguise enable` / `disguise disable` | Toggle the disguise |
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
@@ -36,7 +36,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (the two lists only show the vanilla, non-effect ones) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save |
 | `ReassertSeconds` | `2` | Re-application period on your player |
-| `Logs` | `true` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
+| `Logs` | `true` | Write the mod's own Info messages to the BepInEx log, the whole output of `disguise list` included (warnings and errors are always written) |
 | `ForceObserverRefresh` | `true` | Other players see a change right away (needs the DLL on the server) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look |
 | `HideHelmet` | `true` | Hide the helmet from the other machines |
