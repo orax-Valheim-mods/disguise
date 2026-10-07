@@ -64,8 +64,10 @@ internal static class PositionHold
     /// <summary>
     /// Hands back the position this ZDO was last relayed with while the real one stays inside
     /// the band, and the real one (adopted as the new held value) as soon as it leaves it.
-    /// No-op outside the window, for a viking, and while the observer refresh fakes its
-    /// far-away position.
+    /// No-op outside the window, for a viking, for anything without the marker of a disguised
+    /// player (a world object is relayed exactly as the game has it - the band is for a
+    /// costume, and holding every rigidbody in the world inside a centimetre is not), and
+    /// while the observer refresh fakes its far-away position.
     /// </summary>
     internal static void Hold(ZDO zdo, ref Vector3 position)
     {
@@ -82,6 +84,10 @@ internal static class PositionHold
             if (ObserverRefresh.s_refreshZdo == zdo)
             {
                 return; // the fake far-away position is what re-creates the instance
+            }
+            if (!DisguiseApplier.HasMarker(zdo))
+            {
+                return; // not one of ours: it is not a costume, and not ours to hold still
             }
             ZDOID id = zdo.m_uid;
             if (!s_held.TryGetValue(id, out Vector3 held))

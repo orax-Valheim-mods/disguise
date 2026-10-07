@@ -816,8 +816,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `PositionHold.cs` - the band the outgoing position of a disguised player is relayed inside
   (§ 3): the owner's rigidbody jitter would otherwise travel to a vanilla client, where
   `ZSyncTransform.SyncPosition` chases it with a lerp and turns it into a shiver of a few
-  millimetres. Server only, packet only, handed back as a copy, and skipped while the
-  observer refresh fakes its far-away position.
+  millimetres. Server only, packet only, handed back as a copy, gated on the `cd_disguise`
+  marker (anything else - the world's own rigidbodies - is relayed as the game has it) and
+  skipped while the observer refresh fakes its far-away position.
 - `RestOffset.cs` - the ground rest of a costume (§ 3): the height its own geometry asks
   for to stop digging into the ground - everything it hangs below the player's feet, plus
   the rise of the terrain under its footprint while the terrain is what the player stands
