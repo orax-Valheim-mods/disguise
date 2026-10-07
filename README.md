@@ -469,6 +469,19 @@ Visual synchronisation on vanilla clients:
   about it (§ 7). The `Static` category of the window and the `static` count of
   `disguise list` are exactly that set of prefabs, so the list tells you what a costume will
   do before you pick it.
+  The position that reaches the other machines comes from that same header, and the value
+  behind it is the owner's **rigidbody** position: a few millimetres of physics jitter
+  (penetration recovery, contacts), changing at every tick even with the character standing
+  still. `ZSyncTransform.SyncPosition` chases that moving target with a `0.2` lerp on every
+  DataRevision, and a costume - a rigid mesh with no animation to hide it behind - shows the
+  chase as a permanent shiver of a few millimetres. The relaying server therefore hands back
+  the **last position it sent** while the real one stays within **1 cm** of it
+  (`PositionHold`, the same getter and the same packet-only window as the flight raise): the
+  target freezes, the receiving object lerps to it once and then stops moving at all, and a
+  character that really walks away leaves the band in a single packet. Nothing is written
+  into a ZDO - the owner's ZDO, the server's state, the saves and the game logic keep the
+  real position - and the observer refresh is excluded, its far-away position being the one
+  thing that has to travel.
 - **Flight** (`cd_fly`, `FlightControl`): your own client writes the requested height into
   your ZDO - in **centimetres**, because `ZDO.Set` has no float overload in the original
   assembly - and that write is throttled to one per 100 ms so a held key cannot bump the
@@ -755,8 +768,14 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   publication of the height (`cd_fly`),
   and the raise the relaying server adds to the outgoing packet header - server only,
   creature only, handed back as a copy so nothing has to be restored (§ 3). It also carries
-  the two windows: the outgoing packet (`BeginSend` / `EndSend`, `Patch_SendZDOs`) and the
-  camera zoom (`SuspendZoom` / `ResumeZoom`, `Patch_UpdateCamera`).
+  its two windows: the outgoing packet (`BeginSend` / `EndSend`, `Patch_SendZDOs`, opened
+  side by side with those of `PositionHold`) and the camera zoom (`SuspendZoom` /
+  `ResumeZoom`, `Patch_UpdateCamera`).
+- `PositionHold.cs` - the band the outgoing position of a disguised player is relayed inside
+  (§ 3): the owner's rigidbody jitter would otherwise travel to a vanilla client, where
+  `ZSyncTransform.SyncPosition` chases it with a lerp and turns it into a shiver of a few
+  millimetres. Server only, packet only, handed back as a copy, and skipped while the
+  observer refresh fakes its far-away position.
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
   ever be played by the creature), decides which of the creature's attacks to play (normal
