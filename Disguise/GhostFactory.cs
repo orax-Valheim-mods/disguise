@@ -20,10 +20,10 @@ namespace Disguise;
 /// window to remove what we do not want and to activate the clone only once it is nothing
 /// but visuals.
 ///
-/// Only Transform, Animator, LODGroup, the renderers, the particle systems and the lights
-/// survive - no Character, no Humanoid, no BaseAI, no ZNetView / ZSync*, no collider, no
-/// rigidbody, no audio, no CharacterAnimEvent (its Awake needs a Character and its
-/// callbacks drive game logic). The clone cannot move, cannot be seen by any game system
+/// Only Transform, Animator, LODGroup, the mesh filters, the renderers, the particle systems
+/// and the lights survive - no Character, no Humanoid, no BaseAI, no ZNetView / ZSync*, no
+/// collider, no rigidbody, no audio, no CharacterAnimEvent (its Awake needs a Character and
+/// its callbacks drive game logic). The clone cannot move, cannot be seen by any game system
 /// and never reaches the network.
 /// </summary>
 internal static class GhostFactory
@@ -212,12 +212,20 @@ internal static class GhostFactory
         return true;
     }
 
+    /// <summary>
+    /// What the strip keeps as "pure visuals". MeshFilter is data, not logic: no Awake, no
+    /// behaviour, nothing to run - but a MeshRenderer that loses it keeps NO mesh at all and
+    /// draws nothing, which used to leave every non-creature costume invisible on the screen
+    /// wearing it (pieces, items, ships, carts, and most static ones too), while a creature,
+    /// drawn by a SkinnedMeshRenderer, never misses it at all.
+    /// </summary>
     private static bool IsVisual(Component component)
     {
         return component is Animator
             || component is LODGroup
             || component is Renderer
             || component is ParticleSystem
+            || component is MeshFilter
             || component is Light;
     }
 }

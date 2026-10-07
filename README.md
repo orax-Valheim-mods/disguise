@@ -242,6 +242,12 @@ and its `OnDestroy` throws on the stripped `SEMan`, so the dead entry would stay
 `Character.s_characters` for the rest of the session: a health bar frozen on screen, an
 exception per frame and the frame time to go with it. Anything non-visual still present
 after the strip is therefore detected, and the clone is **discarded instead of activated**.
+What the strip keeps on purpose is the visuals themselves - the transforms (the skeleton a
+skinned mesh is bound to), `Animator`, `LODGroup`, the **mesh filters**, the renderers, the
+particles and the lights: a `MeshRenderer` whose `MeshFilter` went with the strip keeps no
+mesh at all and draws nothing, which is what used to leave every non-creature costume -
+pieces, items, ships, carts and most static ones too - invisible on your own screen, while a
+creature, drawn by a `SkinnedMeshRenderer`, never missed it at all.
 The clone sits at your player transform, copied once per
 frame from `LateUpdate`, and is deliberately **not parented** to you: a child would be walked
 by every `GetComponentsInChildren` the game and the mod run on your player, extending your
