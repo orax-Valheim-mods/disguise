@@ -33,9 +33,13 @@ namespace Disguise;
 /// physics ray that replies with the very height it was handed when it hits NOTHING, so a
 /// missing collider and a perfectly flat slope come out as one number - which is how a
 /// costume ends up lying flat on a hillside while its log claims the ground was level. The
-/// ray is therefore cast again by hand (hit and miss both known), the loaded heightmap
-/// answers when no collider did, and whichever of the two answered - or that neither could
-/// - is printed by the report along with the height it read against the player's feet.
+/// ray is therefore cast again by hand (hit and miss both known), the ground is probed for
+/// the component that makes it terrain whatever layer it answers to, and the loaded
+/// heightmap answers when no collider did. Whichever of the three answered - or that none
+/// could - is printed by the report along with the height it read against the player's feet,
+/// and a read that answers with nothing prints its own self-test: the position, the layer
+/// and its mask, what the unfiltered ray meets on the way down, and how many terrain maps
+/// this machine has registered.
 ///
 /// - The HEIGHT: everything the costume hangs below the level its player stands on, whatever
 ///   part of the ground under its footprint the fitted plane cannot explain, and a few
@@ -111,6 +115,26 @@ internal static class RestOffset
     private static readonly int s_terrainMask = LayerMask.GetMask("terrain");
 
     /// <summary>
+    /// Which of the three reads answered: the terrain-layer ray, the probe that recognises
+    /// the ground by the component it carries, or the loaded heightmap. The report prints it
+    /// so that a machine whose layer answers to nothing cannot pass for flat ground.
+    /// </summary>
+    private const int RaySource = 0;
+
+    private const int ProbeSource = 1;
+
+    private const int HeightmapSource = 2;
+
+    /// <summary>
+    /// The probe's ray results: preallocated, because it runs for every sample of every ring
+    /// on a machine where the layer ray never hits - and reading the ground may not cost one
+    /// allocation per sample. Triggers are never terrain, so they are not asked for.
+    /// </summary>
+    private const int ProbeCapacity = 48;
+
+    private static readonly RaycastHit[] s_probeHits = new RaycastHit[ProbeCapacity];
+
+    /// <summary>
     /// Measured once per costume, by prefab hash: x = how far its lowest COLLIDER hangs below
     /// the pivot (never above it); y = how far its flat bottom reaches sideways.
     /// </summary>
@@ -182,6 +206,13 @@ internal static class RestOffset
     private static float s_nextReport;
 
     /// <summary>
+    /// The earliest next self-test line about a ground no read could answer: once when it
+    /// first happens, then at most every half minute, so a failure nobody can see from the
+    /// report alone still costs one line rather than one per packet.
+    /// </summary>
+    private static float s_nextNoGround;
+
+    /// <summary>
     /// Rotation logging: the angle last written into an outgoing body (NaN until the first
     /// one), and the earliest next line about the swap in either direction. Computed and
     /// sent are two different answers; only this one reaches the machine that shivers.
@@ -245,13 +276,20 @@ internal static class RestOffset
                 out Vector3 normal,
                 out float rise,
                 out float groundDelta,
-                out bool viaHeightmap
+                out int groundSource
             );
             s_pendingZdo = zdo;
             s_pendingNormal = normal;
             if (lift > 0f)
             {
-                Report(hash, lift, normal, rise, groundDelta, viaHeightmap);
+                // A costume lifted from its hang alone while nothing at all could be read
+                // under it is the one case the report cannot explain on its own: name the
+                // cause here, where the ground was actually asked for.
+                if (float.IsNaN(groundDelta))
+                {
+                    ReportNoGround(hash, position);
+                }
+                Report(hash, lift, normal, rise, groundDelta, groundSource);
                 position.y += lift;
             }
         }
@@ -429,21 +467,21 @@ internal static class RestOffset
         out Vector3 normal,
         out float rise,
         out float groundDelta,
-        out bool viaHeightmap
+        out int groundSource
     )
     {
         normal = Vector3.up;
         lift = 0f;
         rise = 0f;
         groundDelta = float.NaN;
-        viaHeightmap = false;
+        groundSource = RaySource;
         if (!Footprint(prefabHash, out Vector2 footprint))
         {
             return;
         }
 
         float best = position.y;
-        if (footprint.y > MinReach && TryGround(position, out float ground, out viaHeightmap))
+        if (footprint.y > MinReach && TryGround(position, out float ground, out groundSource))
         {
             // Kept even when it turns the fit down: a costume relayed flat on a slope must
             // be traceable to this test rather than guessed at.
@@ -477,13 +515,38 @@ internal static class RestOffset
     }
 
     /// <summary>
-    /// The terrain surface under a point, and whether it came from the heightmap instead of
-    /// the ray: the ray first - it is exact and it follows whatever the terrain was
-    /// sculpted into - and the loaded heightmap when no collider answered. False only when
-    /// neither has anything to say, a case the report prints rather than letting it pass
-    /// for flat ground.
+    /// The terrain surface under a point, read three ways before nothing is admitted: the
+    /// terrain-layer ray first (exact, and it follows whatever the terrain was sculpted
+    /// into), then the probe that recognises the ground by the component it carries - for a
+    /// machine where that layer answers to nothing - and only then the loaded heightmap,
+    /// which needs no collider at all. False only when all three have nothing to say, a case
+    /// the report prints rather than letting it pass for flat ground, with a self-test line
+    /// naming which of them failed and why.
     /// </summary>
-    private static bool TryGround(Vector3 position, out float height, out bool viaHeightmap)
+    private static bool TryGround(Vector3 position, out float height, out int source)
+    {
+        if (TryLayerRay(position, out height))
+        {
+            source = RaySource;
+            return true;
+        }
+        if (TryProbe(position, out height))
+        {
+            source = ProbeSource;
+            return true;
+        }
+        if (GameAccess.TryGetTerrainHeight(position, out height))
+        {
+            source = HeightmapSource;
+            return true;
+        }
+        source = RaySource;
+        height = 0f;
+        return false;
+    }
+
+    /// <summary>The game's own read, cast again by hand so that a miss is a miss.</summary>
+    private static bool TryLayerRay(Vector3 position, out float height)
     {
         Vector3 origin = position;
         origin.y = GroundRayTop;
@@ -498,17 +561,124 @@ internal static class RestOffset
         )
         {
             height = hit.point.y;
-            viaHeightmap = false;
-            return true;
-        }
-        if (GameAccess.TryGetTerrainHeight(position, out height))
-        {
-            viaHeightmap = true;
             return true;
         }
         height = 0f;
-        viaHeightmap = false;
         return false;
+    }
+
+    /// <summary>
+    /// The same ray through every layer, keeping only what carries a Heightmap - how the
+    /// game itself reads a collider back to learn that it is terrain (GetGroundInfo). A
+    /// floor, water, a roof and the costume's own hull are all skipped, so this answers with
+    /// exactly the surface the layer ray was meant to find, whatever that layer is called on
+    /// this machine; the topmost terrain wins, as it would have won the masked ray.
+    /// </summary>
+    private static bool TryProbe(Vector3 position, out float height)
+    {
+        height = 0f;
+        Type? heightmap = GameAccess.s_heightmapType;
+        if (heightmap == null)
+        {
+            return false;
+        }
+        Vector3 origin = position;
+        origin.y = GroundRayTop;
+        int count = Physics.RaycastNonAlloc(
+            origin,
+            Vector3.down,
+            s_probeHits,
+            GroundRayLength,
+            Physics.AllLayers,
+            QueryTriggerInteraction.Ignore
+        );
+        bool found = false;
+        float closest = float.MaxValue;
+        for (int i = 0; i < count; i++)
+        {
+            RaycastHit hit = s_probeHits[i];
+            if (hit.distance >= closest)
+            {
+                continue;
+            }
+            Collider? collider = hit.collider;
+            if (collider == null || collider.GetComponent(heightmap) == null)
+            {
+                continue;
+            }
+            closest = hit.distance;
+            height = hit.point.y;
+            found = true;
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// The self-test: what no read of the ground could answer, once when it first fails and
+    /// then at most every half minute. It names the three things the report cannot tell
+    /// apart - a layer answering to nothing, a machine where no collider answers at all, and
+    /// a position no world was generated under - so the next step is read rather than
+    /// guessed at.
+    /// </summary>
+    private static void ReportNoGround(int prefabHash, Vector3 position)
+    {
+        if (!DisguiseConfig.ConfigLogs.Value || Time.realtimeSinceStartup < s_nextNoGround)
+        {
+            return;
+        }
+        s_nextNoGround = Time.realtimeSinceStartup + 30f;
+        int layer = LayerMask.NameToLayer("terrain");
+        int lookup = GameAccess.s_heightmapGetHeight == null ? -1 : GameAccess.CountHeightmaps();
+        Disguise.LogInfo(
+            $"Ground rest: no ground under {PrefabResolver.PrefabName(prefabHash)} at "
+                + $"({position.x:F1}, {position.y:F1}, {position.z:F1}) | terrain mask "
+                + $"{s_terrainMask} (layer {layer}) | {DescribeProbe(position)} | heightmaps "
+                + $"{lookup}, Heightmap.GetHeight "
+                + (GameAccess.s_heightmapGetHeight == null ? "not resolved" : "resolved")
+        );
+    }
+
+    /// <summary>
+    /// What the unfiltered ray meets on its way down: the first collider's name and layer,
+    /// so that a terrain on an unexpected layer - or nothing at all - is a name in the log
+    /// instead of a hypothesis.
+    /// </summary>
+    private static string DescribeProbe(Vector3 position)
+    {
+        Vector3 origin = position;
+        origin.y = GroundRayTop;
+        int count = Physics.RaycastNonAlloc(
+            origin,
+            Vector3.down,
+            s_probeHits,
+            GroundRayLength,
+            Physics.AllLayers,
+            QueryTriggerInteraction.Ignore
+        );
+        if (count == 0)
+        {
+            return "ray meets nothing in 10000 m";
+        }
+        if (count >= s_probeHits.Length)
+        {
+            return $"ray meets {count}+ colliders (buffer full)";
+        }
+        int top = 0;
+        float closest = float.MaxValue;
+        for (int i = 0; i < count; i++)
+        {
+            if (s_probeHits[i].distance < closest)
+            {
+                closest = s_probeHits[i].distance;
+                top = i;
+            }
+        }
+        Collider? collider = s_probeHits[top].collider;
+        if (collider == null)
+        {
+            return "ray meets an unnamed collider";
+        }
+        return $"ray meets \"{collider.name}\" [{LayerMask.LayerToName(collider.gameObject.layer)}] at {s_probeHits[top].point.y:F1} m";
     }
 
     /// <summary>
@@ -861,10 +1031,10 @@ internal static class RestOffset
     /// <summary>
     /// One line about the ground a costume is really being relayed over, whenever any part
     /// of the answer changes and at most every two seconds: the lift, the tilt, the height
-    /// read under the player's own feet with the source it came from, and the part of the
-    /// ground the plane could not explain. Built only after the clock has run out, so that
-    /// switching the logs off - or leaving them on - costs no allocation at all between two
-    /// lines.
+    /// read under the player's own feet with the read that answered for it, and the part of
+    /// the ground the plane could not explain. Built only after the clock has run out, so
+    /// that switching the logs off - or leaving them on - costs no allocation at all between
+    /// two lines.
     /// </summary>
     private static void Report(
         int prefabHash,
@@ -872,7 +1042,7 @@ internal static class RestOffset
         Vector3 normal,
         float rise,
         float groundDelta,
-        bool viaHeightmap
+        int source
     )
     {
         if (!DisguiseConfig.ConfigLogs.Value)
@@ -890,7 +1060,7 @@ internal static class RestOffset
         string sign = groundDelta >= 0f ? "+" : "";
         string ground = float.IsNaN(groundDelta)
             ? "no terrain read"
-            : $"ground {sign}{groundDelta:F2} m vs feet ({(viaHeightmap ? "heightmap" : "ray")})";
+            : $"ground {sign}{groundDelta:F2} m vs feet ({SourceName(source)})";
         string message =
             $"Ground rest: {PrefabResolver.PrefabName(prefabHash)} is relayed {lift:F3} m above "
             + $"its player, laid {tilt:F1} degrees off upright | {ground}, rise {rise:F2} m";
@@ -900,6 +1070,19 @@ internal static class RestOffset
         }
         s_lastReport = message;
         Disguise.LogInfo(message);
+    }
+
+    /// <summary>
+    /// Which read answered, named the way the report prints it: the terrain layer, the probe
+    /// that recognises terrain by its component, or the heightmap the world was built from.
+    /// </summary>
+    private static string SourceName(int source)
+    {
+        if (source == ProbeSource)
+        {
+            return "probe";
+        }
+        return source == HeightmapSource ? "heightmap" : "ray";
     }
 
     /// <summary>

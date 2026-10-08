@@ -501,8 +501,15 @@ Visual synchronisation on vanilla clients:
   never guessed at either: the game's own read is a ray that answers with the height it was
   given when it hits nothing, so a missing collider and a perfectly level slope are one and
   the same number. The ray is therefore cast again by hand (hit and miss both known) over
-  the terrain layer, and the loaded heightmap answers when no collider did. What cannot
-  fight back is never measured:
+  the terrain layer, with **two more reads behind it**: the same ray through every layer
+  keeping only what carries a `Heightmap` - terrain recognised by what it is rather than by
+  a layer name - and the loaded heightmap, which needs no collider at all. The report names
+  whichever answered (`ray`, `probe` or `heightmap`), and a costume that still has nothing
+  under it prints a self-test line of its own with the position, the terrain layer and its
+  mask, what the unfiltered ray meets on the way down, and how many terrain maps this
+  machine has registered (`Ground rest: no ground under <name> at (x, y, z) | terrain mask
+  <n> (layer <n>) | ...`) - so `no terrain read` says *why* instead of only *that*. What
+  cannot fight back is never measured:
   no `ZSyncTransform` (nothing pulls it back to the ZDO), a kinematic rigidbody (moved with
   `MovePosition`, which no contact pushes back), or a `Character` of its own (a creature
   settles itself - the reason a `Troll` costume never shivered). Same rules as the band:
@@ -512,7 +519,8 @@ Visual synchronisation on vanilla clients:
   (`Ground rest: <name> hangs <n> m below its colliders, ...`), then one line per change with
   the lift, the tilt, the height read under your feet and the source it came from, and the
   rise (`Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright
-  | ground <x> m vs feet (ray), rise <r> m`), and - since a tilt moves the lift by less than
+  | ground <x> m vs feet (<ray|probe|heightmap>), rise <r> m`), and - since a tilt moves the
+  lift by less than
   the two centimetres that line used to be waited for - a line of its own when the tilt is
   really written into the packet, which is what separates "the ground was flat" from "the
   tilt never left this machine".
@@ -838,10 +846,12 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   for to stop digging into the ground - everything it hangs below the player's feet, plus
   what the plane fitted under its footprint cannot explain, plus the clearance. Measured
   once per prefab (box, sphere, capsule and mesh colliders; the meshes only for the log),
-  skipped for what cannot fight back, the ground read with a ray of our own over the
-  terrain layer - the loaded heightmap behind it, both reached through `GameAccess` so no
-  new game member is named - and added as a copy to the outgoing position on the relaying
-  server and to the clone of your own screen, recomputed there at most ten times a second.
+  skipped for what cannot fight back, the ground read with a ray of our own over the terrain
+  layer - the probe that recognises terrain by the component it carries behind it, and the
+  loaded heightmap behind that, both reached through `GameAccess` so no new game member is
+  named, with a self-test line for a read that answers with nothing - and added as a copy to
+  the outgoing position on the relaying server and to the clone of your own screen,
+  recomputed there at most ten times a second.
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
   ever be played by the creature), decides which of the creature's attacks to play (normal
@@ -988,12 +998,14 @@ test is `GameObject.GetComponent("ZSyncTransform")` - Unity's own string overloa
 answers exactly the same question on a prefab asset - so the seventh category adds no game
 member either.
 Those three features cost **nothing**, and so does most of what came after them: the ground
-rest measures geometry with Unity's own `GetComponent` / `Collider` / `Matrix4x4` and reads
-the terrain through `ZoneSystem.instance` and `ZoneSystem.GetGroundHeight(Vector3)`, and the
-health swap writes through `ZDOExtraData.Set(ZDOID, Int32, Single)` - the float twin of the
-silent int write `GameAccess` already used - for **+3** members over the 82 the count stood
-at: `ZoneSystem.instance`, `ZoneSystem.GetGroundHeight` and that float overload. Everything
-else of the two fixes (`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`,
+rest measures geometry with Unity's own `GetComponent` / `Collider` / `Matrix4x4` and casts
+the game's terrain ray itself with `Physics.Raycast` - `ZoneSystem.GetGroundHeight` is no
+longer referenced at all, which took the two members it cost back off the count - while the
+heightmap behind it is reached through `Assembly.GetType("Heightmap")` and `GetMethod`, so
+neither the type nor the method is named and the audit cannot see either; and the health
+swap writes through `ZDOExtraData.Set(ZDOID, Int32, Single)` - the float twin of the silent
+int write `GameAccess` already used - for **+1** member over the 82 the count stood at.
+Everything else of the two fixes (`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`,
 `ZNet.IsServer()`, `prefab.GetComponent("...")`, `prefab.GetComponent<Character>()`) was
 already referenced somewhere else, and neither fix added a Harmony patch: both run inside
 ones that already existed (`Patch_ZDOSerialize`, `Patch_ZDOGetPosition`, `Patch_SendZDOs`),
@@ -1040,7 +1052,7 @@ so the count of twenty-four stays correct.
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
 | The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the seven `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
 | Your building costume does not follow you on the client (it stays where you changed it) | Normal, and it is the prefab and not the sync: on a machine running no DLL of ours the only code that applies a ZDO position to a transform is `ZSyncTransform`, and no `Piece` has one - the client drew your wall once, where your ZDO was, and has nothing left to move it with (§ 3). `disguise set <creature>` follows everywhere; so do ships, carts and dropped items. The `Static` category of the window is precisely the set of prefabs that cannot move, and `disguise list` prints its count (`static <n>`) |
-| A cart or a raft costume shivers by a few centimetres on the machine of a player watching you | The ground rest is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, the costume is sent to the height where it rests instead of one it has to be pushed out of, and the receiving body stops fighting back. Water and thin air never had that shiver (there is no contact to lose), and neither does your own clone (GhostFactory gives it no physics at all). With `Logs = Enabled` the log says what a costume really gets: `Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright | ground <x> m vs feet (ray), rise <r> m` - a lift of roughly *hang + 5 cm* with `rise 0.00` on a slope, or `no terrain read` when neither the ray nor the heightmap found the ground, means the costume never left the terrain buried in it; `Ground rest: <name> rotation written into the packet: <d> degrees` is the companion line showing that tilt really went out. |
+| A cart or a raft costume shivers by a few centimetres on the machine of a player watching you | The ground rest is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, the costume is sent to the height where it rests instead of one it has to be pushed out of, and the receiving body stops fighting back. Water and thin air never had that shiver (there is no contact to lose), and neither does your own clone (GhostFactory gives it no physics at all). With `Logs = Enabled` the log says what a costume really gets: `Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright | ground <x> m vs feet (<ray|probe|heightmap>), rise <r> m` - a lift of roughly *hang + 5 cm* with `rise 0.00` **and a tilt above zero degrees on a slope** is the costume lying on it, while the same lift with `laid 0.0 degrees` on ground you can see sloping, or `no terrain read` when none of the three reads answered, means the costume never left the terrain buried in it; a failed read prints its own line right after it - `Ground rest: no ground under <name> at (x, y, z) \| terrain mask <n> (layer <n>) \| <what the unfiltered ray met> \| heightmaps <n>, Heightmap.GetHeight <resolved\|not resolved>` - which is the whole diagnosis of that case. `Ground rest: <name> rotation written into the packet: <d> degrees` is the companion line showing that tilt really went out. |
 | A cart or a raft costume looks wrecked on another player's screen (missing planks, a torn sail) | The costume is wearing **your** hit points: `WearNTear` reads the `health` of the ZDO it is attached to, and your ZDO carries yours (§ 3). The relaying server swaps it for the costume's own maximum for the duration of the packet, so the dedicated server must run the current DLL (§ 1.b). Nothing about it changes for you, for the server's own state or for the save file - and the trade-off is that nobody but you and the server can read your health through a disguise any more |
 | The log of the player watching you fills with `Failed to find rpc method 213315071` (or `531685242`) | Harmless, and both hashes are known: `213315071` = `RPC_ResetCloth`, broadcast by the vanilla `Character.ResetCloth()` whenever your body starts moving (and on a jump); `531685242` = `SetTrigger`, the animation trigger broadcast (§ 4.7). A client without the DLL builds your costume, and a wall has neither a `Character` nor a `ZSyncAnimation` to answer with - the machine logs that it knows no such method and does nothing, which is exactly right since there is nothing to reset or to animate. A creature costume logs neither (both components are there), and a client running the DLL never does either (it builds a real `Player`) |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |

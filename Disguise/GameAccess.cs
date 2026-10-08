@@ -78,21 +78,67 @@ internal static class GameAccess
     // do: that one casts a physics ray and answers with the very height it was given when
     // nothing was hit, leaving "no ground here" and "perfectly flat ground" as one number.
     // The type itself is looked up by name on the assembly the game loads, so no new game
-    // type is referenced either.
-    internal static readonly MethodInfo? s_heightmapGetHeight = typeof(ZoneSystem)
-        .Assembly.GetType("Heightmap")
-        ?.GetMethod(
-            "GetHeight",
-            BindingFlags.Static | BindingFlags.Public,
-            null,
-            new[] { typeof(Vector3), typeof(float).MakeByRefType() },
-            null
-        );
+    // type is referenced either. It is kept because the ground probe needs it as a Type:
+    // terrain is what carries it, and a collider is read back with it (GetGroundInfo) rather
+    // than with a layer name that may mean nothing on this machine.
+    internal static readonly Type? s_heightmapType = typeof(ZoneSystem).Assembly.GetType(
+        "Heightmap"
+    );
+
+    internal static readonly MethodInfo? s_heightmapGetHeight = s_heightmapType?.GetMethod(
+        "GetHeight",
+        BindingFlags.Static | BindingFlags.Public,
+        null,
+        new[] { typeof(Vector3), typeof(float).MakeByRefType() },
+        null
+    );
+
+    // Heightmap.GetAllHeightmaps(): the count of terrain maps this machine has registered,
+    // read for the ground self-test only. It is the one number that separates "no collider
+    // under the ray" from "no terrain here at all", which is the difference between a layer
+    // that answers to nothing and a world nothing was generated in.
+    internal static readonly MethodInfo? s_heightmapAllMethod = s_heightmapType?.GetMethod(
+        "GetAllHeightmaps",
+        BindingFlags.Static | BindingFlags.Public,
+        null,
+        Type.EmptyTypes,
+        null
+    );
 
     /// <summary>The reused [position, out value] box of that reflection call.</summary>
     private static readonly object[] s_heightArgs = new object[] { Vector3.zero, 0f };
 
     private static bool s_heightErrorLogged;
+
+    private static bool s_heightCountErrorLogged;
+
+    /// <summary>
+    /// How many terrain maps this machine has registered, or -1 when the list cannot be
+    /// reached. Only the self-test reads it: the report itself never needs to know.
+    /// </summary>
+    internal static int CountHeightmaps()
+    {
+        MethodInfo? method = s_heightmapAllMethod;
+        if (method == null)
+        {
+            return -1;
+        }
+        try
+        {
+            return method.Invoke(null, null) is System.Collections.ICollection list
+                ? list.Count
+                : -1;
+        }
+        catch (Exception ex)
+        {
+            if (!s_heightCountErrorLogged)
+            {
+                s_heightCountErrorLogged = true;
+                Disguise.LogError($"Cannot call Heightmap.GetAllHeightmaps: {ex.Message}");
+            }
+            return -1;
+        }
+    }
 
     /// <summary>
     /// ZNetView of a character (Character.m_nview is "protected" -&gt; reflection).
