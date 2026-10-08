@@ -84,7 +84,8 @@ its answer on the status line at the bottom, which holds the "click a row" hint 
 first press (the branch added them one step at a time; the preview there shows the creature
 of the row the pointer is on, filmed
 by a camera of its own into a texture, and the configured one while the pointer is on no row
-at all, and the list is a filter field over a scrollable list of every vanilla prefab -
+at all, and the list is a filter field - with a **Clear** button at its right, which empties
+the field and brings every row back - over a scrollable list of every vanilla prefab -
 minus what the checkboxes have switched off (`Static`, `Creatures`, `Items`, `Buildings`,
 `Nature`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice
 survives a restart) - the row of the prefab configured right now in orange on beige rows, a click on any

@@ -347,7 +347,9 @@ again (§ 3), so a costume of that kind stays behind while you walk for anyone w
 vanilla client. This is why a wall has left `Buildings`: every buildable object that does
 not move now lives under `Static`, where you can see what you are picking before it happens.
 The
-**prefab list**: a filter field over a scrollable list of every **vanilla** prefab (no
+**prefab list**: a filter field with a **Clear** button at its right - it empties the field
+and brings every row back, through the same `SetActive` re-run a checkbox asks for, then the
+list returns to the top - over a scrollable list of every **vanilla** prefab (no
 `fx_` / `sfx_` / `vfx_` effect either) - the exact
 list `disguise list` prints, minus what the checkboxes have switched off - the row of the
 prefab configured right now highlighted in orange, and a click on any row =
@@ -940,7 +942,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   pushes a value typed in ConfigurationManager back into its box without reopening - and
   `Refilter` on every toggle, which only re-runs the filter: the rows themselves are built
   once, at the opening.
-- `GuiCreatureList.cs` - the prefab list: Jotunn's filter field and scroll view, one row per
+- `GuiCreatureList.cs` - the prefab list: Jotunn's filter field with the **Clear** button at
+  its right (the field and the button share the width of the block, rows keep all of theirs;
+  the button empties the field through `SetTextWithoutNotify` and asks for `Refilter` itself
+  - one path, taken once, instead of depending on whether a write notifies), and Jotunn's
+  scroll view, one row per
   vanilla prefab built **once** at open (both filters only show and hide rows with
   `SetActive`, so typing or ticking creates nothing), the kind of every row kept in a third
   parallel list next to the name and the body (which checkbox owns it), `Refilter` - what a

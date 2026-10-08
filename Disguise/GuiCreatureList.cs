@@ -8,12 +8,12 @@ using UnityEngine.UI;
 namespace Disguise;
 
 /// <summary>
-/// The prefab list of the Disguise window: a filter field (Jotunn input) and a scroll view
-/// (Jotunn) holding one row per vanilla prefab - exactly the names "disguise list" prints,
-/// through PrefabCatalog.Names, so the console and the window can never disagree about a
-/// name. What the window adds are two filters of its own on top of that shared source: the
-/// text field, and the six category checkboxes (GuiCategories) that decide which kinds of
-/// prefab are shown at all.
+/// The prefab list of the Disguise window: a filter field (Jotunn input) with a Clear button
+/// at its right, and a scroll view (Jotunn) holding one row per vanilla prefab - exactly the
+/// names "disguise list" prints, through PrefabCatalog.Names, so the console and the window
+/// can never disagree about a name. What the window adds are two filters of its own on top
+/// of that shared source: the text field, and the six category checkboxes (GuiCategories)
+/// that decide which kinds of prefab are shown at all.
 ///
 /// Every row is built ONCE when the window opens - for every kind, so switching a category
 /// back on costs nothing - and the filters then only show and hide them (SetActive): typing
@@ -39,6 +39,15 @@ internal static class GuiCreatureList
 
     private const float FilterHeight = 36f;
     private const float Spacing = 2f;
+
+    /// <summary>
+    /// The Clear button beside the filter: its width and the air between it and the field.
+    /// The two of them are exactly as wide as the list below (Build gives the field what is
+    /// left of the width it is handed), so the block still ends where the rows end.
+    /// </summary>
+    private const float ClearWidth = 70f;
+
+    private const float ClearGap = 6f;
 
     /// <summary>
     /// The scroll view narrows its own content by the vertical scrollbar (Jotunn's rule), so
@@ -79,10 +88,11 @@ internal static class GuiCreatureList
     // ------------------------------------------------------------------ build
 
     /// <summary>
-    /// Builds the whole block inside the window: the filter field on top, the scroll view
-    /// under it, every row, and the notice shown when nothing matches. GuiWindow owns the
-    /// layout and passes the top-left corner of the block, its width and the height of the
-    /// list itself (the filter and the gap are taken from there).
+    /// Builds the whole block inside the window: the filter field on top with the Clear
+    /// button at its right, the scroll view under it, every row, and the notice shown when
+    /// nothing matches. GuiWindow owns the layout and passes the top-left corner of the
+    /// block, its width and the height of the list itself (the filter, the button and the
+    /// gap are taken from there: field + gap + button = the width passed in).
     /// </summary>
     internal static void Build(Transform parent, float x, float y, float width, float listHeight)
     {
@@ -91,6 +101,9 @@ internal static class GuiCreatureList
 
         GUIManager gui = GUIManager.Instance;
 
+        // The Clear button takes its width out of the block, never out of the list below:
+        // the rows keep the full width they were given.
+        float fieldWidth = width - ClearGap - ClearWidth;
         GameObject field = gui.CreateInputField(
             parent,
             new Vector2(0f, 1f),
@@ -99,7 +112,7 @@ internal static class GuiCreatureList
             InputField.ContentType.Standard,
             "filter (e.g. troll)",
             18,
-            width,
+            fieldWidth,
             FilterHeight
         );
         s_filter = field.GetComponent<InputField>();
@@ -116,6 +129,26 @@ internal static class GuiCreatureList
         RectTransform fieldRect = field.GetComponent<RectTransform>();
         fieldRect.pivot = new Vector2(0f, 1f);
         fieldRect.anchoredPosition = new Vector2(x, y);
+
+        // The Clear button, at the right of the field and as tall as it: Jotunn's own button
+        // (the Valheim style the command row uses), its position the CENTRE of the box - the
+        // pivot Unity leaves in the middle - so x is the middle of the button and y the
+        // middle of the field (its top corner minus half its height, GuiWindow's own rule
+        // for the command row).
+        GameObject clear = gui.CreateButton(
+            "Clear",
+            parent,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(x + fieldWidth + ClearGap + (ClearWidth * 0.5f), y - (FilterHeight * 0.5f)),
+            ClearWidth,
+            FilterHeight
+        );
+        Button? clearButton = clear.GetComponent<Button>();
+        if (clearButton != null)
+        {
+            clearButton.onClick.AddListener(ClearFilter);
+        }
 
         float listY = y - FilterHeight - Spacing;
         GameObject scroll = gui.CreateScrollView(
@@ -372,6 +405,26 @@ internal static class GuiCreatureList
     {
         InputField? field = s_filter;
         SetFilter(field != null ? field.text : string.Empty);
+    }
+
+    /// <summary>
+    /// The Clear button at the right of the filter: empties the field and re-runs the filter
+    /// exactly the way a category box does (Refilter - SetActive only, no row built nor
+    /// dropped, then back to the top), so every row is on screen again whatever was typed.
+    /// The text is written WITHOUT the field's own notification and the refilter is asked
+    /// for right here: one path, taken once, instead of depending on whether a write of
+    /// `.text` notifies - two filters on screen must never disagree. A window is the only
+    /// thing that can carry the button, so without one there is nothing to clear.
+    /// </summary>
+    private static void ClearFilter()
+    {
+        InputField? field = s_filter;
+        if (field == null)
+        {
+            return;
+        }
+        field.SetTextWithoutNotify(string.Empty);
+        Refilter();
     }
 
     /// <summary>
