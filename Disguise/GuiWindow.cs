@@ -28,11 +28,15 @@ internal static class GuiWindow
     internal const float Width = 860f;
 
     /// <summary>
-    /// Height of the panel: the list keeps its 300 px, the two pose rows (GuiPose) take the
-    /// band that opens under it, and the status line - anchored to the bottom edge - follows
-    /// this down, so nothing above ever moves when it changes.
+    /// Height of the panel. The list block takes 338 of them (filter 36 + gap 2 + 300 of
+    /// list, GuiCreatureList.BlockHeight) under the -132 it starts at, so it ends at -470;
+    /// the two pose rows (GuiPose) take 78 more with their gaps, -476 down to -554; and the
+    /// status line - anchored to the bottom edge, its box ending 58 px above it - follows
+    /// this down, so nothing above ever moves when it changes. 630 is what leaves those two
+    /// rows their band above that line: 540 left 50 px under the list, which fit neither of
+    /// them, and 600 put the Offset row back over the last rows of the list.
     /// </summary>
-    internal const float Height = 600f;
+    internal const float Height = 630f;
 
     // Left half of the window: top-left corner of the filter + list block, and its size.
     private const float ListX = 24f;
@@ -43,7 +47,10 @@ internal static class GuiWindow
 
     private const float ListHeight = 300f;
 
-    /// <summary>Gap between the bottom of the list and the first pose row (GuiPose).</summary>
+    /// <summary>
+    /// Gap between the bottom of the list BLOCK (filter + gap + list) and the first pose row
+    /// (GuiPose).
+    /// </summary>
     private const float PoseGap = 6f;
 
     /// <summary>
@@ -193,9 +200,15 @@ internal static class GuiWindow
         // The filter field and the scrollable list, built by GuiCreatureList.
         GuiCreatureList.Build(window.transform, ListX, ListY, ListWidth, ListHeight);
 
-        // The two rows that move and turn the costume, under the list they belong to
-        // (GuiWindow owns the corner, GuiPose owns the rhythm of its own two rows).
-        GuiPose.Build(window.transform, ListX, ListY - ListHeight - PoseGap);
+        // The two rows that move and turn the costume, under the block the list makes (the
+        // list itself is only its scroll view: the filter field and its gap are part of the
+        // block too, which is why the corner is measured through BlockHeight - GuiWindow
+        // owns the corner, GuiPose owns the rhythm of its own two rows).
+        GuiPose.Build(
+            window.transform,
+            ListX,
+            ListY - GuiCreatureList.BlockHeight(ListHeight) - PoseGap
+        );
 
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);

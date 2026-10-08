@@ -102,6 +102,17 @@ internal static class GuiCreatureList
     // ------------------------------------------------------------------ build
 
     /// <summary>
+    /// How tall the whole block is for a list of that height: the scroll view is only its
+    /// lower part, and the filter field and the gap above it belong to the block as well.
+    /// GuiWindow needs it to place whatever sits UNDER the list (GuiPose), which would
+    /// otherwise be built over the last rows.
+    /// </summary>
+    internal static float BlockHeight(float listHeight)
+    {
+        return FilterHeight + Spacing + listHeight;
+    }
+
+    /// <summary>
     /// Builds the whole block inside the window: the filter field on top with the Clear
     /// button at its right, the scroll view under it, every row, and the notice shown when
     /// nothing matches. GuiWindow owns the layout and passes the top-left corner of the

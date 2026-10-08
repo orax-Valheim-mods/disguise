@@ -1009,9 +1009,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   is best-fit, so a long prefab name shrinks instead of running past the window, and
   `RefreshState` writes it only when the words changed: once per frame while the window is
   open, plus every click - and it hands the six pose fields their sync on the same pass), the
-  corner of the two pose rows (`GuiPose.Build` gets the band the layout leaves under the list;
-  the panel is 600 px tall because of them, and the status line is anchored to its bottom
-  edge, so nothing above moves when it grows), the
+  corner of the two pose rows (`GuiPose.Build` gets the band the layout leaves under the
+  list BLOCK - the scroll view is only its lower part, the filter field and its gap being
+  part of the block too, measured through `GuiCreatureList.BlockHeight`, which is what keeps
+  the rows off the last rows of the list; the panel is 630 px tall because of them, and the
+  status line is anchored to its bottom edge, so nothing above moves when it grows), the
   row of four command buttons under the picture (each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
   label), the status line below them, and the coordinates of the list block. It only builds,
@@ -1039,7 +1041,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   of the configured prefab, a row click routed to `DisguiseCommand.ApplyCreature`, and
   `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
   player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which
-  is how the picture knows what the pointer is on.
+  is how the picture knows what the pointer is on. `BlockHeight(listHeight)` answers how tall
+  the whole block is for a list of that height - the scroll view is only its lower part, the
+  filter field and its gap being part of the block too - which is what GuiWindow measures the
+  corner of the pose rows through.
 - `GuiPose.cs` - the two rows under the list: the six editable fields holding `PoseControl`
   (Offset X/Y/Z in world units, Rotation X/Y/Z in degrees), and the whole difference between
   a box and a value. A change applies **as it is typed**, each field parsing through
