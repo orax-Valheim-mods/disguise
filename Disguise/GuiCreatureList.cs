@@ -12,7 +12,7 @@ namespace Disguise;
 /// (Jotunn) holding one row per vanilla prefab - exactly the names "disguise list" prints,
 /// through PrefabCatalog.Names, so the console and the window can never disagree about a
 /// name. What the window adds are two filters of its own on top of that shared source: the
-/// text field, and the seven category checkboxes (GuiCategories) that decide which kinds of
+/// text field, and the six category checkboxes (GuiCategories) that decide which kinds of
 /// prefab are shown at all.
 ///
 /// Every row is built ONCE when the window opens - for every kind, so switching a category

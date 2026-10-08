@@ -60,7 +60,6 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) |
 | `ShowBuildings` | `true` | Show the buildable prefabs that **do** move (a `Piece` carrying `ZSyncTransform`: a cart, a raft, a training dummy) - walls and floors are under `ShowStatic` |
 | `ShowNature` | `true` | Show the natural prefabs that do move (the static majority of trees, plants, pickables, rocks and ore veins is under `ShowStatic`) |
-| `ShowShips` | `true` | Show the ships |
 | `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
@@ -77,7 +76,7 @@ rotation keep their own wheel throughout.
 The **Disguise window** (opened and closed by `GuiKey` = `F8 + LeftAlt` - the chord is
 written on the title row, next to Close, and always read from the config - or by
 `disguise gui`) is built with **Jotunn**'s
-Valheim-styled controls: the seven category checkboxes, the prefab list, its 3D preview and
+Valheim-styled controls: the six category checkboxes, the prefab list, its 3D preview and
 four buttons under the
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
 `Own view` and `Flight`, each one running its sub-command like the console would and writing
@@ -87,7 +86,7 @@ of the row the pointer is on, filmed
 by a camera of its own into a texture, and the configured one while the pointer is on no row
 at all, and the list is a filter field over a scrollable list of every vanilla prefab -
 minus what the checkboxes have switched off (`Static`, `Creatures`, `Items`, `Buildings`,
-`Nature`, `Ships`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice
+`Nature`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice
 survives a restart) - the row of the prefab configured right now in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by

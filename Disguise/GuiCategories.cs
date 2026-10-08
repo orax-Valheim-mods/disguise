@@ -9,7 +9,7 @@ namespace Disguise;
 
 /// <summary>
 /// The row of category checkboxes of the Disguise window: one box per PrefabKind, deciding
-/// which categories the list shows (seven of them, seven boxes - the console's "disguise
+/// which categories the list shows (six of them, six boxes - the console's "disguise
 /// list" always prints every kind).
 ///
 /// The state lives in the config ([6 - GUI], Show* = true by default), so a choice survives
@@ -54,10 +54,10 @@ internal static class GuiCategories
     // ------------------------------------------------------------------ build
 
     /// <summary>
-    /// Builds the seven checkboxes at (x, y) with y the CENTRE of the row: box, then its
+    /// Builds the six checkboxes at (x, y) with y the CENTRE of the row: box, then its
     /// label sized to the text it really has (measured through Text.preferredWidth, so the
     /// gap before the next box is the same whatever the word is). The row grows right from
-    /// the list's x and stops well inside the window: seven short labels never reach
+    /// the list's x and stops well inside the window: six short labels never reach
     /// GuiWindow.Width - 24 of margin (the widest of them, "Creatures", is the one to watch).
     /// </summary>
     internal static void Build(Transform parent, float x, float y)
@@ -194,7 +194,7 @@ internal static class GuiCategories
         GuiCreatureList.Refilter();
     }
 
-    /// <summary>The Show* entry of a kind: the seven boxes are the seven entries, no copy anywhere.</summary>
+    /// <summary>The Show* entry of a kind: the six boxes are the six entries, no copy anywhere.</summary>
     private static ConfigEntry<bool> Entry(PrefabKind kind)
     {
         switch (kind)
@@ -209,8 +209,6 @@ internal static class GuiCategories
                 return DisguiseConfig.ConfigShowBuildings;
             case PrefabKind.Nature:
                 return DisguiseConfig.ConfigShowNature;
-            case PrefabKind.Ship:
-                return DisguiseConfig.ConfigShowShips;
             default:
                 return DisguiseConfig.ConfigShowOther;
         }

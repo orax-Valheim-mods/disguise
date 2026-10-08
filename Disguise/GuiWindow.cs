@@ -13,7 +13,7 @@ namespace Disguise;
 /// only builds, it never keeps the window alive and it never talks to the console.
 ///
 /// The window as the branch built it, in four steps: title and the prefab configured right
-/// now (with the GuiKey chord on the title row, next to Close), the seven category checkboxes
+/// now (with the GuiKey chord on the title row, next to Close), the six category checkboxes
 /// that gate the list (GuiCategories builds them, this class only says where they sit), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
@@ -166,7 +166,7 @@ internal static class GuiWindow
         );
         s_state = state.GetComponent<Text>();
 
-        // The seven category checkboxes, in the free band above the state line: they decide
+        // The six category checkboxes, in the free band above the state line: they decide
         // which kinds of prefab the list below is allowed to show.
         GuiCategories.Build(window.transform, ListX, CategoryY);
 

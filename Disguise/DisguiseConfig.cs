@@ -58,7 +58,7 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<int> ConfigGuiScrollStep = null!;
 
-    // -- 6 - GUI, continued: which categories the window's list shows (the seven checkboxes -
+    // -- 6 - GUI, continued: which categories the window's list shows (the six checkboxes -
     //    one per kind, read there at every opening and at every frame, so a value typed in
     //    ConfigurationManager lands without reopening. The console's "disguise list" always
     //    prints every kind: these hide rows in the window, never names from the catalogue.
@@ -71,8 +71,6 @@ internal static class DisguiseConfig
     internal static ConfigEntry<bool> ConfigShowBuildings = null!;
 
     internal static ConfigEntry<bool> ConfigShowNature = null!;
-
-    internal static ConfigEntry<bool> ConfigShowShips = null!;
 
     internal static ConfigEntry<bool> ConfigShowOther = null!;
 
@@ -346,18 +344,12 @@ internal static class DisguiseConfig
             "Show the natural prefabs (trees, plants, pickables, rocks, ore veins) in the "
                 + "window's list."
         );
-        ConfigShowShips = config.Bind(
-            "6 - GUI",
-            "ShowShips",
-            true,
-            "Show the ships in the window's list."
-        );
         ConfigShowOther = config.Bind(
             "6 - GUI",
             "ShowOther",
             true,
             "Show the prefabs no other category claims (spawners, markers, whatever a world "
-                + "mod adds) in the window's list. Off, the list only holds what the six "
+                + "mod adds) in the window's list. Off, the list only holds what the five "
                 + "other checkboxes show - nothing is ever dropped from the catalogue itself."
         );
 

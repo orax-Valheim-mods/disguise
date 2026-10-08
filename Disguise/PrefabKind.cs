@@ -43,12 +43,11 @@ internal enum PrefabKind
     /// </summary>
     Nature = 4,
 
-    /// <summary>A Ship.</summary>
-    Ship = 5,
-
     /// <summary>
-    /// Whatever none of the six above claimed: spawners, markers, terrain objects. The list
-    /// only ever drops a modded name or an effect one (PrefabCatalog).
+    /// Whatever none of the five above claimed: spawners, markers, terrain objects - and any
+    /// prefab the tests above no longer name, a ship being one of them since its category
+    /// was dropped (a Piece is still Building: the raft and the karve never reach here). The
+    /// list only ever drops a modded name or an effect one (PrefabCatalog).
     /// </summary>
-    Other = 6,
+    Other = 5,
 }

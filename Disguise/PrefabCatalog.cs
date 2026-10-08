@@ -21,7 +21,7 @@ namespace Disguise;
 /// fetched or counted, so the counts and the names always describe the same set.
 ///
 /// The two lists stay identical because they come out of this one class - the window only
-/// adds its two filters on top (the text field, then the seven category checkboxes).
+/// adds its two filters on top (the text field, then the six category checkboxes).
 ///
 /// ZNetScene is the technical limit of any disguise - a vanilla client rebuilds your object
 /// from ITS OWN prefab table, by hash, so only prefabs every installation already carries
@@ -31,7 +31,7 @@ namespace Disguise;
 internal static class PrefabCatalog
 {
     /// <summary>How many kinds PrefabKind holds: the size of every array indexed by it.</summary>
-    internal const int KindCount = 7;
+    internal const int KindCount = 6;
 
     /// <summary>
     /// The component that moves an object, looked up by NAME and never as a generic:
@@ -79,10 +79,6 @@ internal static class PrefabCatalog
         {
             return PrefabKind.Nature;
         }
-        if (prefab.GetComponent<Ship>() != null)
-        {
-            return PrefabKind.Ship;
-        }
         return PrefabKind.Other;
     }
 
@@ -100,7 +96,7 @@ internal static class PrefabCatalog
     /// <summary>
     /// Every vanilla prefab name matching the optional substring, sorted case-insensitively.
     /// shown is the checkbox state indexed by PrefabKind: null means "every kind", which is
-    /// what the console asks for, and the window passes the seven flags of its own.
+    /// what the console asks for, and the window passes the six flags of its own.
     /// </summary>
     internal static List<string> Names(string? filter, bool[]? shown)
     {
@@ -136,8 +132,6 @@ internal static class PrefabCatalog
                 return "buildings";
             case PrefabKind.Nature:
                 return "nature";
-            case PrefabKind.Ship:
-                return "ships";
             default:
                 return "other";
         }
