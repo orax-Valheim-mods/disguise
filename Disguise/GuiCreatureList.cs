@@ -15,12 +15,14 @@ namespace Disguise;
 /// of that shared source: the text field, and the six category checkboxes (GuiCategories)
 /// that decide which kinds of prefab are shown at all.
 ///
-/// Every row is built ONCE when the window opens - for every kind, so switching a category
-/// back on costs nothing - and the filters then only show and hide them (SetActive): typing
-/// or ticking creates nothing and destroys nothing, which is what keeps either one free on a
-/// list of hundreds of prefabs. The rows live in three parallel lists at the same index - the
-/// name (what gets applied), the kind (which checkbox owns it) and the body (what is on
-/// screen).
+/// The opening only builds the rows of the categories the boxes have ON: a row is a Jotunn
+/// button, and hundreds of them are what makes an opening cost something. A category
+/// switched on later is paid for THEN - once, by EnsureShownRows through Refilter - and no
+/// row is ever destroyed, so switching a category off and back on is again only a SetActive.
+/// The three lists run parallel at the same index - the name (what gets applied), the kind
+/// (which checkbox owns it) and the body (what is on screen, null while its category has
+/// never been shown) - and the text filter only shows and hides, which is what keeps typing
+/// free on a list of hundreds of prefabs.
 ///
 /// A row click is the console's "disguise set &lt;name&gt;": DisguiseCommand.ApplyCreature writes
 /// the config and re-applies at once, then the highlight and the state line under the title
@@ -61,7 +63,19 @@ internal static class GuiCreatureList
 
     private static readonly List<PrefabKind> s_kinds = new();
 
-    private static readonly List<GameObject> s_rows = new();
+    /// <summary>
+    /// The body of each row, null while its category has never been shown: the opening only
+    /// builds the categories the boxes have on, and EnsureShownRows fills the rest in.
+    /// </summary>
+    private static readonly List<GameObject?> s_rows = new();
+
+    /// <summary>
+    /// The content the rows are children of, and the width they are built with: kept because
+    /// a category switched on later is built long after Build returned.
+    /// </summary>
+    private static Transform? s_content;
+
+    private static float s_rowWidth;
 
     private static InputField? s_filter;
     private static ScrollRect? s_scroll;
@@ -97,7 +111,6 @@ internal static class GuiCreatureList
     internal static void Build(Transform parent, float x, float y, float width, float listHeight)
     {
         Forget();
-        float startedAt = Time.realtimeSinceStartup;
 
         GUIManager gui = GUIManager.Instance;
 
@@ -231,53 +244,47 @@ internal static class GuiCreatureList
         }
 
         float rowWidth = width - (2f * HandleDistanceToBorder) - HandleSize;
+        s_content = content;
+        s_rowWidth = rowWidth;
+
+        // The catalogue first: every name, then the kind of each - the component tests that
+        // say which checkbox owns the row, and the only pass of them at this opening
+        // (PrefabCatalog skips them when all it was asked for is names).
+        float catalogueStartedAt = Time.realtimeSinceStartup;
         List<string> names = PrefabCatalog.Names(null, null);
         for (int i = 0; i < names.Count; i++)
         {
             string name = names[i];
-            PrefabKind kind = PrefabCatalog.KindOf(name);
-            GameObject body = gui.CreateButton(
-                name,
-                content,
-                new Vector2(0.5f, 0.5f),
-                new Vector2(0.5f, 0.5f),
-                Vector2.zero,
-                rowWidth,
-                RowHeight
-            );
-            Text? label = body.GetComponentInChildren<Text>();
-            if (label != null)
-            {
-                // Jotunn already aligns the text of a button to the left, and paints it
-                // ValheimOrange (ApplyButtonStyle): "the selected row turns orange" showed
-                // nothing at first because every row was orange. The list now reads beige,
-                // with the configured creature in orange - the colours the title and the
-                // state line already use.
-                label.color = gui.ValheimBeige;
-            }
-
-            Button? button = body.GetComponent<Button>();
-            if (button != null)
-            {
-                string creature = name;
-                button.onClick.AddListener(() => Select(creature));
-
-                // Hovering the row shows its creature in the preview of step 3 (and stepping
-                // off any row puts the configured one back) - GuiRowHover is that listener,
-                // and GuiPreview the rule it feeds.
-                GuiPreview.WatchRow(body, creature);
-            }
-
             s_names.Add(name);
-            s_kinds.Add(kind);
-            s_rows.Add(body);
+            s_kinds.Add(PrefabCatalog.KindOf(name));
+        }
+        float catalogueMs = (Time.realtimeSinceStartup - catalogueStartedAt) * 1000f;
+
+        // The rows then - only for the categories the boxes have ON. A row is four objects
+        // built by Jotunn, and the rows of a category switched off were built only to be
+        // hidden again: an opening now costs what it is going to SHOW. A category switched
+        // on later is paid for once, in order, by EnsureShownRows; nothing here is ever
+        // destroyed, so switching one off again stays the SetActive it has always been.
+        float rowsStartedAt = Time.realtimeSinceStartup;
+        int built = 0;
+        for (int i = 0; i < s_names.Count; i++)
+        {
+            GameObject? row = GuiCategories.Shown(s_kinds[i])
+                ? CreateRow(s_names[i], content, rowWidth)
+                : null;
+            s_rows.Add(row);
+            if (row != null)
+            {
+                built++;
+            }
         }
 
-        // The list is built once per opening, and with every category shown that is hundreds
-        // of rows of four objects each: one line when Logs is on, so an opening that feels
-        // slow can be read off the log next to its row count instead of guessed at.
+        // One line when Logs is on, so an opening that feels slow can be read off the log:
+        // the walk that tags every prefab, and the rows actually built for it.
         Disguise.LogDebug(
-            $"GUI: {s_rows.Count} row(s) in {(Time.realtimeSinceStartup - startedAt) * 1000f:0.0} ms."
+            $"GUI: {s_names.Count} name(s) in {catalogueMs:0.0} ms, "
+                + $"{built} of {s_rows.Count} row(s) in "
+                + $"{(Time.realtimeSinceStartup - rowsStartedAt) * 1000f:0.0} ms."
         );
 
         if (s_rows.Count == 0)
@@ -294,6 +301,87 @@ internal static class GuiCreatureList
         SetFilter(string.Empty);
     }
 
+    /// <summary>
+    /// One row of the list: a Jotunn button of the list's own width and RowHeight, its text
+    /// beige (Jotunn paints every button orange - the configured creature needs that colour
+    /// to stand out), a click routed to Select and the pointer routed to the preview.
+    /// content and rowWidth are what Build measured: a row can also be owed to a category
+    /// switched on long after Build returned.
+    /// </summary>
+    private static GameObject CreateRow(string name, Transform content, float rowWidth)
+    {
+        GUIManager gui = GUIManager.Instance;
+        GameObject body = gui.CreateButton(
+            name,
+            content,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            Vector2.zero,
+            rowWidth,
+            RowHeight
+        );
+        Text? label = body.GetComponentInChildren<Text>();
+        if (label != null)
+        {
+            // Jotunn already aligns the text of a button to the left, and paints it
+            // ValheimOrange (ApplyButtonStyle): "the selected row turns orange" showed
+            // nothing at first because every row was orange. The list now reads beige,
+            // with the configured creature in orange - the colours the title and the
+            // state line already use.
+            label.color = gui.ValheimBeige;
+        }
+
+        Button? button = body.GetComponent<Button>();
+        if (button != null)
+        {
+            string creature = name;
+            button.onClick.AddListener(() => Select(creature));
+
+            // Hovering the row shows its creature in the preview of step 3 (and stepping
+            // off any row puts the configured one back) - GuiRowHover is that listener,
+            // and GuiPreview the rule it feeds.
+            GuiPreview.WatchRow(body, creature);
+        }
+        return body;
+    }
+
+    /// <summary>
+    /// Builds the rows a category is OWING: the opening only made the ones the boxes had on,
+    /// so a category switched on since then has no body yet - Refilter is the one place that
+    /// asks, and both ways of switching a category on (the box, or a Show* value typed in
+    /// ConfigurationManager) go through it, so a category is paid for exactly once. The rows
+    /// keep the order of the sorted names, which is what the sibling index of the content
+    /// says: a new row goes at the number of rows already built in front of it. The rows
+    /// that exist are never touched - switching a category off stays a SetActive.
+    /// </summary>
+    private static void EnsureShownRows()
+    {
+        Transform? content = s_content;
+        if (content == null)
+        {
+            return; // no window (or a build that lost its scroll view): nothing can be owed
+        }
+
+        int sibling = 0;
+        for (int i = 0; i < s_rows.Count; i++)
+        {
+            GameObject? body = s_rows[i];
+            if (body != null)
+            {
+                sibling++;
+                continue;
+            }
+            if (!GuiCategories.Shown(s_kinds[i]))
+            {
+                continue;
+            }
+            GameObject row = CreateRow(s_names[i], content, s_rowWidth);
+            row.transform.SetSiblingIndex(sibling);
+            s_rows[i] = row;
+            sibling++;
+        }
+    }
+
     /// <summary>Drops every reference to the window's list (closed, or destroyed by a scene change).</summary>
     internal static void Forget()
     {
@@ -303,6 +391,8 @@ internal static class GuiCreatureList
         s_filter = null;
         s_scroll = null;
         s_noMatch = null;
+        s_content = null;
+        s_rowWidth = 0f;
         s_syncedCreature = string.Empty;
 
         // The next window brings a brand new ScrollRect, which starts on Unity's own
@@ -357,7 +447,9 @@ internal static class GuiCreatureList
     /// text (case-insensitive, like the console's list filter), hides the others. Nothing is
     /// created nor destroyed here: only SetActive, plus the scroll back to the top so the
     /// first match is where the eye already is. Typing a letter and ticking a box both end
-    /// up here, which is why the two can never disagree about what is on screen.
+    /// up here, which is why the two can never disagree about what is on screen. A null body
+    /// is a row a category still owes (Refilter builds it one call above) and can never
+    /// match - its category is off, so it is not on screen either way.
     /// </summary>
     private static void SetFilter(string text)
     {
@@ -365,14 +457,18 @@ internal static class GuiCreatureList
         int matches = 0;
         for (int i = 0; i < s_rows.Count; i++)
         {
+            GameObject? body = s_rows[i];
+            if (body == null)
+            {
+                continue;
+            }
             bool match =
                 GuiCategories.Shown(s_kinds[i])
                 && (
                     needle.Length == 0
                     || s_names[i].IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0
                 );
-            GameObject body = s_rows[i];
-            if (body != null && body.activeSelf != match)
+            if (body.activeSelf != match)
             {
                 body.SetActive(match);
             }
@@ -399,22 +495,26 @@ internal static class GuiCreatureList
     /// <summary>
     /// Re-runs the filter with the text already in the field: what a category box asks for
     /// (GuiCategories), and what a Show* value changed in ConfigurationManager asks for while
-    /// the window is open. Same work as typing: SetActive only, no row is built nor dropped.
+    /// the window is open - the only two things that can change which rows the list OWES.
+    /// The rows a category just switched on has never had are built first, once
+    /// (EnsureShownRows), and the rest of the work is SetActive, exactly as typing a letter.
     /// </summary>
     internal static void Refilter()
     {
+        EnsureShownRows();
         InputField? field = s_filter;
         SetFilter(field != null ? field.text : string.Empty);
     }
 
     /// <summary>
     /// The Clear button at the right of the filter: empties the field and re-runs the filter
-    /// exactly the way a category box does (Refilter - SetActive only, no row built nor
-    /// dropped, then back to the top), so every row is on screen again whatever was typed.
-    /// The text is written WITHOUT the field's own notification and the refilter is asked
-    /// for right here: one path, taken once, instead of depending on whether a write of
-    /// `.text` notifies - two filters on screen must never disagree. A window is the only
-    /// thing that can carry the button, so without one there is nothing to clear.
+    /// exactly the way a category box does (Refilter - build what a category owes, then
+    /// SetActive, no row ever dropped, then back to the top), so every row is on screen again
+    /// whatever was typed. The text is written WITHOUT the field's own notification and the
+    /// refilter is asked for right here: one path, taken once, instead of depending on
+    /// whether a write of `.text` notifies - two filters on screen must never disagree. A
+    /// window is the only thing that can carry the button, so without one there is nothing
+    /// to clear.
     /// </summary>
     private static void ClearFilter()
     {
@@ -452,7 +552,7 @@ internal static class GuiCreatureList
         GUIManager gui = GUIManager.Instance;
         for (int i = 0; i < s_rows.Count; i++)
         {
-            GameObject body = s_rows[i];
+            GameObject? body = s_rows[i];
             if (body == null || !body.activeSelf)
             {
                 continue;

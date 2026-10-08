@@ -346,6 +346,10 @@ boxes in the band the layout leaves free between the title and the state line - 
 `Creatures`, `Items`, `Buildings`, `Nature`, `Other` - one per category, each
 hiding the rows of its category in the list below (the state is kept in `6 - GUI` / `Show*`,
 so a choice survives a restart, and `disguise list` prints every category whatever they say).
+The rows of a category that is **off** are not built at the opening at all - an opening then
+costs only what it is going to show - and are built the first time the box is switched on
+(once, in the order of the list); a row is never destroyed, so switching a box off and back
+on is only a `SetActive`.
 **`Static` is the only one of them about movement instead of looks**: a prefab **without**
 `ZSyncTransform` - walls, floors, furniture, trees, rocks, most of what a world is made of -
 is drawn by another machine once, where its object happened to be created, and never moved
@@ -357,7 +361,9 @@ The
 and brings every row back, through the same `SetActive` re-run a checkbox asks for, then the
 list returns to the top - over a scrollable list of every **vanilla** prefab (no
 `fx_` / `sfx_` / `vfx_` effect either) - the exact
-list `disguise list` prints, minus what the checkboxes have switched off - the row of the
+list `disguise list` prints, minus what the checkboxes have switched off (those rows are not
+even built while their box is off, which is what keeps an opening to the cost of what it is
+about to show) - the row of the
 prefab configured right now highlighted in orange, and a click on any row =
 `disguise set <prefab_name>` (config written and applied at once, the line under the title
 updated). The rows read beige and the configured one orange - Jotunn paints the text of all
@@ -825,9 +831,12 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   prefab table by hash - sorted, each tagged with exactly one kind through `KindOf` (the
   first test that matches wins - `ZSyncTransform` first, then every other component read on
   the root like the `Character` test the list shipped with), plus `Names(filter, shown)` and
-  `Counts(filter)`. The console asks
-  for every category, the window passes the six checkboxes of its own: one source, no
-  disagreement. A modded name and an effect name (`fx_` / `sfx_` / `vfx_`) are both cut out
+  `Counts(filter)`. Both ask for every category - the window takes every name and decides
+  with its own six checkboxes, so a category switched on later already has its names - and
+  the walk reads the kind only for a caller that asks for it (the counts, a category mask):
+  `KindOf` is up to ten component tests, the half of the walk that costs, and the window
+  does that single pass itself, for its rows. One source, no disagreement. A modded name and
+  an effect name (`fx_` / `sfx_` / `vfx_`) are both cut out
   at the top of the walk, before anything is fetched or counted.
 - `VanillaPrefabs.cs` - the vanilla test behind both lists, and the only place that decides
   it: Valheim describes its **own** assets in `valheim_Data\StreamingAssets\SoftRef\manifest`
@@ -951,22 +960,25 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   (`Text.preferredWidth`, so the air before the next box is the same whatever the word), the
   `Show*` entry of each kind as the only state - a choice survives a restart, and `Sync`
   pushes a value typed in ConfigurationManager back into its box without reopening - and
-  `Refilter` on every toggle, which only re-runs the filter: the rows themselves are built
-  once, at the opening.
+  `Refilter` on every toggle, which first builds the rows a category just switched ON has
+  never had (the opening only builds the categories already on) and then re-runs the filter
+  over them.
 - `GuiCreatureList.cs` - the prefab list: Jotunn's filter field with the **Clear** button at
   its right (the field and the button share the width of the block, rows keep all of theirs;
   the button empties the field through `SetTextWithoutNotify` and asks for `Refilter` itself
   - one path, taken once, instead of depending on whether a write notifies), and Jotunn's
-  scroll view, one row per
-  vanilla prefab built **once** at open (both filters only show and hide rows with
-  `SetActive`, so typing or ticking creates nothing), the kind of every row kept in a third
-  parallel list next to the name and the body (which checkbox owns it), `Refilter` - what a
-  checkbox and a changed `Show*` call, re-running the filter over the text already typed -
-  the orange highlight of the configured prefab, a
-  row click routed to `DisguiseCommand.ApplyCreature`, and `FilterFocused` - the half of
-  `BlocksInput` that hands the frame to the UI while the player types. Each row is given the
-  listener of the preview (`GuiPreview.WatchRow`), which is how the picture knows what the
-  pointer is on.
+  scroll view, one row per vanilla prefab built **at open for the categories the boxes have
+  on** - the rows a category still owes are made by `EnsureShownRows`, the first time it is
+  switched on and at the sibling index that keeps the sorted order, no row ever destroyed;
+  the text filter and the checkboxes then only show and hide with `SetActive`, so typing
+  never creates anything. The kind of every row is kept in a third parallel list next to the
+  name and the body (which checkbox owns it; the body is null while its category has never
+  been shown), `Refilter` - what a checkbox and a changed `Show*` call: build what a
+  category owes, then re-run the filter over the text already typed - the orange highlight
+  of the configured prefab, a row click routed to `DisguiseCommand.ApplyCreature`, and
+  `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
+  player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which
+  is how the picture knows what the pointer is on.
 - `GuiRowHover.cs` - the listener on every row: pointer in, show its creature; pointer out,
   back to the configured one. Two interfaces and no other, on purpose. Unity's `EventTrigger`
   does the same job with two entries, but it also implements scrolling and dragging - and the
@@ -1121,7 +1133,7 @@ so the count of twenty-four stays correct.
 | The log of the player watching you fills with `Failed to find rpc method 213315071` (or `531685242`) | Harmless, and both hashes are known: `213315071` = `RPC_ResetCloth`, broadcast by the vanilla `Character.ResetCloth()` whenever your body starts moving (and on a jump); `531685242` = `SetTrigger`, the animation trigger broadcast (§ 4.7). A client without the DLL builds your costume, and a wall has neither a `Character` nor a `ZSyncAnimation` to answer with - the machine logs that it knows no such method and does nothing, which is exactly right since there is nothing to reset or to animate. A creature costume logs neither (both components are there), and a client running the DLL never does either (it builds a real `Player`) |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
-| Opening the window takes a noticeable moment | The whole list is built at the opening - one Jotunn button per row, hundreds of rows - and the log says what that cost: `GUI: <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log). The checkboxes and the filter only show and hide those rows, they never rebuild any, so the price is the same whatever they say |
+| Opening the window takes a noticeable moment | Two things cost, and the log says both: `GUI: <n> name(s) in <ms> ms, <built> of <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The catalogue is the walk that tags every vanilla prefab with its kind - up to ten component tests, and exactly ONCE: the walk skips them when all it was asked for is names, and the window does that one pass for its own rows. The rows are Jotunn buttons of four objects each, and only the categories the boxes have ON get one at the opening; a category switched on later is built then, once (in the order of the list), and a row is never destroyed, so switching back and forth stays a `SetActive`. The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log) |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 
 Log files:

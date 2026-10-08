@@ -95,8 +95,10 @@ internal static class PrefabCatalog
 
     /// <summary>
     /// Every vanilla prefab name matching the optional substring, sorted case-insensitively.
-    /// shown is the checkbox state indexed by PrefabKind: null means "every kind", which is
-    /// what the console asks for, and the window passes the six flags of its own.
+    /// shown is a category mask indexed by PrefabKind, null meaning "every kind" - which is
+    /// what BOTH callers pass, the console (its list always prints every category) and the
+    /// window: the window takes every name and filters its OWN rows with it, so a category
+    /// switched on later has its names here already instead of costing a second walk.
     /// </summary>
     internal static List<string> Names(string? filter, bool[]? shown)
     {
@@ -154,7 +156,10 @@ internal static class PrefabCatalog
     /// One pass over the registered prefabs: adds the matching names (when a list is given)
     /// and/or counts every match by kind. A modded name and an effect name never enter
     /// either - both are cut before anything else, so the counts and the names agree on the
-    /// same set. Both callers are one-shot (a console command, the opening of the window),
+    /// same set. The kind is read ONLY when a caller asks for it (counts, or a category
+    /// mask): KindOf is up to ten component tests, the half of this walk that costs, and a
+    /// caller here for names alone - the window, which tags its rows itself - does not need
+    /// them twice. Both callers are one-shot (a console command, the opening of the window),
     /// so nothing is cached - a stale cache would list prefabs a modded world no longer has.
     /// </summary>
     private static void Walk(string? filter, bool[]? shown, List<string>? names, int[]? counts)
@@ -177,6 +182,16 @@ internal static class PrefabCatalog
             GameObject? prefab = zns.GetPrefab(name);
             if (prefab == null)
             {
+                continue;
+            }
+            if (counts == null && shown == null)
+            {
+                // Nobody here says WHICH kind this is: the names alone are enough, and the
+                // window walks KindOf once, on the way to its rows.
+                if (names != null)
+                {
+                    names.Add(name);
+                }
                 continue;
             }
             PrefabKind kind = KindOf(prefab);

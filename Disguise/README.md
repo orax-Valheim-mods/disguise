@@ -88,7 +88,9 @@ at all, and the list is a filter field - with a **Clear** button at its right, w
 the field and brings every row back - over a scrollable list of every vanilla prefab -
 minus what the checkboxes have switched off (`Static`, `Creatures`, `Items`, `Buildings`,
 `Nature`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice
-survives a restart) - the row of the prefab configured right now in orange on beige rows, a click on any
+survives a restart; the rows of a category switched off are **not built** at all, and are
+built the first time its box is ticked - once) - the row of the prefab configured right now
+in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
 `GuiScrollStep` pixels per notch, clamped at both ends so an extra notch never makes it dip

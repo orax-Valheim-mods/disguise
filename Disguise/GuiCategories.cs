@@ -15,8 +15,10 @@ namespace Disguise;
 /// The state lives in the config ([6 - GUI], Show* = true by default), so a choice survives
 /// a restart; Sync pushes it back into the boxes every frame while the window is open, which
 /// is how a value typed in ConfigurationManager shows up without reopening - the same rule
-/// as GuiScrollStep. A toggle only re-runs the filter: the rows are built once, at the
-/// opening, and hiding a category is the same SetActive as typing a letter.
+/// as GuiScrollStep. A toggle re-runs the filter (Refilter), which first builds the rows a
+/// category switched ON has never had - the opening only builds the categories already on -
+/// and then hides or shows with the same SetActive as typing a letter: a row is never
+/// destroyed, so switching a category back and forth costs nothing a second time.
 ///
 /// The row sits in the band the layout leaves free between the title and the state line,
 /// left-aligned with the list it filters; GuiWindow owns those coordinates and passes them.
