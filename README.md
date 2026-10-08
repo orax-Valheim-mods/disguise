@@ -501,15 +501,36 @@ Visual synchronisation on vanilla clients:
   never guessed at either: the game's own read is a ray that answers with the height it was
   given when it hits nothing, so a missing collider and a perfectly level slope are one and
   the same number. The ray is therefore cast again by hand (hit and miss both known) over
-  the terrain layer, with **two more reads behind it**: the same ray through every layer
+  the terrain layer, with **three more reads behind it**: the same ray through every layer
   keeping only what carries a `Heightmap` - terrain recognised by what it is rather than by
-  a layer name - and the loaded heightmap, which needs no collider at all. The report names
-  whichever answered (`ray`, `probe` or `heightmap`), and a costume that still has nothing
-  under it prints a self-test line of its own with the position, the terrain layer and its
-  mask, what the unfiltered ray meets on the way down, and how many terrain maps this
-  machine has registered (`Ground rest: no ground under <name> at (x, y, z) | terrain mask
-  <n> (layer <n>) | ...`) - so `no terrain read` says *why* instead of only *that*. What
-  cannot fight back is never measured:
+  a layer name - the loaded heightmap, which needs no collider at all, and, where this
+  machine has no terrain instance standing under the costume at all, the zone built for
+  that read. That last case is not hypothetical: the game keeps real zones - heightmap,
+  mesh, collider - only around its own reference position, which on a dedicated server is
+  never moved to a player, and the zones a player walks in are generated in *ghost* mode,
+  world data whose temporary root is destroyed the moment it exists (`ZoneSystem.Update`
+  calls `CreateGhostZones` when `CreateLocalZones` did nothing). The game itself has no
+  ground to read there, so `GroundProbe` builds the missing zone exactly as `SpawnZone`
+  would - the game's own zone prefab at the zone position, behind the game's own
+  `IsTerrainReady`, which is also what queues the terrain build - and, when that build is
+  still running, waits for it (bounded, one wait open at a time) instead of letting the
+  packet leave without its ground: the terrain data a tile is built from is *consumed* by
+  that build, and the server has already spent this zone's data once - the ghost pass built
+  the tile, instantiated it and destroyed it - so the first read here has to rebuild it
+  before anything can stand on it, and the game sends a costume again only when the costume
+  itself changes, which turns one packet without its ground into one *wrong minute*. It
+  then reads the heightmap the root carries, and drops the root again after ten seconds
+  without a read. Nothing is ever registered in `ZoneSystem.m_zones`: the game never learns
+  the zone is there, its lifetime never touches it, and from the moment it exists the three
+  reads before it find it like any other terrain. The report names whichever answered
+  (`ray`, `probe`, `heightmap` or `zone`), and a costume that still has nothing under it
+  prints a self-test line of its own with the position, the terrain layer and its mask, what
+  the unfiltered ray meets on the way down, how many terrain maps this machine has
+  registered, and why the zone could not be built (`Ground rest: no ground under <name> at
+  (x, y, z) | terrain mask <n> (layer <n>) | ... | zone probe <reason>`) - so
+  `no terrain read` says *why* instead of only *that*. The first zone built this way is
+  announced once (`Ground rest: no terrain instance stands where the costume is read, so the
+  zone at (x, z) is built to read it.`). What cannot fight back is never measured:
   no `ZSyncTransform` (nothing pulls it back to the ZDO), a kinematic rigidbody (moved with
   `MovePosition`, which no contact pushes back), or a `Character` of its own (a creature
   settles itself - the reason a `Troll` costume never shivered). Same rules as the band:
@@ -519,7 +540,7 @@ Visual synchronisation on vanilla clients:
   (`Ground rest: <name> hangs <n> m below its colliders, ...`), then one line per change with
   the lift, the tilt, the height read under your feet and the source it came from, and the
   rise (`Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright
-  | ground <x> m vs feet (<ray|probe|heightmap>), rise <r> m`), and - since a tilt moves the
+  | ground <x> m vs feet (<ray|probe|heightmap|zone>), rise <r> m`), and - since a tilt moves the
   lift by less than
   the two centimetres that line used to be waited for - a line of its own when the tilt is
   really written into the packet, which is what separates "the ground was flat" from "the
@@ -846,12 +867,32 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   for to stop digging into the ground - everything it hangs below the player's feet, plus
   what the plane fitted under its footprint cannot explain, plus the clearance. Measured
   once per prefab (box, sphere, capsule and mesh colliders; the meshes only for the log),
-  skipped for what cannot fight back, the ground read with a ray of our own over the terrain
-  layer - the probe that recognises terrain by the component it carries behind it, and the
-  loaded heightmap behind that, both reached through `GameAccess` so no new game member is
-  named, with a self-test line for a read that answers with nothing - and added as a copy to
+  skipped for what cannot fight back, the ground read four ways in order - our own ray over
+  the terrain layer, the probe that recognises terrain by the component it carries behind
+  it, the loaded heightmap, and the zone `GroundProbe` builds where nothing else exists -
+  the last three reached through `GameAccess` so no new game member is named, with a
+  self-test line for a read that answers with nothing - and added as a copy to
   the outgoing position on the relaying server and to the clone of your own screen,
-  recomputed there at most ten times a second.
+  recomputed there at most ten times a second. The zone is only ever built while relaying,
+  so it can never be built against a position this machine made up.
+- `GroundProbe.cs` - the zone a machine never built (§ 3): keeps a terrain tile standing
+  where the costume is read, on a machine - a dedicated server - whose zones are generated
+  in *ghost* mode and have their temporary root destroyed the moment they exist. Rebuilds
+  it exactly as `SpawnZone` does (the game's own `m_zonePrefab` at the zone position,
+  behind `HeightmapBuilder.IsTerrainReady`, which is what also queues the terrain build -
+  and waits for it, bounded and one wait open at a time, because the data a tile is built
+  from is consumed by that build and the packet may not leave without it), reads it once
+  with `Heightmap.GetWorldHeight`, and destroys the root again after ten seconds without a
+  read. The root is deliberately left out of `ZoneSystem.m_zones`, where
+  the game puts every zone it spawns together with the lifetime that expels it
+  (`UpdateTTL`, four seconds without a poke): unknown to that register, the zone is neither
+  expired by the game nor mistaken for a loaded one by `IsZoneLoaded`, and only this mod's
+  own lifetime ends it. The heightmap is a different registry - it adds itself when it is
+  enabled and removes itself when destroyed, so the heightmap read finds the zone from the
+  first moment it exists, and the ray and the probe behind it find it by the collider the
+  prefab carries. The zone id is the body of `ZoneSystem.GetZone` / `GetZonePos` copied
+  rather than called, and every handle it needs lives in `GameAccess`, so the audit count
+  does not move.
 - `CreatureTriggers.cs` - the animation bridge: resolves a local trigger against the
   creature's own controller (and against `Player_animator`, so a companion name can only
   ever be played by the creature), decides which of the creature's attacks to play (normal
@@ -1005,6 +1046,13 @@ heightmap behind it is reached through `Assembly.GetType("Heightmap")` and `GetM
 neither the type nor the method is named and the audit cannot see either; and the health
 swap writes through `ZDOExtraData.Set(ZDOID, Int32, Single)` - the float twin of the silent
 int write `GameAccess` already used - for **+1** member over the 82 the count stood at.
+The zone a dedicated server never built is the same story taken one step further: every
+member it touches is **public** in the game (`ZoneSystem.instance`, `ZoneSystem.m_zonePrefab`,
+`HeightmapBuilder.instance` and `IsTerrainReady`, `Heightmap.IsDistantLod`, `m_width`,
+`m_scale`, `GetWorldHeight`) and it still reaches them through reflection, because the
+audit counts a public member just as it counts a private one - while the zone id is the
+body of `ZoneSystem.GetZone` / `GetZonePos` reimplemented in `GroundProbe` rather than
+called, so the fourth read adds no member either and the count stands at 83.
 Everything else of the two fixes (`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`,
 `ZNet.IsServer()`, `prefab.GetComponent("...")`, `prefab.GetComponent<Character>()`) was
 already referenced somewhere else, and neither fix added a Harmony patch: both run inside
@@ -1052,7 +1100,7 @@ so the count of twenty-four stays correct.
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
 | The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the seven `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
 | Your building costume does not follow you on the client (it stays where you changed it) | Normal, and it is the prefab and not the sync: on a machine running no DLL of ours the only code that applies a ZDO position to a transform is `ZSyncTransform`, and no `Piece` has one - the client drew your wall once, where your ZDO was, and has nothing left to move it with (§ 3). `disguise set <creature>` follows everywhere; so do ships, carts and dropped items. The `Static` category of the window is precisely the set of prefabs that cannot move, and `disguise list` prints its count (`static <n>`) |
-| A cart or a raft costume shivers by a few centimetres on the machine of a player watching you | The ground rest is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, the costume is sent to the height where it rests instead of one it has to be pushed out of, and the receiving body stops fighting back. Water and thin air never had that shiver (there is no contact to lose), and neither does your own clone (GhostFactory gives it no physics at all). With `Logs = Enabled` the log says what a costume really gets: `Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright | ground <x> m vs feet (<ray|probe|heightmap>), rise <r> m` - a lift of roughly *hang + 5 cm* with `rise 0.00` **and a tilt above zero degrees on a slope** is the costume lying on it, while the same lift with `laid 0.0 degrees` on ground you can see sloping, or `no terrain read` when none of the three reads answered, means the costume never left the terrain buried in it; a failed read prints its own line right after it - `Ground rest: no ground under <name> at (x, y, z) \| terrain mask <n> (layer <n>) \| <what the unfiltered ray met> \| heightmaps <n>, Heightmap.GetHeight <resolved\|not resolved>` - which is the whole diagnosis of that case. `Ground rest: <name> rotation written into the packet: <d> degrees` is the companion line showing that tilt really went out. |
+| A cart or a raft costume shivers by a few centimetres on the machine of a player watching you | The ground rest is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, the costume is sent to the height where it rests instead of one it has to be pushed out of, and the receiving body stops fighting back. Water and thin air never had that shiver (there is no contact to lose), and neither does your own clone (GhostFactory gives it no physics at all). With `Logs = Enabled` the log says what a costume really gets: `Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright | ground <x> m vs feet (<ray|probe|heightmap|zone>), rise <r> m` - a lift of roughly *hang + 5 cm* with `rise 0.00` **and a tilt above zero degrees on a slope** is the costume lying on it, while the same lift with `laid 0.0 degrees` on ground you can see sloping, or `no terrain read` when none of the four reads answered, means the costume never left the terrain buried in it; a failed read prints its own line right after it - `Ground rest: no ground under <name> at (x, y, z) \| terrain mask <n> (layer <n>) \| <what the unfiltered ray met> \| heightmaps <n>, Heightmap.GetHeight <resolved\|not resolved> \| zone probe <reason>` - which is the whole diagnosis of that case. `ray meets nothing in 10000 m` together with maps that do not cover your feet is the dedicated server standing on zones it ghost-generated (§ 3), and the reason at the end says how far the zone got: `terrain build timed out` or `another zone is building` means the tile was still being produced when the bounded wait ran out - it only has to be produced once, so the next packet has it -, `reflection unresolved` means this machine cannot ask the game at all (an error saying so is logged once), while `Ground rest: no terrain instance stands where the costume is read, so the zone at (x, z) is built to read it.` (written once) says a zone stands there, and the read that used it reports the source as `zone`. `Ground rest: <name> rotation written into the packet: <d> degrees` is the companion line showing that tilt really went out. |
 | A cart or a raft costume looks wrecked on another player's screen (missing planks, a torn sail) | The costume is wearing **your** hit points: `WearNTear` reads the `health` of the ZDO it is attached to, and your ZDO carries yours (§ 3). The relaying server swaps it for the costume's own maximum for the duration of the packet, so the dedicated server must run the current DLL (§ 1.b). Nothing about it changes for you, for the server's own state or for the save file - and the trade-off is that nobody but you and the server can read your health through a disguise any more |
 | The log of the player watching you fills with `Failed to find rpc method 213315071` (or `531685242`) | Harmless, and both hashes are known: `213315071` = `RPC_ResetCloth`, broadcast by the vanilla `Character.ResetCloth()` whenever your body starts moving (and on a jump); `531685242` = `SetTrigger`, the animation trigger broadcast (§ 4.7). A client without the DLL builds your costume, and a wall has neither a `Character` nor a `ZSyncAnimation` to answer with - the machine logs that it knows no such method and does nothing, which is exactly right since there is nothing to reset or to animate. A creature costume logs neither (both components are there), and a client running the DLL never does either (it builds a real `Player`) |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |

@@ -115,15 +115,19 @@ internal static class RestOffset
     private static readonly int s_terrainMask = LayerMask.GetMask("terrain");
 
     /// <summary>
-    /// Which of the three reads answered: the terrain-layer ray, the probe that recognises
-    /// the ground by the component it carries, or the loaded heightmap. The report prints it
-    /// so that a machine whose layer answers to nothing cannot pass for flat ground.
+    /// Which of the four reads answered: the terrain-layer ray, the probe that recognises
+    /// the ground by the component it carries, the loaded heightmap, or - on a machine with
+    /// no terrain instance where the costume stands - the zone built for this read. The
+    /// report prints it so that a machine whose layer answers to nothing cannot pass for
+    /// flat ground.
     /// </summary>
     private const int RaySource = 0;
 
     private const int ProbeSource = 1;
 
     private const int HeightmapSource = 2;
+
+    private const int ZoneSource = 3;
 
     /// <summary>
     /// The probe's ray results: preallocated, because it runs for every sample of every ring
@@ -515,16 +519,23 @@ internal static class RestOffset
     }
 
     /// <summary>
-    /// The terrain surface under a point, read three ways before nothing is admitted: the
+    /// The terrain surface under a point, read four ways before nothing is admitted: the
     /// terrain-layer ray first (exact, and it follows whatever the terrain was sculpted
     /// into), then the probe that recognises the ground by the component it carries - for a
-    /// machine where that layer answers to nothing - and only then the loaded heightmap,
-    /// which needs no collider at all. False only when all three have nothing to say, a case
-    /// the report prints rather than letting it pass for flat ground, with a self-test line
-    /// naming which of them failed and why.
+    /// machine where that layer answers to nothing - then the loaded heightmap, which needs
+    /// no collider at all, and last the zone built for this read when the machine has no
+    /// terrain instance where the costume stands (a dedicated server, which generates those
+    /// zones without ever leaving one standing). False only when all four have nothing to
+    /// say, a case the report prints rather than letting it pass for flat ground, with a
+    /// self-test line naming which of them failed and why.
+    ///
+    /// Every read touches the zone built for its point first: from the moment that zone
+    /// exists the ray above answers from its collider, so the build is the FIRST read of a
+    /// zone and the ones after it cost one dictionary lookup.
     /// </summary>
     private static bool TryGround(Vector3 position, out float height, out int source)
     {
+        GroundProbe.Touch(position);
         if (TryLayerRay(position, out height))
         {
             source = RaySource;
@@ -538,6 +549,14 @@ internal static class RestOffset
         if (GameAccess.TryGetTerrainHeight(position, out height))
         {
             source = HeightmapSource;
+            return true;
+        }
+        // Only the relaying machine builds: a client reads the terrain it already has, and
+        // building one from a view - which may be asked at a faked position - would plant a
+        // zone where nobody ever stood.
+        if (s_sending && GroundProbe.TryGetHeight(position, out height))
+        {
+            source = ZoneSource;
             return true;
         }
         source = RaySource;
@@ -615,10 +634,10 @@ internal static class RestOffset
 
     /// <summary>
     /// The self-test: what no read of the ground could answer, once when it first fails and
-    /// then at most every half minute. It names the three things the report cannot tell
-    /// apart - a layer answering to nothing, a machine where no collider answers at all, and
-    /// a position no world was generated under - so the next step is read rather than
-    /// guessed at.
+    /// then at most every half minute. It names the four things the report cannot tell
+    /// apart - a layer answering to nothing, a machine where no collider answers at all, a
+    /// position no world was generated under, and a zone that could not be built to read it
+    /// (with the reason that build gave) - so the next step is read rather than guessed at.
     /// </summary>
     private static void ReportNoGround(int prefabHash, Vector3 position)
     {
@@ -635,6 +654,7 @@ internal static class RestOffset
                 + $"{s_terrainMask} (layer {layer}) | {DescribeProbe(position)} | heightmaps "
                 + $"{lookup}, Heightmap.GetHeight "
                 + (GameAccess.s_heightmapGetHeight == null ? "not resolved" : "resolved")
+                + $" | zone probe {GroundProbe.LastFailure()}"
         );
     }
 
@@ -1074,7 +1094,8 @@ internal static class RestOffset
 
     /// <summary>
     /// Which read answered, named the way the report prints it: the terrain layer, the probe
-    /// that recognises terrain by its component, or the heightmap the world was built from.
+    /// that recognises terrain by its component, the heightmap the world was built from, or
+    /// the zone built under a costume on a machine that had none standing there.
     /// </summary>
     private static string SourceName(int source)
     {
@@ -1082,7 +1103,11 @@ internal static class RestOffset
         {
             return "probe";
         }
-        return source == HeightmapSource ? "heightmap" : "ray";
+        if (source == HeightmapSource)
+        {
+            return "heightmap";
+        }
+        return source == ZoneSource ? "zone" : "ray";
     }
 
     /// <summary>

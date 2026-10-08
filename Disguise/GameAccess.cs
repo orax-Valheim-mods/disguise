@@ -105,6 +105,99 @@ internal static class GameAccess
         null
     );
 
+    // -- The terrain a dedicated server never spawns --------------------------------------
+    // ZoneSystem.instance, ZoneSystem.m_zonePrefab, HeightmapBuilder.IsTerrainReady and
+    // Heightmap.GetWorldHeight are all PUBLIC in the game, and are reached through
+    // reflection all the same: the visibility audit lists every member reference the DLL
+    // makes, public or not, and none of these may be added to that list. The two types
+    // referenced nowhere are looked up by name on the assembly the game loads, exactly like
+    // Heightmap above.
+    internal static readonly PropertyInfo? s_zoneSystemInstanceProperty =
+        typeof(ZoneSystem).GetProperty(
+            "instance",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        );
+
+    internal static readonly FieldInfo? s_zonePrefabField = typeof(ZoneSystem).GetField(
+        "m_zonePrefab",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    internal static readonly Type? s_heightmapBuilderType = typeof(ZoneSystem).Assembly.GetType(
+        "HeightmapBuilder"
+    );
+
+    internal static readonly Type? s_worldGeneratorType = typeof(ZoneSystem).Assembly.GetType(
+        "WorldGenerator"
+    );
+
+    internal static readonly PropertyInfo? s_heightmapBuilderInstanceProperty =
+        s_heightmapBuilderType?.GetProperty(
+            "instance",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        );
+
+    internal static readonly PropertyInfo? s_worldGeneratorInstanceProperty =
+        s_worldGeneratorType?.GetProperty(
+            "instance",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        );
+
+    // HeightmapBuilder.IsTerrainReady: the guard ZoneSystem.SpawnZone casts before it
+    // instantiates a zone - and not only a question: a tile nobody has queued is queued BY
+    // the question, so asking for it on every read is what gets the terrain built. Only a
+    // true may be obeyed, because instantiating a zone whose data is still missing would
+    // block the sending thread inside RequestTerrainSync.
+    internal static readonly MethodInfo? s_isTerrainReadyMethod = ResolveIsTerrainReady();
+
+    internal static readonly FieldInfo? s_heightmapWidthField = s_heightmapType?.GetField(
+        "m_width",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    internal static readonly FieldInfo? s_heightmapScaleField = s_heightmapType?.GetField(
+        "m_scale",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    // Heightmap.IsDistantLod: SpawnZone asks the guard with the prefab's own answer, and
+    // Generate() then requests the terrain with the same one - the two must agree, or the
+    // tile queued here is a tile the instantiated map never asks for, and
+    // RequestTerrainSync would wait for it forever.
+    internal static readonly PropertyInfo? s_heightmapDistantLodProperty =
+        s_heightmapType?.GetProperty(
+            "IsDistantLod",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+
+    // Heightmap.GetWorldHeight(Vector3, out float): the instance twin of GetHeight above -
+    // the same read, but of ONE map, which is what a zone built here has to be read from:
+    // GetHeight searches the list of maps for a point, and the zone built here already knows
+    // which map it just built.
+    internal static readonly MethodInfo? s_heightmapGetWorldHeightMethod =
+        s_heightmapType?.GetMethod(
+            "GetWorldHeight",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(Vector3), typeof(float).MakeByRefType() },
+            null
+        );
+
+    /// <summary>
+    /// The five parameters of IsTerrainReady (position, width, scale, distant-LOD flag,
+    /// world generator), all refilled before every call - the box is reused rather than
+    /// rebuilt so that a ground read costs no allocation.
+    /// </summary>
+    private static readonly object[] s_terrainReadyArgs = new object[5];
+
+    private static readonly object[] s_worldHeightArgs = new object[] { Vector3.zero, 0f };
+
+    private static bool s_zonePrefabErrorLogged;
+
+    private static bool s_terrainReadyErrorLogged;
+
+    private static bool s_worldHeightErrorLogged;
+
     /// <summary>The reused [position, out value] box of that reflection call.</summary>
     private static readonly object[] s_heightArgs = new object[] { Vector3.zero, 0f };
 
@@ -245,6 +338,180 @@ internal static class GameAccess
         }
         height = (float)args[1];
         return true;
+    }
+
+    /// <summary>
+    /// True when every handle the zone terrain read needs resolved at load time. Asked
+    /// before the first attempt, so that a build refused for want of reflection is a name in
+    /// the log instead of an endless "terrain not built".
+    /// </summary>
+    internal static bool HasZoneTerrainAccess()
+    {
+        return s_heightmapType != null
+            && s_heightmapBuilderInstanceProperty != null
+            && s_worldGeneratorInstanceProperty != null
+            && s_isTerrainReadyMethod != null
+            && s_heightmapWidthField != null
+            && s_heightmapScaleField != null
+            && s_heightmapDistantLodProperty != null
+            && s_heightmapGetWorldHeightMethod != null;
+    }
+
+    /// <summary>
+    /// The zone prefab every tile of terrain is instantiated from, or null when the game's
+    /// own singleton cannot be reached (main menu, before the world exists).
+    /// </summary>
+    internal static GameObject? GetZonePrefab()
+    {
+        PropertyInfo? instance = s_zoneSystemInstanceProperty;
+        FieldInfo? field = s_zonePrefabField;
+        if (instance == null || field == null)
+        {
+            return null;
+        }
+        try
+        {
+            object? system = instance.GetValue(null);
+            return system == null ? null : field.GetValue(system) as GameObject;
+        }
+        catch (Exception ex)
+        {
+            if (!s_zonePrefabErrorLogged)
+            {
+                s_zonePrefabErrorLogged = true;
+                Disguise.LogError($"Cannot read ZoneSystem.m_zonePrefab: {ex.Message}");
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The Heightmap of a zone root (or of the zone prefab it is built from), null when it
+    /// carries none. Inactive children are included: the game reads it off a prefab asset,
+    /// where "active in a hierarchy" is not a question worth asking.
+    /// </summary>
+    internal static Component? GetHeightmap(GameObject? root)
+    {
+        Type? type = s_heightmapType;
+        if (root == null || type == null)
+        {
+            return null;
+        }
+        return root.GetComponentInChildren(type, true);
+    }
+
+    /// <summary>
+    /// ZoneSystem.SpawnZone's own guard: true when the tile's terrain data is built and
+    /// waiting to be instantiated, false while it is being built - in which case asking has
+    /// just queued it - and null when the game cannot be asked at all (no builder, no world
+    /// generator, or the call itself failed). The width and the scale come from the prefab's
+    /// own Heightmap, so the tile asked for is the tile that prefab would build.
+    /// </summary>
+    internal static bool? IsZoneTerrainReady(Vector3 zonePosition, Component? heightmap)
+    {
+        PropertyInfo? builderInstance = s_heightmapBuilderInstanceProperty;
+        PropertyInfo? worldGenInstance = s_worldGeneratorInstanceProperty;
+        MethodInfo? method = s_isTerrainReadyMethod;
+        FieldInfo? widthField = s_heightmapWidthField;
+        FieldInfo? scaleField = s_heightmapScaleField;
+        PropertyInfo? distantLod = s_heightmapDistantLodProperty;
+        if (
+            builderInstance == null
+            || worldGenInstance == null
+            || method == null
+            || widthField == null
+            || scaleField == null
+            || distantLod == null
+            || heightmap == null
+        )
+        {
+            return null;
+        }
+        try
+        {
+            object? builder = builderInstance.GetValue(null);
+            object? worldGen = worldGenInstance.GetValue(null);
+            if (builder == null || worldGen == null)
+            {
+                return null;
+            }
+            object[] args = s_terrainReadyArgs;
+            args[0] = zonePosition;
+            args[1] = widthField.GetValue(heightmap);
+            args[2] = scaleField.GetValue(heightmap);
+            // The prefab's own answer, exactly as SpawnZone passes it: Generate() requests
+            // the terrain with the same flag, so a guess here would queue a tile nobody
+            // asks for and leave the map waiting for one nobody queued.
+            args[3] = distantLod.GetValue(heightmap);
+            args[4] = worldGen;
+            return method.Invoke(builder, args) is bool ready && ready;
+        }
+        catch (Exception ex)
+        {
+            if (!s_terrainReadyErrorLogged)
+            {
+                s_terrainReadyErrorLogged = true;
+                Disguise.LogError($"Cannot call HeightmapBuilder.IsTerrainReady: {ex.Message}");
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The terrain surface one named heightmap gives under a point, or false when no vertex
+    /// of that map covers it. The instance twin of <see cref="TryGetTerrainHeight"/>: same
+    /// read, but of the map that was just built here rather than of whichever map the game
+    /// would search for.
+    /// </summary>
+    internal static bool TryGetHeightmapHeight(
+        Component? heightmap,
+        Vector3 position,
+        out float height
+    )
+    {
+        height = 0f;
+        MethodInfo? method = s_heightmapGetWorldHeightMethod;
+        if (method == null || heightmap == null)
+        {
+            return false;
+        }
+        object[] args = s_worldHeightArgs;
+        args[0] = position;
+        try
+        {
+            if (method.Invoke(heightmap, args) is not bool found || !found)
+            {
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!s_worldHeightErrorLogged)
+            {
+                s_worldHeightErrorLogged = true;
+                Disguise.LogError($"Cannot call Heightmap.GetWorldHeight: {ex.Message}");
+            }
+            return false;
+        }
+        height = (float)args[1];
+        return true;
+    }
+
+    private static MethodInfo? ResolveIsTerrainReady()
+    {
+        Type? builder = s_heightmapBuilderType;
+        Type? worldGen = s_worldGeneratorType;
+        if (builder == null || worldGen == null)
+        {
+            return null;
+        }
+        return builder.GetMethod(
+            "IsTerrainReady",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(Vector3), typeof(int), typeof(float), typeof(bool), worldGen },
+            null
+        );
     }
 
     /// <summary>
