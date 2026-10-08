@@ -30,7 +30,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | setFakePosition | perf | list [filter] | gui | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -61,6 +61,8 @@ internal static class DisguiseCommand
             "view",
             "logs",
             "fly",
+            "offset",
+            "rotation",
             "setFakePosition",
             "perf",
             "list",
@@ -146,6 +148,14 @@ internal static class DisguiseCommand
 
             case "fly":
                 SetFly(ctx, words.Length > 2 ? words[2] : null);
+                break;
+
+            case "offset":
+                SetOffset(ctx, words);
+                break;
+
+            case "rotation":
+                SetRotation(ctx, words);
                 break;
 
             case "gui":
@@ -234,6 +244,11 @@ internal static class DisguiseCommand
             ctx,
             "  disguise fly [on|off]     fly: the creature is raised for the others (visual only)"
         );
+        Say(
+            ctx,
+            "  disguise offset <X Y Z>   move the costume (world units, 1 = 1 metre, visual only)"
+        );
+        Say(ctx, "  disguise rotation <X Y Z> turn the costume in place (degrees, visual only)");
         Say(ctx, "  disguise gui [on|off]     open / close the window (same as the GuiKey chord)");
         Say(
             ctx,
@@ -427,6 +442,101 @@ internal static class DisguiseCommand
     }
 
     /// <summary>
+    /// "disguise offset <X> <Y> <Z>": moves the costume away from you - on your own screen and,
+    /// with this DLL on the dedicated server, on every other machine. Your player never moves:
+    /// the position the server keeps, saves and runs the game logic with stays where you
+    /// stand, only what is drawn and what goes out on the wire is moved (PoseControl). Without
+    /// arguments it only reports where the costume stands right now.
+    /// </summary>
+    private static void SetOffset(Terminal? ctx, string[] words)
+    {
+        const string usage =
+            "Usage: disguise offset <X> <Y> <Z>   (world units, 1 = 1 metre; 0 0 0 puts it back)";
+        if (words.Length < 5)
+        {
+            Vector3 current = PoseControl.Offset;
+            Say(ctx, $"[Disguise] Offset: ({current.x:0.0}, {current.y:0.0}, {current.z:0.0})");
+            Say(ctx, usage);
+            return;
+        }
+        if (!TryReadPose(ctx, words, usage, out float x, out float y, out float z))
+        {
+            return;
+        }
+
+        PoseControl.SetOffset(x, y, z);
+        Vector3 pose = PoseControl.Offset;
+        Say(
+            ctx,
+            $"[Disguise] Offset set: ({pose.x:0.0}, {pose.y:0.0}, {pose.z:0.0}) - the costume is drawn that far from you."
+        );
+        Say(
+            ctx,
+            "Your player never moves: only the position the others are handed does (needs this DLL on the dedicated server)."
+        );
+    }
+
+    /// <summary>
+    /// "disguise rotation <X> <Y> <Z>": turns the costume in place, in degrees, ON TOP of the
+    /// way it already faces - zero therefore changes nothing at all. Same two places as the
+    /// offset (PoseControl), same rule: the player itself is never turned, and what the server
+    /// stores in the save keeps the rotation the game gave you.
+    /// </summary>
+    private static void SetRotation(Terminal? ctx, string[] words)
+    {
+        const string usage =
+            "Usage: disguise rotation <X> <Y> <Z>   (degrees; 0 0 0 faces it the way it normally does)";
+        if (words.Length < 5)
+        {
+            Vector3 current = PoseControl.Euler;
+            Say(ctx, $"[Disguise] Rotation: ({current.x:0.0}, {current.y:0.0}, {current.z:0.0})");
+            Say(ctx, usage);
+            return;
+        }
+        if (!TryReadPose(ctx, words, usage, out float x, out float y, out float z))
+        {
+            return;
+        }
+
+        PoseControl.SetRotation(x, y, z);
+        Vector3 turn = PoseControl.Euler;
+        Say(
+            ctx,
+            $"[Disguise] Rotation set: ({turn.x:0.0}, {turn.y:0.0}, {turn.z:0.0}) - the costume is drawn that way."
+        );
+        Say(
+            ctx,
+            "Your player never turns: only what the others are handed does (needs this DLL on the dedicated server)."
+        );
+    }
+
+    /// <summary>Reads the three numbers of a pose command, or reports what stopped it.</summary>
+    private static bool TryReadPose(
+        Terminal? ctx,
+        string[] words,
+        string usage,
+        out float x,
+        out float y,
+        out float z
+    )
+    {
+        x = 0f;
+        y = 0f;
+        z = 0f;
+        if (
+            !TryParseCoordinate(words[2], out x)
+            || !TryParseCoordinate(words[3], out y)
+            || !TryParseCoordinate(words[4], out z)
+        )
+        {
+            Say(ctx, "[Disguise] The three values must be numbers (e.g. 0 1.5 -45).");
+            Say(ctx, usage);
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// "disguise gui [on|off]": opens or closes the window - the same thing as the GuiKey
     /// chord (F8 + LeftAlt by default), for whoever prefers the console. The window is an
     /// overlay: the game keeps running, only the frames with the pointer on the window or the
@@ -513,8 +623,8 @@ internal static class DisguiseCommand
         if (words.Length >= 4)
         {
             if (
-                !TryParseMapCoordinate(words[2], out float x)
-                || !TryParseMapCoordinate(words[3], out float z)
+                !TryParseCoordinate(words[2], out float x)
+                || !TryParseCoordinate(words[3], out float z)
             )
             {
                 PrintFakePositionUsage(ctx);
@@ -573,10 +683,14 @@ internal static class DisguiseCommand
         return word == "off" || word == "clear" || word == "none" || word == "disable";
     }
 
-    private static bool TryParseMapCoordinate(string text, out float value)
+    /// <summary>
+    /// One number as the game and both keyboards write it: InvariantCulture first (the game
+    /// writes "10.5"), then the current culture, so that "10,5" is also accepted on a French
+    /// keyboard. Shared with the pose (offset / rotation) and with the window, which types the
+    /// same three numbers into its own fields.
+    /// </summary>
+    internal static bool TryParseCoordinate(string text, out float value)
     {
-        // InvariantCulture first (the game writes "10.5"), then the current culture, so
-        // that "10,5" is also accepted on a French keyboard.
         if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
         {
             return true;
@@ -633,6 +747,12 @@ internal static class DisguiseCommand
         Say(
             ctx,
             $"  Flight: {(FlightControl.IsFlying ? $"on, +{FlightControl.Height:0.0} m" : "off")} (disguise fly, keys in [5 - Flight])"
+        );
+        Say(
+            ctx,
+            $"  Pose: offset ({PoseControl.Offset.x:0.0}, {PoseControl.Offset.y:0.0}, {PoseControl.Offset.z:0.0}), "
+                + $"rotation ({PoseControl.Euler.x:0.0}, {PoseControl.Euler.y:0.0}, {PoseControl.Euler.z:0.0}) "
+                + "(disguise offset, disguise rotation)"
         );
         Say(
             ctx,

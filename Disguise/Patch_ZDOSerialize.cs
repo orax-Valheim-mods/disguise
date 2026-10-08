@@ -8,7 +8,8 @@ namespace Disguise;
 /// ZDO.Serialize is the NETWORK path (its only caller is ZDOMan.SendZDOs, the save file
 /// goes through ZDO.Save): for the duration of the packet, EquipmentMask hides the enabled
 /// equipment keys of a disguised player, HealthMask writes the costume's own maximum into
-/// its health key, and RestOffset lays the costume on the ground its player stands on.
+/// its health key, RestOffset lays the costume on the ground its player stands on, and
+/// PoseControl turns it the way its owner asked for.
 ///
 /// Vanilla clients therefore receive 0 for HelmetItem / ChestItem / LegItem / ShoulderItem /
 /// LeftItem... and never glue your gear to the creature rig, and they render a costume that
@@ -17,9 +18,12 @@ namespace Disguise;
 /// rotation is the one the wire cannot carry any other way: ZDO.Serialize is where the body
 /// writes it (the packet header carries a position, never a rotation), so a costume lying on
 /// a slope is only a slope on the machines that render it while this prefix holds it down -
-/// Relaying machine only, like the health (see RestOffset for both). None of the three is
-/// reflected in the DataRevision, so they cost no extra traffic and never change the local
-/// ZDO state (your own view).
+/// Relaying machine only, like the health (see RestOffset for both) - and a costume the owner
+/// turned stays turned while PoseControl composes cd_rx / cd_ry / cd_rz into that same value
+/// (its swap opens BEFORE RestOffset's and closes after it, so the tilt ends up on top of the
+/// turn and one single rotation leaves the server). None of the four is reflected in the
+/// DataRevision, so they cost no extra traffic and never change the local ZDO state (your own
+/// view).
 ///
 /// This runs on every machine owning a disguised ZDO, but also on the server relaying it:
 /// what gets masked there follows the owner's own choice, published in its ZDO as
@@ -37,6 +41,7 @@ internal static class Patch_ZDOSerialize
         {
             __state = EquipmentMask.BeginOutgoingMask(__instance);
             HealthMask.BeginOutgoingHealth(__instance);
+            PoseControl.BeginOutgoingRotation(__instance);
             RestOffset.BeginOutgoingRotation(__instance);
         }
         catch (Exception ex)
@@ -47,8 +52,8 @@ internal static class Patch_ZDOSerialize
     }
 
     // The finalizer runs even if the original method threw: a swap must never outlive the
-    // call it was opened for. HealthMask.End and RestOffset.EndRotation close nothing when
-    // their Begin opened nothing.
+    // call it was opened for. HealthMask.End, RestOffset.EndRotation and
+    // PoseControl.EndOutgoingRotation close nothing when their Begin opened nothing.
     private static Exception? Finalizer(Exception? __exception, bool __state)
     {
         if (__state)
@@ -57,6 +62,7 @@ internal static class Patch_ZDOSerialize
         }
         HealthMask.End();
         RestOffset.EndRotation();
+        PoseControl.EndOutgoingRotation();
         return __exception;
     }
 }

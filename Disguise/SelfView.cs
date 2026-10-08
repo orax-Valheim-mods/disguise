@@ -96,8 +96,13 @@ internal static class SelfView
                     wanted,
                     basePosition
                         + RestOffset.ViewOffset(wanted, basePosition)
+                        + PoseControl.ViewOffset
                         + FlightControl.ViewOffset,
-                    RestOffset.ViewRotation(wanted, basePosition, player.transform.rotation)
+                    RestOffset.ViewRotation(
+                        wanted,
+                        basePosition,
+                        player.transform.rotation * PoseControl.ViewRotation
+                    )
                 );
                 if (ghost == null)
                 {
@@ -147,8 +152,13 @@ internal static class SelfView
             s_ghost.transform.SetPositionAndRotation(
                 basePosition
                     + RestOffset.ViewOffset(s_ghostPrefabHash, basePosition)
+                    + PoseControl.ViewOffset
                     + FlightControl.ViewOffset,
-                RestOffset.ViewRotation(s_ghostPrefabHash, basePosition, player.transform.rotation)
+                RestOffset.ViewRotation(
+                    s_ghostPrefabHash,
+                    basePosition,
+                    player.transform.rotation * PoseControl.ViewRotation
+                )
             );
 
             if (Time.unscaledTime >= s_nextRendererScan)

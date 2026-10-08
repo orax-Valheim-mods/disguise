@@ -115,6 +115,8 @@ In game, open the console with **F5**:
 | `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
 | `disguise logs [on|off]` | Write the mod's own **Info** messages to the BepInEx log (toggles without an argument; warnings and errors are always written, § 2) |
 | `disguise fly [on|off]` | **Raise the creature above you** for the other machines (toggles without an argument, § 2). Purely visual: your player never leaves the ground |
+| `disguise offset <X> <Y> <Z>` | **Move the costume** that far from you - world units, `1` is one metre (no argument reports where it stands, `0 0 0` puts it back, § 3). Purely visual: your player never moves |
+| `disguise rotation <X> <Y> <Z>` | **Turn the costume** in place, in degrees **on top of** the way it already faces (no argument reports it, `0 0 0` is the normal facing, § 3). Purely visual: your player never turns |
 | `disguise setFakePosition [x z \| off]` | Show a **fake position** on the other players' map: no argument records where you stand, `off` shows the real one again (needs the DLL on the server, § 1.b) |
 | `disguise gui [on|off]` | Open / close the Disguise window (`GuiKey`, § 2): same thing as the key chord, for whoever prefers the console |
 | `disguise perf` | Frame time of the window since the previous call: avg / min / max in ms and FPS (the window resets at every report) |
@@ -608,6 +610,32 @@ Visual synchronisation on vanilla clients:
   read worth nothing). That cancels exactly the zoom of the frame, because the method writes
   only `GameCamera.m_distance` with that scroll - and only it: the minimap, the build
   rotation and the climb itself all read the wheel outside the window.
+- **Pose** (`cd_ox` / `cd_oy` / `cd_oz` and `cd_rx` / `cd_ry` / `cd_rz`, `PoseControl`): the
+  offset and the rotation of the costume, set from `disguise offset` / `disguise rotation`
+  and from the two rows of the window, and **memory only** - they start at zero on every
+  launch, and the publication below writes that zero back into the ZDO, which is what erases
+  a value an earlier session left there. Your own client writes the six values into your ZDO
+  as **ints** (the offset in centimetres, the rotation in centidegrees: `ZDO.Set` has no
+  float overload), one pass per 100 ms at most and only for a value that really changed, so
+  typing never floods the DataRevision. The offset then rides the very same channel as the
+  height - a postfix on `ZDO.GetPosition`, open only while `ZDOMan.SendZDOs` builds a packet
+  on the **server** - which adds `cd_ox / 100`, `cd_oy / 100` and `cd_oz / 100` to the copy
+  going into the packet header, *after* the ground rest has measured the spot and *before*
+  the flight raises it, and writes nothing. The rotation cannot ride that header (a header
+  carries a position, never a rotation): `ZDO.Serialize` writes `m_rotation` into the body
+  whenever it differs from identity, so the server composes
+  `current * Euler(cd_rx, cd_ry, cd_rz)` into that one value for the duration of the body
+  being built and puts the stored rotation back immediately after (`Patch_ZDOSerialize`
+  opens this swap **before** `RestOffset`'s own lay-on-the-ground tilt and closes it **after**,
+  so a single rotation - turn first, tilt on top - leaves the server; the receivers apply it
+  where they build the object and where `ZSyncTransform` syncs it). Neither swap bumps the
+  DataRevision, neither reaches `ZDO.Save` - the world file reads through `ZDO.Save`, never
+  through `Serialize` - and both are the relaying machine's alone, because an owner rewriting
+  its own rotation would have the server STORE it. Same two gates as the flight, server only
+  and only while your prefab really is the creature, and the same consequence without the DLL
+  on the server (§ 1.b): your own screen moves and turns the clone at once (`SelfView`
+  composes the turn after your own rotation and hands the ground rest the point the costume
+  now stands on), while everybody else keeps it where it was.
 - **Animations**: partial, and bridged for melee attacks and for the block key. `ZSyncAnimation.SetTrigger`
   carries no name at all inside the ZDO: it broadcasts the raw **parameter name**, and each
   machine applies it to the animator of the object *it* built for that ZDO - a real `Player`
@@ -757,6 +785,11 @@ Visual synchronisation on vanilla clients:
      flies, the others only do while the dedicated server runs the current build. A machine
      running this DLL renders you as a real `Player`, so what it raises is your viking - it
      has no creature of yours to draw (§ 4.7 always applied there too).
+   - The **pose works the same way** (`disguise offset`, `disguise rotation`): the costume
+     can stand and face somewhere else while your player stays exactly where it is, hitboxes
+     and all - only what is drawn is moved and turned. It is memory only like the height
+     (a restart puts it back to `0 0 0`), and it reaches the others only while the dedicated
+     server runs this DLL (§ 1.b).
 
 ---
 
@@ -1123,6 +1156,7 @@ so the count of twenty-four stays correct.
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 | You fly on your own screen but nobody else sees you in the air | The raise is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, a vanilla client receives your creature already raised; without it, only your own view flies (`disguise fly on` then `disguise status` to confirm the height is published). Two older mistakes produce the same symptom, both fixed by deploying the **current** build on the server and restarting it (§ 6): a server whose DLL predates the flight, or one whose DLL raised the position inside `ZDO.Serialize` - the body of a ZDO, which the receiver never reads for a position |
+| The costume does not move or turn for the others | The pose is relayed exactly like the flight (§ 3): the dedicated server must run the current DLL (§ 1.b). `disguise status` must show your values on its `Pose:` line (they reach your ZDO within a tenth of a second; being memory only, a restart puts them back to `0 0 0`). Your own screen moves the clone immediately with `SeeYourDisguise`, which is how to tell a publication problem from a rendering one |
 | The climb / descent keys do nothing | The flight must be **on** first (`disguise fly on` or `FlyEnableKey`): `FlyUpKey` / `FlyDownKey` only act while it is. Then check the four shortcuts in the `[5 - Flight]` section - a value BepInEx cannot read leaves that binding empty and logs `Failed to read keybind from settings: ...` in the log, which needs the format `main key + modifiers` (`UpArrow + LeftAlt`, main key first: `LeftAlt+Home` would be read reversed). Re-record it in ConfigurationManager (Alt+F10) instead of typing it. An unset shortcut (`Not set`) never fires, and nothing of it ever throws |
 | Your own viking stays on the ground while the creature flies | Normal: your body really is on the ground (§ 4.8). Turn `SeeYourDisguise` on (§ 2) to watch the creature fly on your own screen too |
 | The wheel still zooms instead of climbing (or does nothing at all) | The flight must be **on** first (`FlyEnableKey` / `disguise fly on`), `FlyScrollWheel` must be `true`, and `FlyScrollStep` must not be `0` - a step of `0` hands the wheel back to the camera by design. All three are read every frame, so no restart is needed after a change |

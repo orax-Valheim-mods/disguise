@@ -14,13 +14,14 @@ namespace Disguise;
 /// only the packet is faked, the server's ZDO state - and therefore saves and game logic -
 /// always keeps the real position.
 ///
-/// The same Prefix / Postfix / Finalizer also opens and closes the three windows the outgoing
-/// positions are rewritten in: the flight raise (FlightControl.BeginSend / EndSend), the band
-/// that keeps a disguised player's relayed position still (PositionHold.BeginSend / EndSend)
-/// and the lift that keeps its costume from digging into the ground (RestOffset.BeginSend /
-/// EndSend) - for the duration of this call, the positions handed to ZDO.GetPosition may be
-/// raised by cd_fly, held around the last one sent, and lifted to where the costume rests
-/// (Patch_ZDOGetPosition). Nothing to restore there - a raised, held or lifted copy is
+/// The same Prefix / Postfix / Finalizer also opens and closes the four windows the outgoing
+/// positions are rewritten in: the flight raise (FlightControl.BeginSend / EndSend), the pose
+/// move (PoseControl.BeginSend / EndSend), the band that keeps a disguised player's relayed
+/// position still (PositionHold.BeginSend / EndSend) and the lift that keeps its costume from
+/// digging into the ground (RestOffset.BeginSend / EndSend) - for the duration of this call,
+/// the positions handed to ZDO.GetPosition may be held around the last one sent, lifted to
+/// where the costume rests, moved by cd_ox / cd_oy / cd_oz and raised by cd_fly
+/// (Patch_ZDOGetPosition). Nothing to restore there - a held, lifted, moved or raised copy is
 /// returned, never written into a ZDO.
 ///
 /// NOTE: no per-peer filtering here (ZDOMan.ZDOPeer is a private type of the game): your own
@@ -36,10 +37,12 @@ internal static class Patch_SendZDOs
     {
         try
         {
-            // All three windows cover the whole call: from here on, the positions this call
-            // hands to ZDO.GetPosition may be raised (Patch_ZDOGetPosition), held inside the
-            // band (PositionHold) and lifted to where the costume rests (RestOffset).
+            // All four windows cover the whole call: from here on, the positions this call
+            // hands to ZDO.GetPosition may be held inside the band, lifted to where the
+            // costume rests, moved by the pose and raised by the flight
+            // (Patch_ZDOGetPosition).
             FlightControl.BeginSend();
+            PoseControl.BeginSend();
             PositionHold.BeginSend();
             RestOffset.BeginSend();
 
@@ -68,6 +71,7 @@ internal static class Patch_SendZDOs
     private static void Postfix()
     {
         FlightControl.EndSend();
+        PoseControl.EndSend();
         PositionHold.EndSend();
         RestOffset.EndSend();
         RestoreRealPosition();
@@ -78,6 +82,7 @@ internal static class Patch_SendZDOs
     private static Exception? Finalizer(Exception? __exception)
     {
         FlightControl.EndSend();
+        PoseControl.EndSend();
         PositionHold.EndSend();
         RestOffset.EndSend();
         RestoreRealPosition();

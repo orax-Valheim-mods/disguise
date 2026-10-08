@@ -22,6 +22,8 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | `disguise view [on|off]` | Show the creature on your own screen instead of your viking (local only) |
 | `disguise logs [on|off]` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
 | `disguise fly [on|off]` | Raise the creature above you for the others (visual only: your player stays on the ground) |
+| `disguise offset <X> <Y> <Z>` | Move the costume that far from you (world units, `1` is one metre; no argument reports where it stands, `0 0 0` puts it back). Visual only: your player never moves |
+| `disguise rotation <X> <Y> <Z>` | Turn the costume in place, in degrees **on top of** the way it already faces (no argument reports it, `0 0 0` is the normal facing). Visual only: your player never turns |
 | `disguise gui [on|off]` | Open / close the Disguise window (`GuiKey`) |
 | `disguise perf` | Frame time of the last few seconds: avg / min / max in ms and FPS (resets the window) |
 | `disguise status` | Current state (prefab, marker, save protection) |

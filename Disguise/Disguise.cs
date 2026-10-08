@@ -90,6 +90,26 @@ public class Disguise : BaseUnityPlugin
     /// </summary>
     public const string FlyKey = "cd_fly";
 
+    /// <summary>
+    /// Six int flags written by the OWNER of a disguised player: where the other machines must
+    /// draw it - the OFFSET from its player in CENTIMETRES and the ROTATION in CENTIDEGREES
+    /// (see PoseControl), one key per axis. The real position and the real rotation never
+    /// move: the relaying server adds the offset to the position of the outgoing packet and
+    /// composes the rotation into its body, each for that one call only, so neither reaches
+    /// the game logic, the AI nor the save file.
+    /// </summary>
+    public const string OffsetXKey = "cd_ox";
+
+    public const string OffsetYKey = "cd_oy";
+
+    public const string OffsetZKey = "cd_oz";
+
+    public const string RotationXKey = "cd_rx";
+
+    public const string RotationYKey = "cd_ry";
+
+    public const string RotationZKey = "cd_rz";
+
     internal static Harmony? PatchHarmony;
 
     private static Disguise? s_instance;
@@ -180,6 +200,11 @@ public class Disguise : BaseUnityPlugin
         // Flight keys (purely visual): raises what the other machines render, and what your
         // own clone draws - your player itself never moves. Also publishes the height.
         FlightControl.Tick();
+
+        // Pose of the costume (purely visual): publishes the offset and the rotation the
+        // window and the console edit into the player ZDO, where the relaying server reads
+        // them back - ten times a second, and only the values that really changed.
+        PoseControl.Tick();
 
         // Own view (purely local): builds / synchronises / removes the creature clone that
         // replaces your own viking on your screen. No-op without a local player, without
