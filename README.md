@@ -326,22 +326,24 @@ blocks `Menu.Show` for that frame only, or the game would pause on the same key)
 Escape opens it as usual. The title row carries the chord itself, between the title and
 Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
 `Not set` when it is empty), so the window always says how to call it back. The window shows
-the category checkboxes, the prefab list, the 3D preview, the command
-buttons and the status line (the branch added them one step at a time): a row of four buttons
+the category checkboxes, the prefab list, the two pose rows under it, the 3D preview, the
+command buttons and the status line (the branch added them one step at a time): a row of four buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight` =
 `disguise enable` / `disable`, `refresh`, `view`, `fly`), and reporting its answer on the
 line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
 disguise is on and "Enable" while it is off, and both that label and the line under the title
 are rewritten after every click. The **line under the title** reads
-`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   offset: <y>` - the prefab
-and the toggle from the config, the flight from `FlightControl`, and the **offset** that
+`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>` - the prefab
+and the toggle from the config, the flight from `FlightControl`, and the **height** that
 flight lifts the costume by, in metres with one decimal: `0.0` while the flight is off
 (`Disable` puts the height back to 0), the height it is clamped to (0..100) while it is on,
 so the figure is 0 or more and never negative - a raise, not a position: the player and its
-Y never move, only what the machines draw does. Two of those four values move on their own,
-so the line is brought up to date **every frame** the window is on screen, written only when
-the words really changed. The status line
+Y never move, only what the machines draw does. It reads `height` rather than `offset`
+because the **Offset row below** is a different thing (the pose of the costume, described
+just after the list): the line stays about the flight alone. Two of those four values move
+on their own, so the line is brought up to date **every frame** the window is on screen,
+written only when the words really changed. The status line
 holds the hint about clicking a row while no
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
@@ -379,6 +381,21 @@ at both ends**: an extra notch at the top or the bottom simply does nothing, ins
 elastic dip-and-spring-back Unity gives by default. The **3D preview** above the buttons
 shows the creature of the row the pointer is on, the configured one while the pointer is on
 no row at all.
+
+Directly under the list sit the **two rows that pose the costume**: `Offset (m)` with its
+three fields and `Rotation (deg)` with three more, in the order X, Y, Z - all six editable,
+and a change applies **as you type** (`GuiPose`, the window's side of `PoseControl`). The
+offset is in world units (`1` is one metre, the same unit as the height on the line above),
+the rotation in degrees **on top of** the way the costume already faces, so `0 0 0` is the
+game's own pose and nothing changes. The console takes the same two values as
+`disguise offset <X> <Y> <Z>` and `disguise rotation <X> <Y> <Z>` (§ 3), and both sides go
+through the same parser, so `1.5` and `1,5` land alike; a box that is not a number yet -
+empty, a lone `-`, half a typed number - simply keeps the value it had, and a value set from
+the console while the window is open lands in the fields, never in the one being typed in.
+They are **memory only** like the flight height, so they start at `0 0 0` on every launch,
+and what you type reaches your ZDO within a tenth of a second (§ 3). Typing in them hands the
+frame to the UI exactly as the filter field does: the character waits instead of walking off,
+the camera waits instead of spinning behind the window.
 
 The **3D preview** (`CreaturePreview`) is not a scene but a texture. On the first creature
 asked for, the stage is built once: a free layer (the highest one no mod named, 31 down to
@@ -969,12 +986,15 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   command - the one the command was typed in for the console, `null` for a button of the
   window - and `Say` with no terminal writes the line to `GuiStatus` instead: same text,
   only the place where it is read differs. `Run(sub)` is what a button calls.
+  `TryParseCoordinate` is the number parser the pose shares with the window (`GuiPose`),
+  because a value has to mean the same thing wherever it comes from.
 - `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, `Escape`, § 2): the chord
   read once per frame, `GuiWindow.RefreshState` once per frame while the window is on screen
-  (the line under the title carries the flight and the offset it lifts the costume by, two
+  (the line under the title carries the flight and the height it lifts the costume by, two
   values that move by themselves), the Escape that closes the window and stamps the frame
   `Patch_MenuShow` reads, the single window that exists at a time, the `BlocksInput` flag both
-  input patches read (pointer on the window **or** filter field focused), the handover of the
+  input patches read (pointer on the window **or** filter field focused **or** one of the six
+  pose fields focused), the handover of the
   mouse through Jotunn's `GUIManager.BlockInput` (balanced
   one `true` per `false`, only inside the `main` scene) and the healing of a window destroyed
   by a scene change, which cannot release that request by itself.
@@ -982,12 +1002,16 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
   or `Not set`), the six category checkboxes in the band above the state line (this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
-  (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   offset: <y>` - the
-  offset is the raise the flight owns, in metres with one decimal, `0.0` while it is off and
-  never below 0 (`FlightControl` clamps it to 0..100); the Text
+  (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>` - the
+  height is the raise the flight owns, in metres with one decimal, `0.0` while it is off and
+  never below 0 (`FlightControl` clamps it to 0..100); it is named after the flight and not
+  after the pose, whose own `Offset` row is a different thing; the Text
   is best-fit, so a long prefab name shrinks instead of running past the window, and
   `RefreshState` writes it only when the words changed: once per frame while the window is
-  open, plus every click), the
+  open, plus every click - and it hands the six pose fields their sync on the same pass), the
+  corner of the two pose rows (`GuiPose.Build` gets the band the layout leaves under the list;
+  the panel is 600 px tall because of them, and the status line is anchored to its bottom
+  edge, so nothing above moves when it grows), the
   row of four command buttons under the picture (each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
   label), the status line below them, and the coordinates of the list block. It only builds,
@@ -1016,6 +1040,17 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
   player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which
   is how the picture knows what the pointer is on.
+- `GuiPose.cs` - the two rows under the list: the six editable fields holding `PoseControl`
+  (Offset X/Y/Z in world units, Rotation X/Y/Z in degrees), and the whole difference between
+  a box and a value. A change applies **as it is typed**, each field parsing through
+  `DisguiseCommand.TryParseCoordinate` - the parser the console shares, so `1.5` and `1,5`
+  both land - and keeping the value it had while the text is not a number yet (empty, a lone
+  `-`, half a typed number), which is what stops the costume from jumping somewhere the
+  player did not ask for. `Sync`, called from `GuiWindow.RefreshState` once per frame, writes
+  a value back only when the words really differ and **never in the field being typed in**,
+  so a value set from the F5 console lands in the window without disturbing a half-typed one;
+  `Focused` - the second half of `BlocksInput`, beside `FilterFocused` - hands the frame to
+  the UI while one of the six has the focus.
 - `GuiRowHover.cs` - the listener on every row: pointer in, show its creature; pointer out,
   back to the configured one. Two interfaces and no other, on purpose. Unity's `EventTrigger`
   does the same job with two entries, but it also implements scrolling and dragging - and the

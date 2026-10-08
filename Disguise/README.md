@@ -96,20 +96,30 @@ in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
 `GuiScrollStep` pixels per notch, clamped at both ends so an extra notch never makes it dip
-and spring back). **Escape** closes it like the Close button - and it is this key, never the
+and spring back) - and, in the band under the list, the **two rows that pose the costume**:
+`Offset (m)` and `Rotation (deg)`, three editable fields each in the order X, Y, Z, applied
+**as you type** (`GuiPose`, the window's side of `PoseControl`): world units for the offset
+(`1` is one metre), degrees **on top of** the way the costume already faces for the rotation,
+`0 0 0` therefore being the pose the game gives it. The console takes the same two values as
+`disguise offset <X> <Y> <Z>` / `disguise rotation <X> <Y> <Z>`, both sides parse them the
+same way (`1.5` and `1,5` both land), a box that is not a number yet keeps the value it had,
+and the pose is memory only - a restart starts from `0 0 0` again. **Escape** closes it like the Close button - and it is this key, never the
 pause menu's, for the frame it happens (`Patch_MenuShow`); the next Escape opens the pause
 menu as usual. The window is an **overlay**: nothing is paused,
 you can still walk around with it open, and a frame belongs to the UI only while the pointer
-is on the window **or** the filter field is focused - a click on a row never reaches your
-character, the camera waits instead of spinning behind the window, and typing a filter never
-walks your character away nor turns the camera.
+is on the window **or** the filter field **or** one of the six pose fields is focused - a
+click on a row never reaches your character, the camera waits instead of spinning behind the
+window, and typing a filter or a coordinate never walks your character away nor turns the
+camera.
 
 The line under the title reads
-`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   offset: <y>`: the prefab and
+`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>`: the prefab and
 the toggle from the config, the flight from `disguise fly` (the `5 - Flight` keys), and the
-**offset** that flight lifts the costume by - metres with one decimal, `0.0` while the flight
+**height** that flight lifts the costume by - metres with one decimal, `0.0` while the flight
 is off, and never negative (the height is clamped to 0..100). It is a raise, not a height of
-your own: your character stays on the ground, only what the other machines draw goes up.
+your own: your character stays on the ground, only what the other machines draw goes up. The
+line says `height` and not `offset` because the **Offset row** of the pose (above) is a
+different thing: this one is about the flight alone.
 Two of those four values move on their own, so the line is rewritten every frame the window is
 on screen, and only when something on it really changed.
 

@@ -27,7 +27,12 @@ internal static class GuiWindow
     /// <summary>Final size of the window: it must not jump when the last step arrives.</summary>
     internal const float Width = 860f;
 
-    internal const float Height = 540f;
+    /// <summary>
+    /// Height of the panel: the list keeps its 300 px, the two pose rows (GuiPose) take the
+    /// band that opens under it, and the status line - anchored to the bottom edge - follows
+    /// this down, so nothing above ever moves when it changes.
+    /// </summary>
+    internal const float Height = 600f;
 
     // Left half of the window: top-left corner of the filter + list block, and its size.
     private const float ListX = 24f;
@@ -37,6 +42,9 @@ internal static class GuiWindow
     private const float ListWidth = 400f;
 
     private const float ListHeight = 300f;
+
+    /// <summary>Gap between the bottom of the list and the first pose row (GuiPose).</summary>
+    private const float PoseGap = 6f;
 
     /// <summary>
     /// Centre of the checkbox row (GuiCategories): the band the layout leaves free between
@@ -169,7 +177,7 @@ internal static class GuiWindow
         Text? stateText = state.GetComponent<Text>();
         if (stateText != null)
         {
-            // Four values on the line now (prefab, the toggle, the flight, the offset): a
+            // Four values on the line now (prefab, the toggle, the flight, the height): a
             // long prefab name must make the text smaller rather than run past the edges of
             // the window - the rule the chord label above already follows, at its own sizes.
             stateText.resizeTextForBestFit = true;
@@ -184,6 +192,10 @@ internal static class GuiWindow
 
         // The filter field and the scrollable list, built by GuiCreatureList.
         GuiCreatureList.Build(window.transform, ListX, ListY, ListWidth, ListHeight);
+
+        // The two rows that move and turn the costume, under the list they belong to
+        // (GuiWindow owns the corner, GuiPose owns the rhythm of its own two rows).
+        GuiPose.Build(window.transform, ListX, ListY - ListHeight - PoseGap);
 
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
@@ -257,14 +269,16 @@ internal static class GuiWindow
         RunCommand(DisguiseConfig.ConfigEnabled.Value ? "disable" : "enable");
 
     /// <summary>
-    /// Rewrites the line under the title and the label of the toggle, writing NEITHER when it
-    /// is unchanged: called once per frame while the window is open (DisguiseGui.Tick), by
-    /// GuiCreatureList after a row was clicked or after a change the console made while the
-    /// window was open, and by the command buttons after they ran their sub-command. Two of
-    /// the four values on the line move on their own - the flight and its offset - so the
-    /// ordinary frame costs the line being built and compared, never a write to the Text
-    /// (which would lay it out again for the same words). Does nothing without a window,
-    /// which is every frame it is closed and every frame after a scene change destroyed it.
+    /// Rewrites the line under the title, the label of the toggle and the six pose fields,
+    /// writing NONE of them when it is unchanged: called once per frame while the window is
+    /// open (DisguiseGui.Tick), by GuiCreatureList after a row was clicked or after a change
+    /// the console made while the window was open, and by the command buttons after they ran
+    /// their sub-command. Two of the four values on the line move on their own - the flight
+    /// and its height - so the ordinary frame costs the line being built and compared, never a
+    /// write to the Text (which would lay it out again for the same words); the pose fields
+    /// cost six more string comparisons, and skip the one being typed in (GuiPose). Does
+    /// nothing without a window, which is every frame it is closed and every frame after a
+    /// scene change destroyed it.
     /// </summary>
     internal static void RefreshState()
     {
@@ -287,6 +301,8 @@ internal static class GuiWindow
                 power.text = toggle;
             }
         }
+
+        GuiPose.Sync();
     }
 
     /// <summary>
@@ -334,9 +350,11 @@ internal static class GuiWindow
     /// <summary>
     /// The line under the title: the prefab configured right now, whether the disguise is on,
     /// whether the flight is, and how far the costume is raised above the player - the
-    /// flight's own height, in metres, with one decimal. It is an OFFSET, not a position:
-    /// the player never moves and neither does its Y, only what the machines draw is lifted
-    /// (FlightControl.ViewOffset on this screen, cd_fly in the packets of every other one).
+    /// flight's own height, in metres, with one decimal. It is called a height rather than an
+    /// offset because the Offset row below (GuiPose) is a different thing: this one is the
+    /// flight's own raise, an offset and not a position - the player never moves and neither
+    /// does its Y, only what the machines draw is lifted (FlightControl.ViewOffset on this
+    /// screen, cd_fly in the packets of every other one).
     /// </summary>
     private static string DescribeState()
     {
@@ -344,17 +362,18 @@ internal static class GuiWindow
         string disguise = DisguiseConfig.ConfigEnabled.Value ? "on" : "off";
         string flight = FlightControl.IsFlying ? "on" : "off";
         return $"Prefab: {creature}   -   disguise {disguise}   -   "
-            + $"Flight {flight}   offset: {Offset()}";
+            + $"Flight {flight}   height: {FlightHeight()}";
     }
 
     /// <summary>
     /// How far the costume stands above the player (metres, one decimal): "0.0" while the
     /// flight is off - Disable puts the height back to 0 there - and the height the flight
-    /// holds it at otherwise. FlightControl clamps that height to 0..100, so the offset can
-    /// only ever read 0 or more: a negative raise has no meaning (nothing sinks under the
-    /// ground the player already stands on).
+    /// holds it at otherwise. FlightControl clamps that height to 0..100, so it can only ever
+    /// read 0 or more: a negative raise has no meaning (nothing sinks under the ground the
+    /// player already stands on). The pose of the costume itself is written by the two rows
+    /// below and never reaches this line, which keeps it about the flight alone.
     /// </summary>
-    private static string Offset()
+    private static string FlightHeight()
     {
         float raise = FlightControl.IsFlying ? FlightControl.Height : 0f;
         return $"{raise:0.0}";
