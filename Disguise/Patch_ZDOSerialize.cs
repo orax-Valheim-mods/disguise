@@ -20,10 +20,12 @@ namespace Disguise;
 /// a slope is only a slope on the machines that render it while this prefix holds it down -
 /// Relaying machine only, like the health (see RestOffset for both) - and a costume the owner
 /// turned stays turned while PoseControl composes cd_rx / cd_ry / cd_rz into that same value
-/// (its swap opens BEFORE RestOffset's and closes after it, so the tilt ends up on top of the
-/// turn and one single rotation leaves the server). None of the four is reflected in the
-/// DataRevision, so they cost no extra traffic and never change the local ZDO state (your own
-/// view).
+/// (its swap opens AFTER RestOffset's and closes before it, so the turn ends up on top of the
+/// tilt and one single rotation leaves the server - the other order would erase it, since a
+/// lay-on-the-ground is a FromToRotation onto the ground normal: it forces the up axis of
+/// whatever it is applied to, which is exactly the pitch and the roll of the turn). None of
+/// the four is reflected in the DataRevision, so they cost no extra traffic and never change
+/// the local ZDO state (your own view).
 ///
 /// This runs on every machine owning a disguised ZDO, but also on the server relaying it:
 /// what gets masked there follows the owner's own choice, published in its ZDO as
@@ -41,8 +43,10 @@ internal static class Patch_ZDOSerialize
         {
             __state = EquipmentMask.BeginOutgoingMask(__instance);
             HealthMask.BeginOutgoingHealth(__instance);
-            PoseControl.BeginOutgoingRotation(__instance);
+            // Ground first, turn on top of it - the order SelfView gives the clone, and the
+            // only one that leaves the pitch and the roll of the turn standing.
             RestOffset.BeginOutgoingRotation(__instance);
+            PoseControl.BeginOutgoingRotation(__instance);
         }
         catch (Exception ex)
         {
@@ -53,7 +57,9 @@ internal static class Patch_ZDOSerialize
 
     // The finalizer runs even if the original method threw: a swap must never outlive the
     // call it was opened for. HealthMask.End, RestOffset.EndRotation and
-    // PoseControl.EndOutgoingRotation close nothing when their Begin opened nothing.
+    // PoseControl.EndOutgoingRotation close nothing when their Begin opened nothing. The two
+    // rotation swaps close in the reverse order they were opened in: each puts back the value
+    // IT found, so the one that opened last has to hand its predecessor's value back first.
     private static Exception? Finalizer(Exception? __exception, bool __state)
     {
         if (__state)
@@ -61,8 +67,8 @@ internal static class Patch_ZDOSerialize
             EquipmentMask.End();
         }
         HealthMask.End();
-        RestOffset.EndRotation();
         PoseControl.EndOutgoingRotation();
+        RestOffset.EndRotation();
         return __exception;
     }
 }

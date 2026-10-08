@@ -643,16 +643,20 @@ Visual synchronisation on vanilla clients:
   whenever it differs from identity, so the server composes
   `current * Euler(cd_rx, cd_ry, cd_rz)` into that one value for the duration of the body
   being built and puts the stored rotation back immediately after (`Patch_ZDOSerialize`
-  opens this swap **before** `RestOffset`'s own lay-on-the-ground tilt and closes it **after**,
-  so a single rotation - turn first, tilt on top - leaves the server; the receivers apply it
-  where they build the object and where `ZSyncTransform` syncs it). Neither swap bumps the
+  opens `RestOffset`'s own lay-on-the-ground tilt **first** and this swap **after** it, and
+  closes them the other way round, so a single rotation - ground first, turn on top - leaves
+  the server; the other order would erase the turn, because a lay-on-the-ground is a
+  `FromToRotation` onto the ground normal: it pins the up axis of whatever it lands on, so a
+  tilt composed on top of the turn would take its pitch and its roll back out and leave only
+  the yaw. The receivers apply it where they build the object and where `ZSyncTransform`
+  syncs it). Neither swap bumps the
   DataRevision, neither reaches `ZDO.Save` - the world file reads through `ZDO.Save`, never
   through `Serialize` - and both are the relaying machine's alone, because an owner rewriting
   its own rotation would have the server STORE it. Same two gates as the flight, server only
   and only while your prefab really is the creature, and the same consequence without the DLL
-  on the server (§ 1.b): your own screen moves and turns the clone at once (`SelfView`
-  composes the turn after your own rotation and hands the ground rest the point the costume
-  now stands on), while everybody else keeps it where it was.
+  on the server (§ 1.b): your own screen moves and turns the clone at once (`SelfView` hands
+  the ground rest your own rotation and composes the turn **on top of** the result, the same
+  order the packet leaves the server in), while everybody else keeps it where it was.
 - **Animations**: partial, and bridged for melee attacks and for the block key. `ZSyncAnimation.SetTrigger`
   carries no name at all inside the ZDO: it broadcasts the raw **parameter name**, and each
   machine applies it to the animator of the object *it* built for that ZDO - a real `Player`

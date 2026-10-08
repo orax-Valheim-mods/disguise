@@ -70,9 +70,11 @@ internal static class PoseControl
     internal static Vector3 ViewOffset => s_offset;
 
     /// <summary>
-    /// The turn the local clone is given on top of the player's own rotation. Composed AFTER
-    /// it (base * turn), which is exactly what the relaying machine writes into the packet, so
-    /// the two views agree: a turn of zero changes nothing at all.
+    /// The turn the local clone is given on top of everything else: composed AFTER the
+    /// ground-rest rotation (ground first, then turn), which is exactly what the relaying
+    /// machine writes into the packet, so the two views agree: a turn of zero changes nothing
+    /// at all. Only this order keeps a turn around X or Z - the ground rest aligns the up axis
+    /// of what it is applied to, and would otherwise take that part of the turn back out.
     /// </summary>
     internal static Quaternion ViewRotation => Quaternion.Euler(s_euler);
 
@@ -227,9 +229,12 @@ internal static class PoseControl
     /// The stored rotation, the save file and your own view are therefore never touched.
     ///
     /// The body writes m_rotation only when it differs from identity, and RestOffset composes
-    /// its lay-on-the-ground tilt into the same value: Patch_ZDOSerialize opens this one
-    /// first and closes it last, so a costume that is both turned and laid on a slope leaves
-    /// the server as one single rotation, in which the tilt is applied on top of the turn.
+    /// its lay-on-the-ground tilt into the same value: Patch_ZDOSerialize opens RestOffset's
+    /// swap FIRST and this one after it, so a costume that is both turned and laid on a slope
+    /// leaves the server as one single rotation, in which the turn is applied on top of the
+    /// tilt. The order matters: a lay-on-the-ground is a FromToRotation onto the ground
+    /// normal, which pins the up axis of whatever it lands on - composed the other way round
+    /// it would take the pitch and the roll of the turn back out, leaving only the yaw.
     ///
     /// Returns true when a swap really happened: the caller must then call
     /// EndOutgoingRotation, which is harmless when nothing was opened.

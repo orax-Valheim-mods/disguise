@@ -416,6 +416,11 @@ internal static class RestOffset
     /// screen draws from the normal and the rotation it is about to be given. Nothing is
     /// transmitted between the two machines: they measure the same ground over the same
     /// footprint and reach the same pose.
+    ///
+    /// The caller composes the pose turn ON TOP of this result, exactly as Patch_ZDOSerialize
+    /// composes it on top of the same tilt in the packet - and it has to be on top: this is a
+    /// FromToRotation onto the ground normal, so it pins the up axis of whatever it lands on
+    /// and would take a turn around X or Z straight back out, leaving only the yaw.
     /// </summary>
     internal static Quaternion ViewRotation(int prefabHash, Vector3 position, Quaternion rotation)
     {
