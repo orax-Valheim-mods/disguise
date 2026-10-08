@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using BepInEx.Configuration;
 using Jotunn.Managers;
 using UnityEngine;
@@ -74,8 +75,9 @@ internal static class GuiWindow
 
     /// <summary>
     /// The line under the title, kept here so it can be rewritten after a click on a row or a
-    /// change made by the console while the window is open. Unity-null once the window is
-    /// gone, which is the whole safety of RefreshState.
+    /// change made by the console while the window is open - and once per frame while it is
+    /// open, because the flight and the altitude move on their own (DisguiseGui.Tick).
+    /// Unity-null once the window is gone, which is the whole safety of RefreshState.
     /// </summary>
     private static Text? s_state;
 
@@ -164,7 +166,17 @@ internal static class GuiWindow
             800f,
             40f
         );
-        s_state = state.GetComponent<Text>();
+        Text? stateText = state.GetComponent<Text>();
+        if (stateText != null)
+        {
+            // Four values on the line now (prefab, the toggle, the flight, the altitude): a
+            // long prefab name must make the text smaller rather than run past the edges of
+            // the window - the rule the chord label above already follows, at its own sizes.
+            stateText.resizeTextForBestFit = true;
+            stateText.resizeTextMaxSize = 20;
+            stateText.resizeTextMinSize = 14;
+        }
+        s_state = stateText;
 
         // The six category checkboxes, in the free band above the state line: they decide
         // which kinds of prefab the list below is allowed to show.
@@ -245,24 +257,35 @@ internal static class GuiWindow
         RunCommand(DisguiseConfig.ConfigEnabled.Value ? "disable" : "enable");
 
     /// <summary>
-    /// Rewrites the line under the title from the config: called by GuiCreatureList after a
-    /// row was clicked (or after a change the console made while the window is open), and by
-    /// the command buttons after they ran their sub-command. The toggle's label is rewritten
-    /// with it, since both say the same state. Does nothing without a window, which is every
-    /// frame it is closed and every frame after a scene change destroyed it.
+    /// Rewrites the line under the title and the label of the toggle, writing NEITHER when it
+    /// is unchanged: called once per frame while the window is open (DisguiseGui.Tick), by
+    /// GuiCreatureList after a row was clicked or after a change the console made while the
+    /// window was open, and by the command buttons after they ran their sub-command. Two of
+    /// the four values on the line move on their own - the flight and the altitude - so the
+    /// ordinary frame costs the line being built and compared, never a write to the Text
+    /// (which would lay it out again for the same words). Does nothing without a window,
+    /// which is every frame it is closed and every frame after a scene change destroyed it.
     /// </summary>
     internal static void RefreshState()
     {
         Text? label = s_state;
         if (label != null)
         {
-            label.text = DescribeState();
+            string line = DescribeState();
+            if (!string.Equals(label.text, line, StringComparison.Ordinal))
+            {
+                label.text = line;
+            }
         }
 
         Text? power = s_power;
         if (power != null)
         {
-            power.text = DescribePower();
+            string toggle = DescribePower();
+            if (!string.Equals(power.text, toggle, StringComparison.Ordinal))
+            {
+                power.text = toggle;
+            }
         }
     }
 
@@ -308,12 +331,27 @@ internal static class GuiWindow
         return label;
     }
 
-    /// <summary>The line under the title: what is configured right now, and whether it is on.</summary>
+    /// <summary>
+    /// The line under the title: the prefab configured right now, whether the disguise is on,
+    /// whether the flight is, and how high the player stands - the WORLD Y of the local
+    /// player with one decimal, "-" while there is none (the main menu has no player to
+    /// read). The altitude is the body's own: the flight raises the costume
+    /// (FlightControl.Height), never the player standing in it.
+    /// </summary>
     private static string DescribeState()
     {
         string creature = PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash);
-        string state = DisguiseConfig.ConfigEnabled.Value ? "disguise on" : "disguise off";
-        return $"Prefab: {creature}   -   {state}";
+        string disguise = DisguiseConfig.ConfigEnabled.Value ? "on" : "off";
+        string flight = FlightControl.IsFlying ? "on" : "off";
+        return $"Prefab: {creature}   -   disguise {disguise}   -   "
+            + $"Flight {flight}   Altitude {Altitude()}";
+    }
+
+    /// <summary>The local player's height, or "-" where there is no local player at all.</summary>
+    private static string Altitude()
+    {
+        Player? player = Player.m_localPlayer;
+        return player != null ? $"{player.transform.position.y:0.0}" : "-";
     }
 
     /// <summary>

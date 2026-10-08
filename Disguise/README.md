@@ -100,6 +100,13 @@ is on the window **or** the filter field is focused - a click on a row never rea
 character, the camera waits instead of spinning behind the window, and typing a filter never
 walks your character away nor turns the camera.
 
+The line under the title reads
+`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   Altitude <y>`: the prefab and
+the toggle from the config, the flight from `disguise fly` (the `5 - Flight` keys), and the
+altitude of your character - its world height with one decimal, `-` before a world is loaded.
+Two of those four values move on their own, so the line is rewritten every frame the window is
+on screen, and only when something on it really changed.
+
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.
 Your own view always keeps your equipment. The choice is published in **your** ZDO

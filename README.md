@@ -331,7 +331,13 @@ exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flig
 `disguise enable` / `disable`, `refresh`, `view`, `fly`), and reporting its answer on the
 line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
 disguise is on and "Enable" while it is off, and both that label and the line under the title
-are rewritten after every click. The status line holds the hint about clicking a row while no
+are rewritten after every click. The **line under the title** reads
+`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   Altitude <y>` - the prefab
+and the toggle from the config, the flight from `FlightControl`, the altitude from the local
+player's world Y (one decimal, `-` while there is no player at all, which is the main menu) -
+and two of those four values move on their own, so the line is brought up to date **every
+frame** the window is on screen, written only when the words really changed. The status line
+holds the hint about clicking a row while no
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
 several lines, the console keeps them all, and the first one is the headline - the notes a
@@ -919,7 +925,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   window - and `Say` with no terminal writes the line to `GuiStatus` instead: same text,
   only the place where it is read differs. `Run(sub)` is what a button calls.
 - `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, `Escape`, § 2): the chord
-  read once per frame, the Escape that closes the window and stamps the frame
+  read once per frame, `GuiWindow.RefreshState` once per frame while the window is on screen
+  (the line under the title carries the flight and the altitude, two values that move by
+  themselves), the Escape that closes the window and stamps the frame
   `Patch_MenuShow` reads, the single window that exists at a time, the `BlocksInput` flag both
   input patches read (pointer on the window **or** filter field focused), the handover of the
   mouse through Jotunn's `GUIManager.BlockInput` (balanced
@@ -929,8 +937,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
   or `Not set`), the six category checkboxes in the band above the state line (this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
-  (`Prefab: <name>   -   <state>`, rewritten by `RefreshState` after a
-  change), the
+  (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   Altitude <y>` - the
+  altitude is the local player's world Y with one decimal, `-` where there is none; the Text
+  is best-fit, so a long prefab name shrinks instead of running past the window, and
+  `RefreshState` writes it only when the words changed: once per frame while the window is
+  open, plus every click), the
   row of four command buttons under the picture (each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
   label), the status line below them, and the coordinates of the list block. It only builds,
