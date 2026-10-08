@@ -76,7 +76,7 @@ internal static class GuiWindow
     /// <summary>
     /// The line under the title, kept here so it can be rewritten after a click on a row or a
     /// change made by the console while the window is open - and once per frame while it is
-    /// open, because the flight and the altitude move on their own (DisguiseGui.Tick).
+    /// open, because the flight and its offset move on their own (DisguiseGui.Tick).
     /// Unity-null once the window is gone, which is the whole safety of RefreshState.
     /// </summary>
     private static Text? s_state;
@@ -169,7 +169,7 @@ internal static class GuiWindow
         Text? stateText = state.GetComponent<Text>();
         if (stateText != null)
         {
-            // Four values on the line now (prefab, the toggle, the flight, the altitude): a
+            // Four values on the line now (prefab, the toggle, the flight, the offset): a
             // long prefab name must make the text smaller rather than run past the edges of
             // the window - the rule the chord label above already follows, at its own sizes.
             stateText.resizeTextForBestFit = true;
@@ -261,7 +261,7 @@ internal static class GuiWindow
     /// is unchanged: called once per frame while the window is open (DisguiseGui.Tick), by
     /// GuiCreatureList after a row was clicked or after a change the console made while the
     /// window was open, and by the command buttons after they ran their sub-command. Two of
-    /// the four values on the line move on their own - the flight and the altitude - so the
+    /// the four values on the line move on their own - the flight and its offset - so the
     /// ordinary frame costs the line being built and compared, never a write to the Text
     /// (which would lay it out again for the same words). Does nothing without a window,
     /// which is every frame it is closed and every frame after a scene change destroyed it.
@@ -333,10 +333,10 @@ internal static class GuiWindow
 
     /// <summary>
     /// The line under the title: the prefab configured right now, whether the disguise is on,
-    /// whether the flight is, and how high the player stands - the WORLD Y of the local
-    /// player with one decimal, "-" while there is none (the main menu has no player to
-    /// read). The altitude is the body's own: the flight raises the costume
-    /// (FlightControl.Height), never the player standing in it.
+    /// whether the flight is, and how far the costume is raised above the player - the
+    /// flight's own height, in metres, with one decimal. It is an OFFSET, not a position:
+    /// the player never moves and neither does its Y, only what the machines draw is lifted
+    /// (FlightControl.ViewOffset on this screen, cd_fly in the packets of every other one).
     /// </summary>
     private static string DescribeState()
     {
@@ -344,14 +344,20 @@ internal static class GuiWindow
         string disguise = DisguiseConfig.ConfigEnabled.Value ? "on" : "off";
         string flight = FlightControl.IsFlying ? "on" : "off";
         return $"Prefab: {creature}   -   disguise {disguise}   -   "
-            + $"Flight {flight}   Altitude {Altitude()}";
+            + $"Flight {flight}   offset: {Offset()}";
     }
 
-    /// <summary>The local player's height, or "-" where there is no local player at all.</summary>
-    private static string Altitude()
+    /// <summary>
+    /// How far the costume stands above the player (metres, one decimal): "0.0" while the
+    /// flight is off - Disable puts the height back to 0 there - and the height the flight
+    /// holds it at otherwise. FlightControl clamps that height to 0..100, so the offset can
+    /// only ever read 0 or more: a negative raise has no meaning (nothing sinks under the
+    /// ground the player already stands on).
+    /// </summary>
+    private static string Offset()
     {
-        Player? player = Player.m_localPlayer;
-        return player != null ? $"{player.transform.position.y:0.0}" : "-";
+        float raise = FlightControl.IsFlying ? FlightControl.Height : 0f;
+        return $"{raise:0.0}";
     }
 
     /// <summary>

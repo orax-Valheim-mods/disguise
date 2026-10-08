@@ -332,11 +332,14 @@ exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flig
 line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
 disguise is on and "Enable" while it is off, and both that label and the line under the title
 are rewritten after every click. The **line under the title** reads
-`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   Altitude <y>` - the prefab
-and the toggle from the config, the flight from `FlightControl`, the altitude from the local
-player's world Y (one decimal, `-` while there is no player at all, which is the main menu) -
-and two of those four values move on their own, so the line is brought up to date **every
-frame** the window is on screen, written only when the words really changed. The status line
+`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   offset: <y>` - the prefab
+and the toggle from the config, the flight from `FlightControl`, and the **offset** that
+flight lifts the costume by, in metres with one decimal: `0.0` while the flight is off
+(`Disable` puts the height back to 0), the height it is clamped to (0..100) while it is on,
+so the figure is 0 or more and never negative - a raise, not a position: the player and its
+Y never move, only what the machines draw does. Two of those four values move on their own,
+so the line is brought up to date **every frame** the window is on screen, written only when
+the words really changed. The status line
 holds the hint about clicking a row while no
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
@@ -935,8 +938,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   only the place where it is read differs. `Run(sub)` is what a button calls.
 - `DisguiseGui.cs` - the Disguise window (`GuiKey`, `disguise gui`, `Escape`, § 2): the chord
   read once per frame, `GuiWindow.RefreshState` once per frame while the window is on screen
-  (the line under the title carries the flight and the altitude, two values that move by
-  themselves), the Escape that closes the window and stamps the frame
+  (the line under the title carries the flight and the offset it lifts the costume by, two
+  values that move by themselves), the Escape that closes the window and stamps the frame
   `Patch_MenuShow` reads, the single window that exists at a time, the `BlocksInput` flag both
   input patches read (pointer on the window **or** filter field focused), the handover of the
   mouse through Jotunn's `GUIManager.BlockInput` (balanced
@@ -946,8 +949,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
   or `Not set`), the six category checkboxes in the band above the state line (this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
-  (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   Altitude <y>` - the
-  altitude is the local player's world Y with one decimal, `-` where there is none; the Text
+  (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   offset: <y>` - the
+  offset is the raise the flight owns, in metres with one decimal, `0.0` while it is off and
+  never below 0 (`FlightControl` clamps it to 0..100); the Text
   is best-fit, so a long prefab name shrinks instead of running past the window, and
   `RefreshState` writes it only when the words changed: once per frame while the window is
   open, plus every click), the

@@ -81,10 +81,10 @@ internal static class DisguiseGui
                 GuiCategories.Sync();
 
                 // The line under the title now holds values that move on their own - the
-                // flight and the altitude - so it is brought up to date here too, and not
-                // only when something clicked or the console changed the creature.
-                // RefreshState writes only what really changed, so the frame where nothing
-                // moved costs the line being built and compared, never a write.
+                // flight and the offset it lifts the costume by - so it is brought up to
+                // date here too, and not only when something clicked or the console changed
+                // the creature. RefreshState writes only what really changed, so the frame
+                // where nothing moved costs the line being built and compared, never a write.
                 GuiWindow.RefreshState();
 
                 // What the preview shows (the row under the pointer, else the configured
