@@ -15,11 +15,11 @@ namespace Disguise;
 ///
 /// The window as the branch built it, in four steps: title and, directly under it, the line
 /// that says what is configured (with the GuiKey chord on the title row, next to Close), the
-/// six category checkboxes that gate the list (GuiCategories builds them, this class only
-/// says where they sit - under that line), the
+/// row of checkboxes that gate the list (six categories then Favorites - GuiCategories builds
+/// them, this class only says where they sit - under that line), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
-/// films into it), under it the four command buttons, and at the bottom the status line
+/// films into it), under it the five command buttons, and at the bottom the status line
 /// (GuiStatus), which is the hint while no button has been pressed and the answer of the
 /// last one after that.
 /// </summary>
@@ -82,7 +82,9 @@ internal static class GuiWindow
     /// <summary>Gap between the bottom of the picture and the row of buttons under it.</summary>
     private const float PreviewGap = 6f;
 
-    // The command row, as wide as the picture above it: four buttons of equal width.
+    // The command row, as wide as the picture above it: CommandCount buttons of equal width.
+    private const int CommandCount = 5;
+
     private const float ButtonHeight = 40f;
 
     private const float ButtonGap = 6f;
@@ -100,6 +102,14 @@ internal static class GuiWindow
     private static Text? s_power;
 
     /// <summary>
+    /// The label of the Favorite button, kept here with the toggle's because it follows
+    /// something that moves on its own as well: the prefab the pointer is on (GuiPreview), so
+    /// it can flip between "Add favorite" and "Remove favorite" without a click. Unity-null
+    /// once the window is gone, which is the whole safety of RefreshState.
+    /// </summary>
+    private static Text? s_favorite;
+
+    /// <summary>
     /// The line under the title, kept here so it can be rewritten after a click on a row or a
     /// change made by the console while the window is open - and once per frame while it is
     /// open, because the flight and its offset move on their own (DisguiseGui.Tick).
@@ -112,6 +122,7 @@ internal static class GuiWindow
         GUIManager gui = GUIManager.Instance;
         s_state = null;
         s_power = null;
+        s_favorite = null;
 
         // Draggable: Jotunn puts its DragWindowCntrl on the panel, and the whole background
         // forwards the gesture, so there is no dedicated title bar to grab.
@@ -205,7 +216,8 @@ internal static class GuiWindow
         }
         s_state = stateText;
 
-        // The six category checkboxes, under the state line and over the block they filter.
+        // The checkbox row - six categories, then Favorites - under the state line and over
+        // the block it filters.
         GuiCategories.Build(window.transform, ListX, CategoryY);
 
         // The filter field and the scrollable list, built by GuiCreatureList.
@@ -224,7 +236,7 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        // The four command buttons under the picture, then the line they answer on (which
+        // The five command buttons under the picture, then the line they answer on (which
         // still holds the hint about clicking a row while no button has been pressed).
         CommandButtons(gui, window.transform);
         GuiStatus.Build(window.transform);
@@ -233,13 +245,16 @@ internal static class GuiWindow
     }
 
     /// <summary>
-    /// The row under the picture: four buttons, each one running its sub-command through
-    /// DisguiseCommand.Run, which has no console here and answers on the status line below.
-    /// The first one is a toggle, so what it says and what it runs both follow the config.
+    /// The row under the picture: CommandCount buttons of equal width, each one running its
+    /// sub-command through DisguiseCommand.Run, which has no console here and answers on the
+    /// status line below. The first is a toggle, so what it says and what it runs both follow
+    /// the config; the last follows what the pointer is on (DescribeFavorite), which is why
+    /// RefreshState rewrites it every frame like the state line above.
     /// </summary>
     private static void CommandButtons(GUIManager gui, Transform parent)
     {
-        float width = (CreaturePreview.PictureWidth - (3f * ButtonGap)) / 4f;
+        float width =
+            (CreaturePreview.PictureWidth - ((CommandCount - 1) * ButtonGap)) / CommandCount;
         float centre = PreviewX + (width * 0.5f);
 
         s_power = Command(gui, parent, DescribePower(), centre, width, TogglePower);
@@ -252,6 +267,9 @@ internal static class GuiWindow
 
         centre += width + ButtonGap;
         _ = Command(gui, parent, "Flight", centre, width, () => RunCommand("fly"));
+
+        centre += width + ButtonGap;
+        s_favorite = Command(gui, parent, DescribeFavorite(), centre, width, ToggleFavorite);
     }
 
     /// <summary>One button of the command row; its label Text is returned for the toggle.</summary>
@@ -278,7 +296,17 @@ internal static class GuiWindow
         {
             button.onClick.AddListener(onClick);
         }
-        return body.GetComponentInChildren<Text>();
+        Text? text = body.GetComponentInChildren<Text>();
+        if (text != null)
+        {
+            // Five buttons in the width of the picture: "Remove favorite" is the widest label
+            // of the row, and Unity's Text CLIPS what does not fit unless it is told to shrink
+            // instead - the rule the chord and the state line of this window already follow.
+            text.resizeTextForBestFit = true;
+            text.resizeTextMaxSize = text.fontSize;
+            text.resizeTextMinSize = 10;
+        }
+        return text;
     }
 
     /// <summary>What every command button does: run its sub-command, then rewrite the state.</summary>
@@ -293,16 +321,25 @@ internal static class GuiWindow
         RunCommand(DisguiseConfig.ConfigEnabled.Value ? "disable" : "enable");
 
     /// <summary>
-    /// Rewrites the line under the title, the label of the toggle and the six pose fields,
-    /// writing NONE of them when it is unchanged: called once per frame while the window is
-    /// open (DisguiseGui.Tick), by GuiCreatureList after a row was clicked or after a change
-    /// the console made while the window was open, and by the command buttons after they ran
-    /// their sub-command. Two of the four values on the line move on their own - the flight
-    /// and its height - so the ordinary frame costs the line being built and compared, never a
-    /// write to the Text (which would lay it out again for the same words); the pose fields
-    /// cost six more string comparisons, and skip the one being typed in (GuiPose). Does
-    /// nothing without a window, which is every frame it is closed and every frame after a
-    /// scene change destroyed it.
+    /// The Favorite button: mark the prefab it points at, or take the mark off - the very
+    /// target its label announced (DescribeFavorite): the row under the pointer, then the
+    /// last row the pointer was on, so a prefab can be marked without being applied first.
+    /// </summary>
+    private static void ToggleFavorite() => RunCommand("favorite " + GuiPreview.FavoriteTarget());
+
+    /// <summary>
+    /// Rewrites the line under the title, the labels of the toggle and of the Favorite button,
+    /// and the six pose fields, writing NONE of them when it is unchanged: called once per
+    /// frame while the window is open (DisguiseGui.Tick), by GuiCreatureList after a row was
+    /// clicked or after a change the console made while the window was open, and by the
+    /// command buttons after they ran their sub-command. Two of the four values on the line
+    /// move on their own - the flight and its height - so the ordinary frame costs the line
+    /// being built and compared, never a write to the Text (which would lay it out again for
+    /// the same words); the Favorite label follows the pointer, which costs a look at the row
+    /// it is on and one at the marks (both a string compare and a set lookup); the pose
+    /// fields cost six more string comparisons, and skip the one being typed in (GuiPose).
+    /// Does nothing without a window, which is every frame it is closed and every frame after
+    /// a scene change destroyed it.
     /// </summary>
     internal static void RefreshState()
     {
@@ -323,6 +360,16 @@ internal static class GuiWindow
             if (!string.Equals(power.text, toggle, StringComparison.Ordinal))
             {
                 power.text = toggle;
+            }
+        }
+
+        Text? favorite = s_favorite;
+        if (favorite != null)
+        {
+            string mark = DescribeFavorite();
+            if (!string.Equals(favorite.text, mark, StringComparison.Ordinal))
+            {
+                favorite.text = mark;
             }
         }
 
@@ -419,6 +466,24 @@ internal static class GuiWindow
     /// </summary>
     private static string DescribePower() =>
         DisguiseConfig.ConfigEnabled.Value ? "Disable" : "Enable";
+
+    /// <summary>
+    /// The label of the Favorite button: what pressing it does to the prefab it will act on -
+    /// the row under the pointer, then the last row the pointer was on, then the configured
+    /// one (GuiPreview.FavoriteTarget). Rewritten by RefreshState like the line above, so a
+    /// pointer crossing the list flips the button at once: it announces its target before
+    /// anything is pressed, which is what keeps the picture - which goes back to the
+    /// configured creature the moment the pointer leaves a row - from leaving you unsure of
+    /// what is about to be marked. The name itself is never printed here (it is one button
+    /// wide): the answer does that, on the status line below.
+    /// </summary>
+    private static string DescribeFavorite()
+    {
+        string target = GuiPreview.FavoriteTarget();
+        return target.Length > 0 && PrefabFavorites.Contains(target)
+            ? "Remove favorite"
+            : "Add favorite";
+    }
 
     /// <summary>
     /// The GuiKey chord as the config records it - main key first, then the modifiers, which

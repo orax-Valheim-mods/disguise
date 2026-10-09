@@ -21,7 +21,8 @@ namespace Disguise;
 /// fetched or counted, so the counts and the names always describe the same set.
 ///
 /// The two lists stay identical because they come out of this one class - the window only
-/// adds its two filters on top (the text field, then the six category checkboxes).
+/// adds its two filters on top (the text field, then the checkbox row: six category boxes
+/// and the Favorites box, which while it is ticked shows the marked names alone).
 ///
 /// ZNetScene is the technical limit of any disguise - a vanilla client rebuilds your object
 /// from ITS OWN prefab table, by hash, so only prefabs every installation already carries

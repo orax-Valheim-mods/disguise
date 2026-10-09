@@ -12,13 +12,14 @@ namespace Disguise;
 /// at its right, and a scroll view (Jotunn) holding one row per vanilla prefab - exactly the
 /// names "disguise list" prints, through PrefabCatalog.Names, so the console and the window
 /// can never disagree about a name. What the window adds are two filters of its own on top
-/// of that shared source: the text field, and the six category checkboxes (GuiCategories)
-/// that decide which kinds of prefab are shown at all.
+/// of that shared source: the text field, and the checkbox row (GuiCategories) - the six
+/// categories of PrefabKind, then Favorites, which while it is on shows the marked prefabs
+/// only.
 ///
-/// The opening only builds the rows of the categories the boxes have ON: a row is a Jotunn
-/// button, and hundreds of them are what makes an opening cost something. A category
-/// switched on later is paid for THEN - once, by EnsureShownRows through Refilter - and no
-/// row is ever destroyed, so switching a category off and back on is again only a SetActive.
+/// The opening only builds the rows the boxes already OWED: a row is a Jotunn button, and
+/// hundreds of them are what makes an opening cost something. A row owed later is paid for
+/// THEN - once, by EnsureShownRows through Refilter - and no
+/// row is ever destroyed, so switching a box off and back on is again only a SetActive.
 /// The three lists run parallel at the same index - the name (what gets applied), the kind
 /// (which checkbox owns it) and the body (what is on screen, null while its category has
 /// never been shown) - and the text filter only shows and hides, which is what keeps typing
@@ -271,16 +272,17 @@ internal static class GuiCreatureList
         }
         float catalogueMs = (Time.realtimeSinceStartup - catalogueStartedAt) * 1000f;
 
-        // The rows then - only for the categories the boxes have ON. A row is four objects
-        // built by Jotunn, and the rows of a category switched off were built only to be
-        // hidden again: an opening now costs what it is going to SHOW. A category switched
-        // on later is paid for once, in order, by EnsureShownRows; nothing here is ever
-        // destroyed, so switching one off again stays the SetActive it has always been.
+        // The rows then - only the rows the boxes already OWE. A row is four objects
+        // built by Jotunn, and a row built only to be hidden again is waste: an opening now
+        // costs what it is going to SHOW. A row owed later (a category switched on, or the
+        // Favorites box ticked with marks whose category is off) is paid for once, in order,
+        // by EnsureShownRows; nothing here is ever destroyed, so switching one box off again
+        // stays the SetActive it has always been.
         float rowsStartedAt = Time.realtimeSinceStartup;
         int built = 0;
         for (int i = 0; i < s_names.Count; i++)
         {
-            GameObject? row = GuiCategories.Shown(s_kinds[i])
+            GameObject? row = GuiCategories.ShowRow(s_names[i], s_kinds[i])
                 ? CreateRow(s_names[i], content, rowWidth)
                 : null;
             s_rows.Add(row);
@@ -382,7 +384,7 @@ internal static class GuiCreatureList
                 sibling++;
                 continue;
             }
-            if (!GuiCategories.Shown(s_kinds[i]))
+            if (!GuiCategories.ShowRow(s_names[i], s_kinds[i]))
             {
                 continue;
             }
@@ -454,13 +456,14 @@ internal static class GuiCreatureList
     // ------------------------------------------------------------------ filter and selection
 
     /// <summary>
-    /// Shows the rows that belong to a category the window has switched on AND contain the
-    /// text (case-insensitive, like the console's list filter), hides the others. Nothing is
-    /// created nor destroyed here: only SetActive, plus the scroll back to the top so the
+    /// Shows the rows the boxes want ON (a category the window has switched on, or - with
+    /// the Favorites box ticked - a marked prefab, whatever its category) AND that contain
+    /// the text (case-insensitive, like the console's list filter), hides the others. Nothing
+    /// is created nor destroyed here: only SetActive, plus the scroll back to the top so the
     /// first match is where the eye already is. Typing a letter and ticking a box both end
     /// up here, which is why the two can never disagree about what is on screen. A null body
-    /// is a row a category still owes (Refilter builds it one call above) and can never
-    /// match - its category is off, so it is not on screen either way.
+    /// is a row the boxes still owe (Refilter builds it one call above) and can never match
+    /// - the boxes want it off, so it is not on screen either way.
     /// </summary>
     private static void SetFilter(string text)
     {
@@ -474,7 +477,7 @@ internal static class GuiCreatureList
                 continue;
             }
             bool match =
-                GuiCategories.Shown(s_kinds[i])
+                GuiCategories.ShowRow(s_names[i], s_kinds[i])
                 && (
                     needle.Length == 0
                     || s_names[i].IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0

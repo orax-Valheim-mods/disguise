@@ -16,6 +16,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | Command | Effect |
 |---|---|
 | `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter); a prefab a mod adds, and an effect prefab (`fx_`, `sfx_`, `vfx_`), are never listed. The whole output also goes to the BepInEx log while `Logs = true` |
+| `disguise favorite [prefab]` | Mark a prefab as a favorite, or take the mark off (one command does both and says which; no argument = the configured prefab). Favorites live in `6 - GUI` / `Favorites`, and the window's Favorites box then lists them alone |
 | `disguise set Troll` | Change the prefab and enable the disguise |
 | `disguise enable` / `disguise disable` | Toggle the disguise |
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
@@ -63,6 +64,8 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `ShowBuildings` | `true` | Show the buildable prefabs that **do** move (a `Piece` carrying `ZSyncTransform`: a cart, a raft, a training dummy) - walls and floors are under `ShowStatic` |
 | `ShowNature` | `true` | Show the natural prefabs that do move (the static majority of trees, plants, pickables, rocks and ore veins is under `ShowStatic`) |
 | `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) |
+| `ShowFavorites` | `false` | Tick the window's **Favorites** box: the list then shows **only** the prefabs marked in `Favorites`, and the six category boxes are ignored while it is ticked (one click gets a favorites list, one more the categories back) |
+| `Favorites` | *(empty)* | Comma-separated names of the marked prefabs (e.g. `Troll,Draugr,Wolf`), written by the window's Favorite button or by `disguise favorite [prefab]` and read by its Favorites box. The names are the ones `disguise list` prints; a name no catalogue holds never matches a row |
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
@@ -78,11 +81,13 @@ rotation keep their own wheel throughout.
 The **Disguise window** (opened and closed by `GuiKey` = `F8 + LeftAlt` - the chord is
 written on the title row, next to Close, and always read from the config - or by
 `disguise gui`) is built with **Jotunn**'s
-Valheim-styled controls: the line under the title, the six category checkboxes under it, the
+Valheim-styled controls: the line under the title, the checkbox row under it, the
 prefab list, its 3D preview and
-four buttons under the
+five buttons under the
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
-`Own view` and `Flight`, each one running its sub-command like the console would and writing
+`Own view`, `Flight` and `Add favorite` / `Remove favorite` (a toggle as well, following what
+the pointer is on - the row under it, then the last one it was on - so a prefab can be marked
+without being applied first), each one running its sub-command like the console would and writing
 its answer on the status line at the bottom, which holds the "click a row" hint before the
 first press (the branch added them one step at a time; the preview there shows the creature
 of the row the pointer is on, filmed
@@ -91,8 +96,11 @@ at all, and the list is a filter field - with a **Clear** button at its right, w
 the field and brings every row back - over a scrollable list of every vanilla prefab -
 minus what the checkboxes have switched off (`Static`, `Creatures`, `Items`, `Buildings`,
 `Nature`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice
-survives a restart; the rows of a category switched off are **not built** at all, and are
-built the first time its box is ticked - once) - the row of the prefab configured right now
+survives a restart; the rows a box owes are **not built** at all, and are
+built the first time it is ticked - once) - and a seventh box, `Favorites`, which is not a
+category but a mark: while it is ticked the list shows the marked prefabs **alone**, the six
+category boxes then being ignored, and the marks are kept in `6 - GUI` / `Favorites` (the
+Favorite button writes them, and `disguise favorite [prefab]` as well) - the row of the prefab configured right now
 in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
@@ -125,8 +133,8 @@ your own: your character stays on the ground, only what the other machines draw 
 line says `height` and not `offset` because the **Offset row** of the pose (above) is a
 different thing: this one is about the flight alone.
 The flight values are the two that move on their own, so the line is rewritten every frame
-the window is on screen, and only when something on it really changed. The six category
-checkboxes sit under this line, above the list they filter.
+the window is on screen, and only when something on it really changed. The checkbox row sits
+under this line, above the list it filters: six category boxes, then `Favorites`.
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.

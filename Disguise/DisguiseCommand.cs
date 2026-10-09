@@ -30,7 +30,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | gui | help",
+                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -66,6 +66,7 @@ internal static class DisguiseCommand
             "setFakePosition",
             "perf",
             "list",
+            "favorite",
             "gui",
         };
         try
@@ -97,13 +98,15 @@ internal static class DisguiseCommand
     /// Runs one sub-command with no console behind it: a button of the window (GuiWindow).
     /// There is no terminal to print to, so Say hands the message to the window's own status
     /// line (GuiStatus) - the console and the window report their own way, on the same text.
+    /// The sub may carry an argument the way the console spells it ("favorite Troll"), so it
+    /// is split here into the words Execute reads.
     /// </summary>
     internal static void Run(string sub)
     {
         // One action = one line on the window: the notes a command goes on printing in the
         // console after its headline are dropped there.
         GuiStatus.Clear();
-        Execute(null, new[] { "disguise", sub });
+        Execute(null, ("disguise " + sub).Split(' '));
     }
 
     /// <summary>The sub-command table: the console passes its terminal, the window none.</summary>
@@ -204,6 +207,10 @@ internal static class DisguiseCommand
                 ListPrefabs(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
+            case "favorite":
+                ToggleFavorite(ctx, RestOf(words, 2));
+                break;
+
             case "help":
             case "?":
                 PrintHelp(ctx);
@@ -230,6 +237,8 @@ internal static class DisguiseCommand
             ctx,
             "  disguise list [filter]    every vanilla prefab you can become (the window too)"
         );
+        Say(ctx, "  disguise favorite [name]  mark / unmark a favorite (the window's Favorite");
+        Say(ctx, "                            button, with the row the pointer is on)");
         Say(ctx, "  disguise set <prefab>     change the prefab and enable the disguise");
         Say(ctx, "                            (a click on a row of the window does this too)");
         Say(ctx, "  disguise enable           enable the disguise");
@@ -784,6 +793,40 @@ internal static class DisguiseCommand
             ctx,
             "  Install this DLL on the dedicated server AND on your PC, never on other players."
         );
+    }
+
+    /// <summary>
+    /// "disguise favorite [prefab]": marks a prefab as a favorite, or takes the mark off - one
+    /// call does either and answers which. No name means the configured creature, which is
+    /// also how the window's Favorite button runs it (its own name is the row the pointer is
+    /// on, so a prefab can be marked without being applied first). The window's list follows
+    /// through GuiCategories.Sync, which reads the config line every frame while it is open:
+    /// nothing here ever reaches into the GUI.
+    /// </summary>
+    private static void ToggleFavorite(Terminal? ctx, string name)
+    {
+        string target =
+            name.Length > 0 ? name : DisguiseConfig.ConfigCreature.Value ?? string.Empty;
+        if (target.Length == 0)
+        {
+            Say(ctx, "[Disguise] Nothing to mark: no prefab is configured.");
+            return;
+        }
+        bool added = PrefabFavorites.Toggle(target);
+        Say(
+            ctx,
+            added
+                ? $"[Disguise] \"{target}\" added to favorites."
+                : $"[Disguise] \"{target}\" taken off the favorites."
+        );
+    }
+
+    /// <summary>Every word from <paramref name="from"/> on, as one value: a name may hold a space.</summary>
+    private static string RestOf(string[] words, int from)
+    {
+        return words.Length > from
+            ? string.Join(" ", words, from, words.Length - from)
+            : string.Empty;
     }
 
     /// <summary>

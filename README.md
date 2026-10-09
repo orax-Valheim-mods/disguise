@@ -108,6 +108,7 @@ In game, open the console with **F5**:
 |---|---|
 | `disguise status` | Current state (prefab, marker, save protection) |
 | `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, and the effect prefabs (`fx_`, `sfx_`, `vfx_`), are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
+| `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it with the row the pointer is on). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
@@ -326,14 +327,19 @@ blocks `Menu.Show` for that frame only, or the game would pause on the same key)
 Escape opens it as usual. The title row carries the chord itself, between the title and
 Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
 `Not set` when it is empty), so the window always says how to call it back. The window shows
-the line under the title, then the category checkboxes under that line, the prefab list, the two pose rows under it, the 3D preview, the
-command buttons and the status line (the branch added them one step at a time): a row of four buttons
+the line under the title, then the checkbox row under that line, the prefab list, the two pose rows under it, the 3D preview, the
+command buttons and the status line (the branch added them one step at a time): a row of five buttons
 under the picture, each one running the sub-command its label stands for
-exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight` =
-`disguise enable` / `disable`, `refresh`, `view`, `fly`), and reporting its answer on the
+exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight`,
+`Add favorite` / `Remove favorite` =
+`disguise enable` / `disable`, `refresh`, `view`, `fly`, `favorite <prefab>`), and reporting its answer on the
 line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
 disguise is on and "Enable" while it is off, and both that label and the line under the title
-are rewritten after every click. The **line under the title** reads
+are rewritten after every click. The last one is a toggle the same way - "Add favorite" over a
+prefab with no mark, "Remove favorite" over one that has - and it follows what the pointer is
+on rather than the configured costume (the row under the pointer, then the last row the
+pointer was on), which is how a prefab gets marked without being applied first; the answer it
+writes on the status line names the prefab it changed. The **line under the title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
 flight lifts the costume by, in metres with one decimal: `0.0` while the flight is off
@@ -353,15 +359,24 @@ holds the hint about clicking a row while no
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
 several lines, the console keeps them all, and the first one is the headline - the notes a
-command goes on printing after it stay in the console. The **category checkboxes**: six
+command goes on printing after it stay in the console. The **checkbox row**: seven
 boxes in the band under the state line and over the list - `Static`,
-`Creatures`, `Items`, `Buildings`, `Nature`, `Other` - one per category, each
-hiding the rows of its category in the list below (the state is kept in `6 - GUI` / `Show*`,
-so a choice survives a restart, and `disguise list` prints every category whatever they say).
+`Creatures`, `Items`, `Buildings`, `Nature`, `Other`, `Favorites` - the first six one per
+category, each hiding the rows of its category in the list below (the state is kept in
+`6 - GUI` / `Show*`, so a choice survives a restart, and `disguise list` prints every category
+whatever they say), and the seventh about the **marks** instead of a category: a favorite is
+not a category of its own - the prefab keeps the one category it has - but a checkbox of its
+own, and while `Favorites` is ticked the list shows the marked prefabs **alone**, the six
+category boxes then being ignored (one click giving a favorites list, one more the categories
+back - `ShowFavorites`, `Favorites` in `6 - GUI`). A mark is set by the last button of the
+picture - with the row the pointer is on, so a prefab can be marked without being applied
+first - or by `disguise favorite [prefab]`, and taken off by the same two; the window follows
+the marks as they come and go, they being read from the config every frame while it is open.
 The rows of a category that is **off** are not built at the opening at all - an opening then
 costs only what it is going to show - and are built the first time the box is switched on
 (once, in the order of the list); a row is never destroyed, so switching a box off and back
-on is only a `SetActive`.
+on is only a `SetActive`. Ticking `Favorites` owes the rows of marks whose category is off,
+and they are built the same way, once.
 **`Static` is the only one of them about movement instead of looks**: a prefab **without**
 `ZSyncTransform` - walls, floors, furniture, trees, rocks, most of what a world is made of -
 is drawn by another machine once, where its object happened to be created, and never moved
@@ -375,7 +390,8 @@ list returns to the top - over a scrollable list of every **vanilla** prefab (no
 `fx_` / `sfx_` / `vfx_` effect either) - the exact
 list `disguise list` prints, minus what the checkboxes have switched off (those rows are not
 even built while their box is off, which is what keeps an opening to the cost of what it is
-about to show) - the row of the
+about to show) - and the marked prefabs alone while `Favorites` is ticked, whatever category
+they are in - the row of the
 prefab configured right now highlighted in orange, and a click on any row =
 `disguise set <prefab_name>` (config written and applied at once, the line under the title
 updated). The rows read beige and the configured one orange - Jotunn paints the text of all
@@ -455,6 +471,8 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 | `ShowBuildings` | `true` | Show the buildable prefabs that **do** move (a `Piece` carrying `ZSyncTransform`: a cart, a raft, a training dummy). Walls, floors and furniture have none of it and are listed under `ShowStatic` |
 | `ShowNature` | `true` | Show the natural prefabs that do move (trees, plants, pickables, rocks, ore veins - the static majority of them is under `ShowStatic`) |
 | `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) in the window's list. Off, the list only holds what the five other checkboxes show - nothing is ever dropped from the catalogue itself |
+| `ShowFavorites` | `false` | Tick the window's **Favorites** box: the list then shows **only** the prefabs marked in `Favorites`, and the six category boxes are ignored while it is ticked (untick it to be back on the categories). One click gets a favorites list, one more gets the categories back; a row hidden this way is hidden in the window only, and `disguise list` keeps printing every prefab of every category |
+| `Favorites` | *(empty)* | Comma-separated names of the prefabs marked as favorites (e.g. `Troll,Draugr,Wolf`), written by the window's Favorite button or by `disguise favorite [prefab]`, read by its Favorites box. The names are the ones `disguise list` prints; a name no catalogue holds simply never matches a row, and nothing here is ever dropped from the catalogue itself |
 
 ---
 
@@ -883,7 +901,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
   `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
   share stays `private`.
-- `DisguiseConfig.cs` - the twenty-nine settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the thirty-one settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
@@ -901,7 +919,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   first test that matches wins - `ZSyncTransform` first, then every other component read on
   the root like the `Character` test the list shipped with), plus `Names(filter, shown)` and
   `Counts(filter)`. Both ask for every category - the window takes every name and decides
-  with its own six checkboxes, so a category switched on later already has its names - and
+  with its own checkbox row (its six categories, then Favorites beside them), so a category
+  switched on later already has its names - and
   the walk reads the kind only for a caller that asks for it (the counts, a category mask):
   `KindOf` is up to ten component tests, the half of the walk that costs, and the window
   does that single pass itself, for its rows. One source, no disagreement. A modded name and
@@ -915,6 +934,13 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   lines - a prefab is named after its file - are read once per session into a case-insensitive
   set, `Contains(name)` answers from it after that, and neither file readable means no
   filtering at all (one warning says so, the lists stay as complete as before).
+- `PrefabFavorites.cs` - the marks behind the Favorites box: one comma-separated line in the
+  config (`6 - GUI` / `Favorites`) parsed only when it is not the line the two lists already
+  hold (so `Contains` is free where it is asked per row and per frame), and `Toggle`, which
+  writes the line back whole - the names already in it keep their place, and a name taken off
+  goes out of every place it was repeated. A favorite is a mark and never a category: the
+  kind PrefabCatalog gave the prefab stands, and `GuiCategories.ShowRow` is where the two
+  filters meet.
 - `DisguiseApplier.cs` - `HasMarker` / `ApplyTo` / `InstantiateAs`: writes the marker and
   swaps the network prefab.
 - `EquipmentMask.cs` - the equipment display options (`3 - Display`): swaps the equipment
@@ -1016,8 +1042,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   by a scene change, which cannot release that request by itself.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
-  or `Not set`), the state line directly under the title and the six category checkboxes in
-  the band under that line (this class only
+  or `Not set`), the state line directly under the title and the checkbox row in
+  the band under that line (six categories, then Favorites - this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
   (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the
   height is the raise the flight owns, in metres with one decimal, `0.0` while it is off and
@@ -1034,25 +1060,31 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   part of the block too, measured through `GuiCreatureList.BlockHeight`, which is what keeps
   the rows off the last rows of the list; the panel is 630 px tall because of them, and the
   status line is anchored to its bottom edge, so nothing above moves when it grows), the
-  row of four command buttons under the picture (each one runs its sub-command through
-  `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the toggle's own
-  label), the status line below them, and the coordinates of the list block. It only builds,
+  row of five command buttons under the picture (each one runs its sub-command through
+  `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
+  two toggles among them - the first from the config, the Favorite one from what the pointer
+  is on; their text is best-fit, five buttons now sharing the width of the picture), the
+  status line below them, and the coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
-- `GuiCategories.cs` - the row of six category checkboxes: Jotunn's `CreateToggle` box (the
+- `GuiCategories.cs` - the row of seven checkboxes: Jotunn's `CreateToggle` box (the
   Valheim checkbox, orange marker) with a label measured to its own text
   (`Text.preferredWidth`, so the air before the next box is the same whatever the word), the
-  `Show*` entry of each kind as the only state - a choice survives a restart, and `Sync`
-  pushes a value typed in ConfigurationManager back into its box without reopening - and
-  `Refilter` on every toggle, which first builds the rows a category just switched ON has
-  never had (the opening only builds the categories already on) and then re-runs the filter
-  over them.
+  `Show*` entry of each kind as the only state of the first six - a choice survives a
+  restart, and `Sync` pushes a value typed in ConfigurationManager back into its box without
+  reopening, and reacts to the `Favorites` line too (marks come and go while the window is
+  open) - and `Refilter` on every change, which first builds the rows the boxes just started
+  OWING (the opening only builds what they owe already: the six categories, or the marks
+  when `Favorites` was already ticked) and then re-runs the filter over them. The seventh
+  box reads `ShowFavorites`, and `ShowRow` holds the one rule of a row: the marks alone while
+  it is on, the box of the kind otherwise.
 - `GuiCreatureList.cs` - the prefab list: Jotunn's filter field with the **Clear** button at
   its right (the field and the button share the width of the block, rows keep all of theirs;
   the button empties the field through `SetTextWithoutNotify` and asks for `Refilter` itself
   - one path, taken once, instead of depending on whether a write notifies), and Jotunn's
-  scroll view, one row per vanilla prefab built **at open for the categories the boxes have
-  on** - the rows a category still owes are made by `EnsureShownRows`, the first time it is
-  switched on and at the sibling index that keeps the sorted order, no row ever destroyed;
+  scroll view, one row per vanilla prefab built **at open for what the boxes owe** - the
+  rows a category (or the Favorites box) starts owing later are made by `EnsureShownRows`,
+  the first time they are owed and at the sibling index that keeps the sorted order, no row
+  ever destroyed;
   the text filter and the checkboxes then only show and hide with `SetActive`, so typing
   never creates anything. The kind of every row is kept in a third parallel list next to the
   name and the body (which checkbox owns it; the body is null while its category has never
@@ -1224,7 +1256,7 @@ so the count of twenty-four stays correct.
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 | `disguise gui` says "not opened" (or `GuiKey` does nothing at all) | A dedicated server has no GUI, and before a world is loaded Jotunn's `CustomGUIFront` does not exist yet (`Window: ...` in the log, visible only with `Logs = true`, § 2). An unset `GuiKey` (`Not set`, recorded in ConfigurationManager) never fires. Jotunn itself is a hard dependency (§ 1): without it the mod does not load at all |
 | You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
-| The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the six `Show*` boxes of `6 - GUI` are all off - the window then says "no prefab matches the filter" instead |
+| The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the six `Show*` boxes of `6 - GUI` are all off - or that `ShowFavorites` is ticked while `Favorites` is still empty - the window then says "no prefab matches the filter" instead |
 | Your building costume does not follow you on the client (it stays where you changed it) | Normal, and it is the prefab and not the sync: on a machine running no DLL of ours the only code that applies a ZDO position to a transform is `ZSyncTransform`, and no `Piece` has one - the client drew your wall once, where your ZDO was, and has nothing left to move it with (§ 3). `disguise set <creature>` follows everywhere; so do ships, carts and dropped items. The `Static` category of the window is precisely the set of prefabs that cannot move, and `disguise list` prints its count (`static <n>`) |
 | A cart or a raft costume shivers by a few centimetres on the machine of a player watching you | The ground rest is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, the costume is sent to the height where it rests instead of one it has to be pushed out of, and the receiving body stops fighting back. Water and thin air never had that shiver (there is no contact to lose), and neither does your own clone (GhostFactory gives it no physics at all). With `Logs = Enabled` the log says what a costume really gets: `Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright | ground <x> m vs feet (<ray|probe|heightmap|zone>), rise <r> m` - a lift of roughly *hang + 5 cm* with `rise 0.00` **and a tilt above zero degrees on a slope** is the costume lying on it, while the same lift with `laid 0.0 degrees` on ground you can see sloping, or `no terrain read` when none of the four reads answered, means the costume never left the terrain buried in it; a failed read prints its own line right after it - `Ground rest: no ground under <name> at (x, y, z) \| terrain mask <n> (layer <n>) \| <what the unfiltered ray met> \| heightmaps <n>, Heightmap.GetHeight <resolved\|not resolved> \| zone probe <reason>` - which is the whole diagnosis of that case. `ray meets nothing in 10000 m` together with maps that do not cover your feet is the dedicated server standing on zones it ghost-generated (§ 3), and the reason at the end says how far the zone got: `terrain build timed out` or `another zone is building` means the tile was still being produced when the bounded wait ran out - it only has to be produced once, so the next packet has it -, `reflection unresolved` means this machine cannot ask the game at all (an error saying so is logged once), while `Ground rest: no terrain instance stands where the costume is read, so the zone at (x, z) is built to read it.` (written once) says a zone stands there, and the read that used it reports the source as `zone`. `Ground rest: <name> rotation written into the packet: <d> degrees` is the companion line showing that tilt really went out. |
 | A cart or a raft costume looks wrecked on another player's screen (missing planks, a torn sail) | The costume is wearing **your** hit points: `WearNTear` reads the `health` of the ZDO it is attached to, and your ZDO carries yours (§ 3). The relaying server swaps it for the costume's own maximum for the duration of the packet, so the dedicated server must run the current DLL (§ 1.b). Nothing about it changes for you, for the server's own state or for the save file - and the trade-off is that nobody but you and the server can read your health through a disguise any more |

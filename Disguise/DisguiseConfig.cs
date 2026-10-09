@@ -62,6 +62,8 @@ internal static class DisguiseConfig
     //    one per kind, read there at every opening and at every frame, so a value typed in
     //    ConfigurationManager lands without reopening. The console's "disguise list" always
     //    prints every kind: these hide rows in the window, never names from the catalogue.
+    //    The seventh box is Favorites - not a kind, but a mark kept in its own entry below,
+    //    and while it is on the six Show* values are simply ignored (GuiCategories.ShowRow).
     internal static ConfigEntry<bool> ConfigShowStatic = null!;
 
     internal static ConfigEntry<bool> ConfigShowCreatures = null!;
@@ -73,6 +75,10 @@ internal static class DisguiseConfig
     internal static ConfigEntry<bool> ConfigShowNature = null!;
 
     internal static ConfigEntry<bool> ConfigShowOther = null!;
+
+    internal static ConfigEntry<bool> ConfigShowFavorites = null!;
+
+    internal static ConfigEntry<string> ConfigFavorites = null!;
 
     /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
     internal static void Bind(ConfigFile config)
@@ -351,6 +357,27 @@ internal static class DisguiseConfig
             "Show the prefabs no other category claims (spawners, markers, whatever a world "
                 + "mod adds) in the window's list. Off, the list only holds what the five "
                 + "other checkboxes show - nothing is ever dropped from the catalogue itself."
+        );
+        ConfigShowFavorites = config.Bind(
+            "6 - GUI",
+            "ShowFavorites",
+            false,
+            "Tick the \"Favorites\" box of the window: the list then shows ONLY the prefabs "
+                + "listed in Favorites, and the six category boxes are ignored while it is "
+                + "ticked. Untick it to go back to the categories. Rows are only hidden in "
+                + "the window - \"disguise list\" keeps printing every prefab of every "
+                + "category."
+        );
+        ConfigFavorites = config.Bind(
+            "6 - GUI",
+            "Favorites",
+            string.Empty,
+            "Comma-separated names of the prefabs marked as favorites (e.g. "
+                + "\"Troll,Draugr,Wolf\"). Written by the Favorite button of the window, "
+                + "which marks the prefab the pointer is on - or the configured one while "
+                + "the pointer is on no row - and read by its Favorites box. The names are "
+                + "the ones \"disguise list\" prints; a name no catalogue holds simply never "
+                + "matches a row, and nothing here is ever dropped from the catalogue itself."
         );
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();

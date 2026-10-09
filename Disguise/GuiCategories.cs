@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using Jotunn.Managers;
@@ -8,17 +9,22 @@ using UnityEngine.UI;
 namespace Disguise;
 
 /// <summary>
-/// The row of category checkboxes of the Disguise window: one box per PrefabKind, deciding
-/// which categories the list shows (six of them, six boxes - the console's "disguise
-/// list" always prints every kind).
+/// The row of checkboxes of the Disguise window: six boxes, one per PrefabKind, which decide
+/// the categories the list shows (the console's "disguise list" always prints every kind),
+/// and a seventh - Favorites - which is not a kind at all but a mark beside them (a prefab
+/// keeps the one kind PrefabCatalog gave it). While the seventh is on, the six are ignored
+/// and the list shows the marked prefabs only: one click to leaf through a favorites list,
+/// one more to be back on the categories.
 ///
-/// The state lives in the config ([6 - GUI], Show* = true by default), so a choice survives
-/// a restart; Sync pushes it back into the boxes every frame while the window is open, which
-/// is how a value typed in ConfigurationManager shows up without reopening - the same rule
-/// as GuiScrollStep. A toggle re-runs the filter (Refilter), which first builds the rows a
-/// category switched ON has never had - the opening only builds the categories already on -
-/// and then hides or shows with the same SetActive as typing a letter: a row is never
-/// destroyed, so switching a category back and forth costs nothing a second time.
+/// The state lives in the config ([6 - GUI], the six Show* = true by default, ShowFavorites
+/// = false, the marks themselves in Favorites as one comma-separated line), so a choice
+/// survives a restart; Sync pushes it back into the boxes every frame while the window is
+/// open, which is how a value typed in ConfigurationManager - or a mark written by the
+/// Favorite button - shows up without reopening, the same rule as GuiScrollStep. A toggle
+/// re-runs the filter (Refilter), which first builds the rows the list is OWING - the
+/// opening only builds what the boxes already show - and then hides or shows with the same
+/// SetActive as typing a letter: a row is never destroyed, so switching a box back and forth
+/// costs nothing a second time.
 ///
 /// The row sits UNDER the state line and above the list it filters, left-aligned with it;
 /// GuiWindow owns those coordinates and passes them. Box and label are ONE checkbox - the
@@ -42,6 +48,9 @@ internal static class GuiCategories
     /// <summary>Kept beside the measured text so a rounded pixel can never wrap its last letter.</summary>
     private const float LabelPadding = 4f;
 
+    /// <summary>The six kind boxes, then Favorites: seven boxes, seven entries of config.</summary>
+    private const int BoxCount = PrefabCatalog.KindCount + 1;
+
     /// <summary>The row is placed from the top-left corner of the window, like the list.</summary>
     private static readonly Vector2 Anchor = new Vector2(0f, 1f);
 
@@ -51,27 +60,31 @@ internal static class GuiCategories
     private static readonly List<Toggle> s_toggles = new();
 
     /// <summary>What the boxes showed last, so Sync only reacts to a real change.</summary>
-    private static readonly bool[] s_applied = new bool[PrefabCatalog.KindCount];
+    private static readonly bool[] s_applied = new bool[BoxCount];
+
+    /// <summary>The Favorites line Sync saw last, so a mark added or taken off is also a change.</summary>
+    private static string s_appliedFavorites = string.Empty;
 
     // ------------------------------------------------------------------ build
 
     /// <summary>
-    /// Builds the six checkboxes at (x, y) with y the CENTRE of the row: box, then its
+    /// Builds the seven checkboxes at (x, y) with y the CENTRE of the row: box, then its
     /// label sized to the text it really has (measured through Text.preferredWidth, so the
     /// gap before the next box is the same whatever the word is). The row grows right from
-    /// the list's x and stops well inside the window: six short labels never reach
-    /// GuiWindow.Width - 24 of margin (the widest of them, "Creatures", is the one to watch).
+    /// the list's x and stops well inside the window: seven short labels never reach
+    /// GuiWindow.Width - 24 of margin (the widest of them, "Creatures" or "Favorites", is
+    /// the one to watch).
     /// </summary>
     internal static void Build(Transform parent, float x, float y)
     {
         Forget();
         GUIManager gui = GUIManager.Instance;
+        s_appliedFavorites = DisguiseConfig.ConfigFavorites.Value ?? string.Empty;
 
         float cursor = x;
-        for (int i = 0; i < PrefabCatalog.KindCount; i++)
+        for (int i = 0; i < BoxCount; i++)
         {
-            PrefabKind kind = (PrefabKind)i;
-            bool shown = Shown(kind);
+            bool shown = ShownAt(i);
             s_applied[i] = shown;
 
             GameObject box = gui.CreateToggle(parent, BoxSize, BoxSize);
@@ -90,7 +103,7 @@ internal static class GuiCategories
 
             GameObject label = GuiWindow.Label(
                 gui,
-                Title(kind),
+                TitleAt(i),
                 parent,
                 Anchor,
                 new Vector2(cursor, y),
@@ -125,7 +138,7 @@ internal static class GuiCategories
 
                 // isOn first, the listener after: writing the value must not fire the toggle.
                 toggle.isOn = shown;
-                PrefabKind captured = kind;
+                int captured = i;
                 toggle.onValueChanged.AddListener(on => OnToggled(captured, on));
                 s_toggles.Add(toggle);
 
@@ -153,19 +166,21 @@ internal static class GuiCategories
     /// <summary>
     /// What DisguiseGui.Tick runs once per frame while the window is on screen: a Show* value
     /// changed behind the window (ConfigurationManager) is pushed into its box and the list
-    /// is re-filtered once - only a real difference does either.
+    /// is re-filtered once - and so is a mark added or taken off, since the Favorites line is
+    /// a value of the config like the others (written by the Favorite button, by a console
+    /// "disguise favorite", or by hand in the .cfg). Only a real difference does either.
     /// </summary>
     internal static void Sync()
     {
         int count = s_toggles.Count;
-        if (count != PrefabCatalog.KindCount)
+        if (count != BoxCount)
         {
-            return; // no window, or a partial build: never risk an index that means another kind
+            return; // no window, or a partial build: never risk an index that means another box
         }
         bool changed = false;
         for (int i = 0; i < count; i++)
         {
-            bool want = Shown((PrefabKind)i);
+            bool want = ShownAt(i);
             if (want == s_applied[i])
             {
                 continue;
@@ -178,6 +193,17 @@ internal static class GuiCategories
             }
             changed = true;
         }
+
+        // The Favorites line is a value like the others: a mark written by the Favorite
+        // button, by "disguise favorite", or by hand in the .cfg changes which rows the list
+        // owes - a favorite whose category is OFF may have no row yet, and Refilter builds it.
+        string favorites = DisguiseConfig.ConfigFavorites.Value ?? string.Empty;
+        if (!string.Equals(favorites, s_appliedFavorites, StringComparison.Ordinal))
+        {
+            s_appliedFavorites = favorites;
+            changed = true;
+        }
+
         if (changed)
         {
             GuiCreatureList.Refilter();
@@ -187,17 +213,51 @@ internal static class GuiCategories
     // ------------------------------------------------------------------ state
 
     /// <summary>Whether the window's list shows this category (the config behind its box).</summary>
-    internal static bool Shown(PrefabKind kind) => Entry(kind).Value;
+    internal static bool Shown(PrefabKind kind) => KindEntry(kind).Value;
 
-    private static void OnToggled(PrefabKind kind, bool on)
+    /// <summary>Whether the seventh box is on: the list shows marks and nothing else then.</summary>
+    internal static bool FavoritesOn() => DisguiseConfig.ConfigShowFavorites.Value;
+
+    /// <summary>
+    /// Whether the list shows this ROW: Favorites decides alone while it is on (the six
+    /// kinds are ignored then - one click gets a list of marks and nothing else), and the
+    /// box of the kind decides otherwise. The text filter is the other half of the row's
+    /// life and lives in GuiCreatureList, which asks this once per row.
+    /// </summary>
+    internal static bool ShowRow(string name, PrefabKind kind)
     {
-        s_applied[(int)kind] = on;
-        Entry(kind).Value = on;
+        return FavoritesOn() ? PrefabFavorites.Contains(name) : Shown(kind);
+    }
+
+    /// <summary>The value a box shows: the six kinds, then Favorites (BoxCount of them).</summary>
+    private static bool ShownAt(int index)
+    {
+        return index < PrefabCatalog.KindCount ? Shown((PrefabKind)index) : FavoritesOn();
+    }
+
+    /// <summary>The label of a box: the plural of the kind, then "Favorites".</summary>
+    private static string TitleAt(int index)
+    {
+        return index < PrefabCatalog.KindCount ? Title((PrefabKind)index) : "Favorites";
+    }
+
+    private static void OnToggled(int index, bool on)
+    {
+        s_applied[index] = on;
+        Entry(index).Value = on;
         GuiCreatureList.Refilter();
     }
 
+    /// <summary>The Show* entry of a box: the six kinds are six entries, Favorites its own.</summary>
+    private static ConfigEntry<bool> Entry(int index)
+    {
+        return index < PrefabCatalog.KindCount
+            ? KindEntry((PrefabKind)index)
+            : DisguiseConfig.ConfigShowFavorites;
+    }
+
     /// <summary>The Show* entry of a kind: the six boxes are the six entries, no copy anywhere.</summary>
-    private static ConfigEntry<bool> Entry(PrefabKind kind)
+    private static ConfigEntry<bool> KindEntry(PrefabKind kind)
     {
         switch (kind)
         {
