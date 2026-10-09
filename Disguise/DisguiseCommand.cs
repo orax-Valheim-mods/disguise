@@ -238,7 +238,7 @@ internal static class DisguiseCommand
             "  disguise list [filter]    every vanilla prefab you can become (the window too)"
         );
         Say(ctx, "  disguise favorite [name]  mark / unmark a favorite (the window's Favorite");
-        Say(ctx, "                            button, with the row the pointer is on)");
+        Say(ctx, "                            button does this, on the selected prefab)");
         Say(ctx, "  disguise set <prefab>     change the prefab and enable the disguise");
         Say(ctx, "                            (a click on a row of the window does this too)");
         Say(ctx, "  disguise enable           enable the disguise");
@@ -797,11 +797,12 @@ internal static class DisguiseCommand
 
     /// <summary>
     /// "disguise favorite [prefab]": marks a prefab as a favorite, or takes the mark off - one
-    /// call does either and answers which. No name means the configured creature, which is
-    /// also how the window's Favorite button runs it (its own name is the row the pointer is
-    /// on, so a prefab can be marked without being applied first). The window's list follows
-    /// through GuiCategories.Sync, which reads the config line every frame while it is open:
-    /// nothing here ever reaches into the GUI.
+    /// call does either and answers which. No name means the configured creature, and that is
+    /// the whole of how the window's Favorite button runs it (it is this call with no name,
+    /// so button and console are the same call and can never mark two different prefabs). A
+    /// name is the other way to spell it - from the console or from a hotkey - and it may be
+    /// any prefab at all. The window's list follows through GuiCategories.Sync, which reads
+    /// the config line every frame while it is open: nothing here ever reaches into the GUI.
     /// </summary>
     private static void ToggleFavorite(Terminal? ctx, string name)
     {

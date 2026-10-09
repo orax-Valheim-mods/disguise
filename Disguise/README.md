@@ -16,7 +16,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | Command | Effect |
 |---|---|
 | `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter); a prefab a mod adds, and an effect prefab (`fx_`, `sfx_`, `vfx_`), are never listed. The whole output also goes to the BepInEx log while `Logs = true` |
-| `disguise favorite [prefab]` | Mark a prefab as a favorite, or take the mark off (one command does both and says which; no argument = the configured prefab). Favorites live in `6 - GUI` / `Favorites`, and the window's Favorites box then lists them alone |
+| `disguise favorite [prefab]` | Mark a prefab as a favorite, or take the mark off (one command does both and says which; no argument = the configured prefab, which is how the window's Favorite button runs it - on the prefab selected there). Favorites live in `6 - GUI` / `Favorites`, and the window's Favorites box then lists them alone |
 | `disguise set Troll` | Change the prefab and enable the disguise |
 | `disguise enable` / `disguise disable` | Toggle the disguise |
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
@@ -85,9 +85,9 @@ Valheim-styled controls: the line under the title, the checkbox row under it, th
 prefab list, its 3D preview and
 five buttons under the
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
-`Own view`, `Flight` and `Add favorite` / `Remove favorite` (a toggle as well, following the
-last row the pointer was on - the very one on screen - so a prefab can be marked without
-being applied first), each one running its sub-command like the console would and writing
+`Own view`, `Flight` and `Add favorite` / `Remove favorite` (a toggle as well, acting on the
+prefab selected in the window - the one the state line names, and the very call
+`disguise favorite` makes with no name), each one running its sub-command like the console would and writing
 its answer on the status line at the bottom, which holds the "click a row" hint before the
 first press (the branch added them one step at a time; the preview there shows the last
 creature the pointer was on, filmed by a camera of its own into a texture and framed to fill

@@ -26,8 +26,8 @@ namespace Disguise;
 /// SetActive as typing a letter: a row is never destroyed, so switching a box back and forth
 /// costs nothing a second time. A category and a mark differ in one thing only, and it is
 /// the scroll: a category is another list to look at, so the list goes back to its first row
-/// (Refilter), while a mark is one row more or less behind the row whose Favorite button was
-/// just pressed, so the list keeps the place the pointer is standing in (RefilterInPlace).
+/// (Refilter), while a mark is one row more or less behind the pointer, so the list keeps
+/// the place it is standing in (RefilterInPlace).
 ///
 /// The row sits UNDER the state line and above the list it filters, left-aligned with it;
 /// GuiWindow owns those coordinates and passes them. Box and label are ONE checkbox - the

@@ -373,10 +373,9 @@ internal static class DisguiseConfig
             "Favorites",
             string.Empty,
             "Comma-separated names of the prefabs marked as favorites (e.g. "
-                + "\"Troll,Draugr,Wolf\"). Written by the Favorite button of the window, "
-                + "which marks the last prefab the pointer was on - the configured one "
-                + "while no row has been pointed at in this opening - and read by its "
-                + "Favorites box. The names are "
+                + "\"Troll,Draugr,Wolf\"). Written by the Favorite button of the window - "
+                + "which marks the SELECTED prefab, the very name on the state line - and by "
+                + "\"disguise favorite\", and read by its Favorites box. The names are "
                 + "the ones \"disguise list\" prints; a name no catalogue holds simply never "
                 + "matches a row, and nothing here is ever dropped from the catalogue itself."
         );

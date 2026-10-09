@@ -108,7 +108,7 @@ In game, open the console with **F5**:
 |---|---|
 | `disguise status` | Current state (prefab, marker, save protection) |
 | `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, and the effect prefabs (`fx_`, `sfx_`, `vfx_`), are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
-| `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it with the last row the pointer was on). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
+| `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it exactly that way, on the prefab selected in the window). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
@@ -336,10 +336,11 @@ exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flig
 line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
 disguise is on and "Enable" while it is off, and both that label and the line under the title
 are rewritten after every click. The last one is a toggle the same way - "Add favorite" over a
-prefab with no mark, "Remove favorite" over one that has - and it follows what the pointer is
-on rather than the configured costume (the row under the pointer, then the last row the
-pointer was on), which is how a prefab gets marked without being applied first; the answer it
-writes on the status line names the prefab it changed. The **line under the title** reads
+prefab with no mark, "Remove favorite" over one that has - and it acts on the prefab
+**selected** in the window, the one the state line names: the console's own
+`disguise favorite` with no name, so the button and the command are one single call and the
+answer it writes on the status line always names the prefab it changed. The **line under the
+title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
 flight lifts the costume by, in metres with one decimal: `0.0` while the flight is off
@@ -369,9 +370,9 @@ not a category of its own - the prefab keeps the one category it has - but a che
 own, and while `Favorites` is ticked the list shows the marked prefabs **alone**, the six
 category boxes then being ignored (one click giving a favorites list, one more the categories
 back - `ShowFavorites`, `Favorites` in `6 - GUI`). A mark is set by the last button of the
-picture - with the last row the pointer was on, which is the very one on screen, so a prefab
-can be marked without being applied first - or by `disguise favorite [prefab]`, and taken off
-by the same two; the window follows
+picture - on the **selected** prefab, the one the state line names, the very call
+`disguise favorite` makes with no name - or by `disguise favorite [prefab]` for any other
+one, and taken off by the same two; the window follows
 the marks as they come and go, they being read from the config every frame while it is open,
 and the list keeps its place while it does so - a mark is one row more or less behind the row
 whose button was pressed, not another list to look at, where a category box (and a letter
@@ -1081,8 +1082,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   status line is anchored to its bottom edge, so nothing above moves when it grows), the
   row of five command buttons under the picture (each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
-  two toggles among them - the first from the config, the Favorite one from what the pointer
-  is on; their text is best-fit, five buttons now sharing the width of the picture), the
+  two toggles among them - the first from the config, the Favorite one from the configured
+  prefab and its mark; their text is best-fit, five buttons now sharing the width of the picture), the
   status line below them, and the coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
 - `GuiCategories.cs` - the row of seven checkboxes: Jotunn's `CreateToggle` box (the
@@ -1156,7 +1157,6 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   a white plate) and the rule that decides what is in it: the last row the pointer was on, the
   configured creature before any row was pointed at in this opening, the change held back
   0.15 s so that a pointer sweeping the list builds one copy instead of one per row crossed.
-  The rule feeds the Favorite button as well (one target, one name, the two always agreeing).
 - `CreaturePreview.cs` - the stage the preview is filmed from: the free layer, the camera of
   its own and its `RenderTexture`, the two lights, the inert copy of the creature
   (`GhostFactory.BuildInert`), the framing measured from the bounds of its meshes and fitted

@@ -103,9 +103,10 @@ internal static class GuiWindow
 
     /// <summary>
     /// The label of the Favorite button, kept here with the toggle's because it follows
-    /// something that moves on its own as well: the prefab the pointer is on (GuiPreview), so
-    /// it can flip between "Add favorite" and "Remove favorite" without a click. Unity-null
-    /// once the window is gone, which is the whole safety of RefreshState.
+    /// something that moves on its own as well: the configured prefab - the name on the state
+    /// line, which the console can change while the window is open - so it can flip between
+    /// "Add favorite" and "Remove favorite" without a click. Unity-null once the window is
+    /// gone, which is the whole safety of RefreshState.
     /// </summary>
     private static Text? s_favorite;
 
@@ -248,8 +249,8 @@ internal static class GuiWindow
     /// The row under the picture: CommandCount buttons of equal width, each one running its
     /// sub-command through DisguiseCommand.Run, which has no console here and answers on the
     /// status line below. The first is a toggle, so what it says and what it runs both follow
-    /// the config; the last follows what the pointer is on (DescribeFavorite), which is why
-    /// RefreshState rewrites it every frame like the state line above.
+    /// the config; the last follows the configured prefab and its mark (DescribeFavorite),
+    /// which is why RefreshState rewrites it every frame like the state line above.
     /// </summary>
     private static void CommandButtons(GUIManager gui, Transform parent)
     {
@@ -321,12 +322,14 @@ internal static class GuiWindow
         RunCommand(DisguiseConfig.ConfigEnabled.Value ? "disable" : "enable");
 
     /// <summary>
-    /// The Favorite button: mark the prefab it points at, or take the mark off - the very
-    /// target its label announced (DescribeFavorite), and the one the picture is showing
-    /// (GuiPreview.Current): the last row the pointer was on, so a prefab can be marked
-    /// without being applied first.
+    /// The Favorite button: mark the SELECTED prefab - the configured one, the name on the
+    /// state line above - or take the mark off, which is exactly what its label announced
+    /// (DescribeFavorite). It runs the sub-command with NO name at all, and that is the
+    /// console's own way of naming the configured creature ("disguise favorite" with no
+    /// argument): button and console are then one single call, and the two can never end up
+    /// marking two different prefabs.
     /// </summary>
-    private static void ToggleFavorite() => RunCommand("favorite " + GuiPreview.Current());
+    private static void ToggleFavorite() => RunCommand("favorite");
 
     /// <summary>
     /// Rewrites the line under the title, the labels of the toggle and of the Favorite button,
@@ -336,8 +339,8 @@ internal static class GuiWindow
     /// command buttons after they ran their sub-command. Two of the four values on the line
     /// move on their own - the flight and its height - so the ordinary frame costs the line
     /// being built and compared, never a write to the Text (which would lay it out again for
-    /// the same words); the Favorite label follows the pointer, which costs a look at the row
-    /// it is on and one at the marks (both a string compare and a set lookup); the pose
+    /// the same words); the Favorite label follows the configured prefab, which costs a look
+    /// at the config and one at the marks (both a string compare and a set lookup); the pose
     /// fields cost six more string comparisons, and skip the one being typed in (GuiPose).
     /// Does nothing without a window, which is every frame it is closed and every frame after
     /// a scene change destroyed it.
@@ -469,17 +472,16 @@ internal static class GuiWindow
         DisguiseConfig.ConfigEnabled.Value ? "Disable" : "Enable";
 
     /// <summary>
-    /// The label of the Favorite button: what pressing it does to the prefab it will act on -
-    /// the last row the pointer was on, and the configured one while no row has been pointed
-    /// at in this opening (GuiPreview.Current: the very prefab the picture is showing, so one
-    /// target and one name). Rewritten by RefreshState like the line above, so a pointer
-    /// crossing the list flips the button at once: it announces its target before anything is
-    /// pressed. The name itself is never printed here (it is one button wide): the answer
-    /// does that, on the status line below.
+    /// The label of the Favorite button: what pressing it does to the prefab SELECTED in the
+    /// window - the configured one, the very name on the state line above it (so the label
+    /// follows a change the console makes with the window open too). Rewritten by RefreshState
+    /// like that line: the button announces its target before anything is pressed. The name
+    /// itself is never printed here (it is one button wide): the answer does that, on the
+    /// status line below.
     /// </summary>
     private static string DescribeFavorite()
     {
-        string target = GuiPreview.Current();
+        string target = DisguiseConfig.ConfigCreature.Value ?? string.Empty;
         return target.Length > 0 && PrefabFavorites.Contains(target)
             ? "Remove favorite"
             : "Add favorite";

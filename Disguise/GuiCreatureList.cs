@@ -610,10 +610,10 @@ internal static class GuiCreatureList
     /// <summary>
     /// Re-runs the filter exactly as Refilter does - build what the list OWES, then
     /// SetActive - but keeps the scroll where it is instead of going back to the top: what
-    /// a mark added or taken off asks for (GuiCategories.Sync). Pressing the Favorite button
-    /// is not a new list to look at, only one row more or less behind the row whose button
-    /// was pressed - and the eye is ON that row, so jumping to the first one would throw
-    /// away the place the pointer is standing in for nothing.
+    /// a mark added or taken off asks for (GuiCategories.Sync). Marking a prefab is not a
+    /// new list to look at, only one row more or less behind the pointer - and the eye is on
+    /// the list, so jumping to the first row would throw away the place it is standing in
+    /// for nothing.
     /// </summary>
     internal static void RefilterInPlace()
     {

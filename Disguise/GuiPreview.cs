@@ -11,8 +11,7 @@ namespace Disguise;
 /// this opening. What the pointer has been on comes from GuiRowHover, one small component per
 /// row, and it is KEPT: moving off the list (onto the picture, the buttons, the pose rows, out
 /// of the window) does not put the configured creature back, so a row just looked at stays on
-/// screen to be looked at - and the Favorite button acts on that very same prefab (Current),
-/// so the picture and the button can never name two different ones.
+/// screen to be looked at.
 ///
 /// Showing a creature builds an inert copy of it (GhostFactory), which is not free: a
 /// pointer sweeping the list would ask for one copy per row crossed. The change is therefore
@@ -93,15 +92,13 @@ internal static class GuiPreview
     internal static void Hover(string creature) => s_hovered = creature;
 
     /// <summary>
-    /// The prefab the picture shows, and the one the Favorite button acts on (GuiWindow): the
-    /// last row the pointer was on, and the configured creature while no row has been pointed
-    /// at in this opening.
+    /// The prefab the picture shows: the last row the pointer was on, and the configured
+    /// creature while no row has been pointed at in this opening.
     ///
     /// Keeping the last row instead of going back to the configured one when the pointer
     /// leaves the list is what makes the list browsable: the pointer has to cross the window
     /// to reach the buttons, and a rule that reset on every exit would put the configured
-    /// creature back between the eye and the row it just left - worse, the Favorite button
-    /// would then act on another prefab than the one on screen. The memory is dropped with
+    /// creature back between the eye and the row it just left. The memory is dropped with
     /// the window: Build forgets it, once per opening.
     /// </summary>
     internal static string Current()
