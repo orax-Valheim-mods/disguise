@@ -417,7 +417,14 @@ AI, no collider, no sound. Its skinned meshes are told to `updateWhenOffscreen` 
 every camera stops being deformed, and the picture would freeze), its animator is evaluated
 **once and switched off** - the pose is the first frame of its own default state - and the
 camera turns around the creature at 25 degrees per second instead of the creature turning, so
-the framing measured once from the bounds stays true. Each film holds the world's fog and
+the framing measured once from the bounds stays true. The camera never stands closer than
+**40 m** to what it films: the stage is 20 km from the origin, where a float keeps about two
+millimetres, and a camera a hand's width from a small prefab was carried over whole pixels of
+rounding with every step of the turntable - an Acorn or an AxeHead trembled in the picture
+while a creature, metres farther off, did not. What the framing would put nearer is **grown
+on the stage** instead (the picture does not change: a projection cannot tell a bigger object
+from a receded camera, and the box grows with the clone), and the rounding falls to a
+twentieth of a pixel. Each film holds the world's fog and
 ambient off the stage and restores them before Unity renders anything else (cameras run after
 every `Update`, and `DisguiseGui.Tick` is one). A hover is held back 0.15 s before its copy
 is built: a pointer sweeping the list would otherwise ask for one inert copy - up to ten strip

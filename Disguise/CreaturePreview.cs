@@ -22,7 +22,11 @@ namespace Disguise;
 /// outside every camera stops being deformed, so the preview would freeze on a stale pose),
 /// and its animator is evaluated once and switched off: the pose on the picture is the first
 /// frame of its own default state. The camera turns around the creature rather than the
-/// creature turning, so the framing measured once from the bounds stays true while it spins.
+/// creature turning, so the framing measured once from the bounds stays true while it spins,
+/// and it never stands nearer than MinCameraDistance to it - the stage is 20 km from the
+/// origin, where a float keeps two millimetres, and a camera a hand's width from a small
+/// prefab went round on whole pixels of rounding: an Acorn trembled in the picture, a
+/// creature metres farther off did not.
 ///
 /// The stage is built on the first preview asked for and taken down with the window.
 /// </summary>
@@ -62,6 +66,20 @@ internal static class CreaturePreview
 
     /// <summary>Never frame closer than this, so a tiny creature (a Neck, a Skeleton) stays clear of the near plane.</summary>
     private const float MinRadius = 0.25f;
+
+    /// <summary>
+    /// The camera never stands nearer to the creature than this, whatever the prefab. The
+    /// stage is 20 km from the origin, where a float keeps about two millimetres: framed a
+    /// hand's width away - which is where MinRadius puts an Acorn or an AxeHead - the
+    /// camera's own position, its line of sight and the mesh's way back from world to view
+    /// space were all rounded to that grid, and the rounding differed with every step of the
+    /// turntable, so small prefabs visibly trembled in the picture while creatures, metres
+    /// farther off, did not. A prefab framed nearer than this is grown on the stage until it
+    /// stands this far off - the picture does not change, a projection cannot tell a bigger
+    /// object from a receded camera - and the rounding falls to a twentieth of a pixel. It
+    /// bounds the growth too: nothing is ever grown more than 40 / FramedDistance(MinRadius).
+    /// </summary>
+    private const float MinCameraDistance = 40f;
 
     /// <summary>Spares for s_layer: not searched yet, and nothing free found (a mod named them all).</summary>
     private const int NotSearched = -2;
@@ -196,7 +214,8 @@ internal static class CreaturePreview
 
     /// <summary>
     /// Measures what stands on the stage and works out where the camera has to be to show it
-    /// whole: the sphere of every visible mesh, framed by the field of view with a margin.
+    /// whole: the sphere of every visible mesh, framed by the field of view with a margin,
+    /// grown first when it would stand nearer to the camera than MinCameraDistance.
     /// Returns false when there is nothing to draw (a prefab of effects only, say).
     /// </summary>
     private static bool Frame(GameObject clone)
@@ -239,9 +258,22 @@ internal static class CreaturePreview
             return false;
         }
 
-        s_center = bounds.center;
-        s_radius = Mathf.Max(bounds.extents.magnitude, MinRadius);
-        s_distance = s_radius / Mathf.Tan(0.5f * VerticalFov * Mathf.Deg2Rad) * FrameMargin;
+        float radius = Mathf.Max(bounds.extents.magnitude, MinRadius);
+        float scale = Mathf.Max(1f, MinCameraDistance / FramedDistance(radius));
+        if (scale > 1f)
+        {
+            clone.transform.localScale *= scale;
+        }
+
+        // The framing grows with the clone: every mesh moves scale times farther from the
+        // root's own position, so the box does too, and the picture stays the one it was - a
+        // projection cannot tell a bigger object from a receded camera. What the picture does
+        // not keep is the rounding of a position 20 km from the origin, which is what made
+        // small prefabs tremble (MinCameraDistance).
+        Vector3 root = clone.transform.position;
+        s_center = root + ((bounds.center - root) * scale);
+        s_radius = radius * scale;
+        s_distance = FramedDistance(s_radius);
         s_yaw = 0f;
 
         // A near plane a hundredth of the way off, and a far plane that stops not far behind
@@ -249,6 +281,12 @@ internal static class CreaturePreview
         camera.nearClipPlane = Mathf.Max(0.1f, s_distance * 0.01f);
         camera.farClipPlane = s_distance + (s_radius * 3f) + 50f;
         return true;
+    }
+
+    /// <summary>How far back the camera has to stand to fit a sphere of that radius whole.</summary>
+    private static float FramedDistance(float radius)
+    {
+        return radius / Mathf.Tan(0.5f * VerticalFov * Mathf.Deg2Rad) * FrameMargin;
     }
 
     private static void DropCreature()
