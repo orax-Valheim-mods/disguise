@@ -30,6 +30,13 @@ namespace Disguise;
 /// are brought back in sync (GuiWindow.RefreshState). Sync does the same the other way
 /// around, for a creature changed by the console while the window is open.
 ///
+/// The place of the list is remembered too: the window is destroyed as a whole when it
+/// closes, ScrollRect included, so Sync keeps the offset of the content every frame and the
+/// next window is put back there - closing and reopening finds the list exactly where it
+/// was, the way a browser keeps a page. Memory only, never a config: a fresh game starts
+/// with the list at its first row, and so does a place the list has grown out of (clamped
+/// inside the rows it has now).
+///
 /// While the filter has focus, FilterFocused stays true whatever the pointer does:
 /// DisguiseGui.BlocksInput then hands the frame to the UI (Patch_TakeInput and
 /// Patch_SetMouseLook read it), which is the rule Valheim itself uses for the search field of
@@ -60,6 +67,9 @@ internal static class GuiCreatureList
 
     private const float HandleDistanceToBorder = 2f;
 
+    /// <summary>Frames a remembered place is put back for after a build (s_restore).</summary>
+    private const int RestoreFrames = 2;
+
     private static readonly List<string> s_names = new();
 
     private static readonly List<PrefabKind> s_kinds = new();
@@ -86,6 +96,22 @@ internal static class GuiCreatureList
 
     /// <summary>Last GuiScrollStep pushed to the scroll view, so the write is skipped when unchanged.</summary>
     private static int? s_lastGuiScrollStep;
+
+    /// <summary>
+    /// Where the list was, in pixels from its first row: the window is destroyed as a whole
+    /// when it closes, the ScrollRect with it, so the place of the list can only live here -
+    /// memory only, like the rest of what a window keeps (the hover of the preview, the last
+    /// answer), and never a config.
+    /// </summary>
+    private static float s_offset;
+
+    /// <summary>
+    /// Frames left before that place stops being put back (PutBackOffset): the build owes
+    /// two, because a position written on the very frame of the build is clamped away by the
+    /// scroll view - its content has no height until the rows have been laid out - and the
+    /// next frame is the first one whose content really scrolls.
+    /// </summary>
+    private static int s_restore;
 
     /// <summary>
     /// True while the player types in the filter: the frame then belongs to the UI whether
@@ -313,7 +339,14 @@ internal static class GuiCreatureList
             noMatch.SetActive(true);
         }
 
-        SetFilter(string.Empty, true); // the opening: a list from its first row
+        // Back to the first row only for a list the eye has to look at again (a letter, a
+        // category box, the Clear button, Refilter): the OPENING is not one. The scroll view
+        // is brand new here, so its content already starts at the first row by itself, and
+        // Sync puts the place the list had before the window closed back on the frame after -
+        // a position written any earlier would be clamped away by a content no row has been
+        // laid out in yet (RestoreOffset).
+        SetFilter(string.Empty, false);
+        s_restore = RestoreFrames;
     }
 
     /// <summary>
@@ -397,7 +430,11 @@ internal static class GuiCreatureList
         }
     }
 
-    /// <summary>Drops every reference to the window's list (closed, or destroyed by a scene change).</summary>
+    /// <summary>
+    /// Drops every reference to the window's list (closed, or destroyed by a scene change).
+    /// The place of the list itself is kept on purpose: it belongs to the player, not to the
+    /// window, and the next window finds it there again (s_offset, put back by Sync).
+    /// </summary>
     internal static void Forget()
     {
         s_names.Clear();
@@ -410,6 +447,9 @@ internal static class GuiCreatureList
         s_rowWidth = 0f;
         s_syncedCreature = string.Empty;
 
+        // Nothing is left to put a remembered place into (Build owes the next Sync some).
+        s_restore = 0;
+
         // The next window brings a brand new ScrollRect, which starts on Unity's own
         // sensitivity of 1: the option has to be written to it again whatever the cache says.
         s_lastGuiScrollStep = null;
@@ -420,13 +460,24 @@ internal static class GuiCreatureList
     /// <summary>
     /// What DisguiseGui.Tick runs once per frame while the window is on screen: the wheel
     /// speed option is pushed to the scroll view (a change in ConfigurationManager then needs
-    /// no reopening), and the highlight + the state line are brought back to what the config
-    /// says - the console can change the creature with the window open, and the two views
-    /// must agree.
+    /// no reopening), the place of the list is put back after a build and remembered until
+    /// the next one (PutBackOffset, RememberOffset), and the highlight + the state line are
+    /// brought back to what the config says - the console can change the creature with the
+    /// window open, and the two views must agree.
     /// </summary>
     internal static void Sync()
     {
         ApplyScrollStep();
+
+        // The place of the list: put back right after a build, and remembered every frame in
+        // between. The window does not exist any more when it closes, so this is the only
+        // copy of that place there is (s_offset).
+        if (s_restore > 0)
+        {
+            s_restore--;
+            PutBackOffset();
+        }
+        RememberOffset();
 
         string current = DisguiseConfig.ConfigCreature.Value ?? string.Empty;
         if (string.Equals(current, s_syncedCreature, StringComparison.Ordinal))
@@ -453,6 +504,46 @@ internal static class GuiCreatureList
             scroll.scrollSensitivity = step;
             s_lastGuiScrollStep = step;
         }
+    }
+
+    /// <summary>
+    /// Writes the remembered place back into the list: the rows are built in the same order
+    /// every time (same catalogue, same boxes, same sort), so the same number of pixels IS
+    /// the same rows on screen - and a list that is shorter than it was (a box switched off
+    /// meanwhile) is simply clamped inside the rows it has, the first one being reached
+    /// again by a letter or a box.
+    ///
+    /// Asked for a couple of frames after the build (RestoreFrames) and never sooner: the
+    /// rows need one layout pass before their content has a height worth scrolling, and a
+    /// position written before that is clamped away by the very scroll view it was meant
+    /// for. Writing it a second time costs one assignment.
+    /// </summary>
+    private static void PutBackOffset()
+    {
+        RectTransform? content = Content();
+        if (content != null)
+        {
+            Vector2 position = content.anchoredPosition;
+            position.y = s_offset;
+            content.anchoredPosition = position;
+        }
+    }
+
+    /// <summary>Remembers where the list is standing, so the next window finds that place again.</summary>
+    private static void RememberOffset()
+    {
+        RectTransform? content = Content();
+        if (content != null)
+        {
+            s_offset = content.anchoredPosition.y;
+        }
+    }
+
+    /// <summary>The rect the scroll view moves (the rows' parent), null while there is no window.</summary>
+    private static RectTransform? Content()
+    {
+        Transform? content = s_content;
+        return content as RectTransform;
     }
 
     // ------------------------------------------------------------------ filter and selection

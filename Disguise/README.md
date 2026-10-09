@@ -106,7 +106,8 @@ in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
 `GuiScrollStep` pixels per notch, clamped at both ends so an extra notch never makes it dip
-and spring back) - and, in the band under the list, the **two rows that pose the costume**:
+and spring back, and remembered - closing the window and reopening it finds the list exactly
+where it was) - and, in the band under the list, the **two rows that pose the costume**:
 `Offset (m)` and `Rotation (deg)`, three editable fields each in the order X, Y, Z, applied
 **as you type** (`GuiPose`, the window's side of `PoseControl`): world units for the offset
 (`1` is one metre), degrees **on top of** the way the costume already faces for the rotation,

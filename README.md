@@ -403,7 +403,12 @@ of its buttons orange, so the list itself is tinted beige for the difference to 
 and the wheel moves the list by `GuiScrollStep` pixels per notch (3000 by default = about 88
 rows per notch; uGUI's own default is `1`). The list is **clamped
 at both ends**: an extra notch at the top or the bottom simply does nothing, instead of the
-elastic dip-and-spring-back Unity gives by default. The **3D preview** above the buttons
+elastic dip-and-spring-back Unity gives by default. And the place of the list **survives the
+window**: closing it and reopening it finds the list exactly where it was, the same rows on
+screen - the window is destroyed as a whole when it closes, so `GuiCreatureList` keeps the
+offset of the content every frame and writes it back into the next one (memory only, like
+the preview's hover; a place the list has grown out of meanwhile is clamped inside the rows
+it has now). The **3D preview** above the buttons
 shows the last creature the pointer was on, and the configured one before any row has been
 pointed at in this opening: leaving the list does not take the picture back - only another
 row does - so a row can be looked at and then acted on with the same creature on screen the
@@ -1100,8 +1105,12 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   been shown), `Refilter` - what a checkbox and a changed `Show*` call: build what a
   category owes, then re-run the filter over the text already typed and go back to the first
   row - and `RefilterInPlace`, the same work with the scroll left alone, which is what a
-  changed `Favorites` line calls; the orange highlight
-  of the configured prefab, a row click routed to `DisguiseCommand.ApplyCreature`, and
+  changed `Favorites` line calls. The **place of the list** is kept between openings as well:
+  the window is destroyed as a whole when it closes, so `Sync` remembers the offset of the
+  content every frame and `PutBackOffset` writes it back into the next window - a couple of
+  frames after the build, the rows needing one layout pass before a position can hold in
+  them. The orange highlight of the configured prefab, a row click routed to
+  `DisguiseCommand.ApplyCreature`, and
   `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
   player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which
   is how the picture knows what the pointer has been on. `BlockHeight(listHeight)` answers how tall
