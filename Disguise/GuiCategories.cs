@@ -227,6 +227,11 @@ internal static class GuiCategories
         if (marks)
         {
             s_appliedFavorites = favorites;
+
+            // A mark changes what a row SAYS as well as whether it is there: every row
+            // built so far is given its star (GuiCreatureList) before the refilter below
+            // shows it - rows built after this carry the star themselves.
+            GuiCreatureList.SyncFavoriteStars();
         }
 
         if (categories)

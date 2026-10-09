@@ -9,7 +9,9 @@ namespace Disguise;
 /// config ([6 - GUI] Favorites), read through Contains and rewritten by Toggle. The line is
 /// parsed only when it is not the one the two lists were built from - the raw string is
 /// compared first - so Contains is free where it is asked often: the label of the Favorite
-/// button, once per frame, and the list's filter, once per row.
+/// button, once per frame, and the list's filter, once per row - plus the star a row
+/// carries, once when the row is built and once per row when a mark comes or goes
+/// (GuiCreatureList.Label / SyncFavoriteStars).
 ///
 /// A favorite is a MARK on a prefab and never a category of it. The kind PrefabCatalog gave
 /// the prefab stands (PrefabKind stays exactly one per prefab, and the six kind boxes keep

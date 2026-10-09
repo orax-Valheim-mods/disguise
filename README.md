@@ -397,7 +397,11 @@ list returns to the top - over a scrollable list of every **vanilla** prefab (no
 list `disguise list` prints, minus what the checkboxes have switched off (those rows are not
 even built while their box is off, which is what keeps an opening to the cost of what it is
 about to show) - and the marked prefabs alone while `Favorites` is ticked, whatever category
-they are in - the row of the
+they are in - a **gold star** (`★`, `#FFD700`, written as a `<color>` tag inside the label's
+own text, since one `Text` keeps a single colour for a whole label) on every row the marks
+hold: put there by `Label` when a row is built and written again by `SyncFavoriteStars`
+whenever the `Favorites` line changes (hidden rows too - a category can be switched on later
+with no build in between) - the row of the
 prefab configured right now highlighted in orange, and a click on any row =
 `disguise set <prefab_name>` (config written and applied at once, the line under the title
 updated). The rows read beige and the configured one orange - Jotunn paints the text of all
@@ -1122,7 +1126,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   the window is destroyed as a whole when it closes, so `Sync` remembers the offset of the
   content every frame and `PutBackOffset` writes it back into the next window - a couple of
   frames after the build, the rows needing one layout pass before a position can hold in
-  them. The orange highlight of the configured prefab, a row click routed to
+  them. The star of a favorite is the label's own text (`Label` - a gold `#FFD700`
+  `<color>` tag at the right of the name) rewritten row by row by `SyncFavoriteStars`
+  whenever the `Favorites` line changes, hidden rows included. The orange highlight of the
+  configured prefab, a row click routed to
   `DisguiseCommand.ApplyCreature`, and
   `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
   player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which

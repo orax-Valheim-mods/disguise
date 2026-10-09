@@ -51,6 +51,15 @@ internal static class GuiCreatureList
     private const float Spacing = 2f;
 
     /// <summary>
+    /// The star a favorite row carries, at the right of its name: written as a colour tag
+    /// inside the label's own text (a Text keeps one colour for a whole label, so the star
+    /// needs a tag of its own to be gold while the name stays beige or orange). Gold is
+    /// "#FFD700", and the glyph is U+2605 - a plain star, not the emoji one, which a legacy
+    /// Text cannot draw in colour.
+    /// </summary>
+    private const string StarTag = "<color=#FFD700>★</color>";
+
+    /// <summary>
     /// The Clear button beside the filter: its width and the air between it and the field.
     /// The two of them are exactly as wide as the list below (Build gives the field what is
     /// left of the width it is handed), so the block still ends where the rows end.
@@ -353,6 +362,8 @@ internal static class GuiCreatureList
     /// One row of the list: a Jotunn button of the list's own width and RowHeight, its text
     /// beige (Jotunn paints every button orange - the configured creature needs that colour
     /// to stand out), a click routed to Select and the pointer routed to the preview.
+    /// A favorite carries a gold star at the right of its name (Label), put there when the
+    /// row is built and kept there by SyncFavoriteStars.
     /// content and rowWidth are what Build measured: a row can also be owed to a category
     /// switched on long after Build returned.
     /// </summary>
@@ -360,7 +371,7 @@ internal static class GuiCreatureList
     {
         GUIManager gui = GUIManager.Instance;
         GameObject body = gui.CreateButton(
-            name,
+            Label(name),
             content,
             new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f),
@@ -376,6 +387,7 @@ internal static class GuiCreatureList
             // nothing at first because every row was orange. The list now reads beige,
             // with the configured creature in orange - the colours the title and the
             // state line already use.
+            label.supportRichText = true; // and the star of a favorite is a <color> tag
             label.color = gui.ValheimBeige;
         }
 
@@ -391,6 +403,49 @@ internal static class GuiCreatureList
             GuiPreview.WatchRow(body, creature);
         }
         return body;
+    }
+
+    /// <summary>
+    /// One row's own text: the name of the prefab, with a gold star at the right of it while
+    /// it is marked - the mark is read from the config HERE, so a row built at any moment
+    /// carries the star it deserves, and every row is written with this very string (what
+    /// SyncFavoriteStars compares against).
+    /// </summary>
+    private static string Label(string name)
+    {
+        return PrefabFavorites.Contains(name) ? $"{name} {StarTag}" : name;
+    }
+
+    /// <summary>
+    /// A mark taken or set while the window is open (the Favorite button, a console
+    /// "disguise favorite", the .cfg by hand): every row built so far is given the text it
+    /// now deserves - a gold star at the right of a favorite, the bare name otherwise. Only a
+    /// row whose label is already the right one is left alone, so a mark writes the rows it
+    /// is about and nothing else. A HIDDEN row counts too: its category can be switched on
+    /// later with no build in between, so the label is looked for in an inactive body as
+    /// well (that is the bool argument).
+    /// </summary>
+    internal static void SyncFavoriteStars()
+    {
+        for (int i = 0; i < s_rows.Count; i++)
+        {
+            GameObject? body = s_rows[i];
+            string name = s_names[i];
+            if (body == null || string.IsNullOrEmpty(name))
+            {
+                continue;
+            }
+            Text? label = body.GetComponentInChildren<Text>(true);
+            if (label == null)
+            {
+                continue;
+            }
+            string wanted = Label(name);
+            if (!string.Equals(label.text, wanted, StringComparison.Ordinal))
+            {
+                label.text = wanted;
+            }
+        }
     }
 
     /// <summary>

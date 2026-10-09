@@ -103,7 +103,8 @@ Favorite button writes them, and `disguise favorite [prefab]` as well) - and aft
 categories, alphabetical: `Buildings`, `Creatures`, `Items`, `Nature`, `Other`, `Static`
 (one category each, state kept in `6 - GUI` / `Show*`, so a choice survives a restart; the
 rows a box owes are **not built** at all, and are built the first time it is ticked - once)
-- the row of the prefab configured right now
+- a **gold star** (`★`) at the right of every marked row - the row of the prefab configured
+right now
 in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
