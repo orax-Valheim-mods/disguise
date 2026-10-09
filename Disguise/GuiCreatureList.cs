@@ -143,7 +143,9 @@ internal static class GuiCreatureList
         s_filter = field.GetComponent<InputField>();
         if (s_filter != null)
         {
-            s_filter.onValueChanged.AddListener(SetFilter);
+            // Typing IS another list to look at, so the first match goes back to the top;
+            // the other caller of SetFilter keeps the place instead (RefilterInPlace).
+            s_filter.onValueChanged.AddListener(text => SetFilter(text, true));
         }
 
         // Jotunn sets the position BEFORE the anchors and never touches the pivot, which stays
@@ -311,7 +313,7 @@ internal static class GuiCreatureList
             noMatch.SetActive(true);
         }
 
-        SetFilter(string.Empty);
+        SetFilter(string.Empty, true); // the opening: a list from its first row
     }
 
     /// <summary>
@@ -459,13 +461,14 @@ internal static class GuiCreatureList
     /// Shows the rows the boxes want ON (a category the window has switched on, or - with
     /// the Favorites box ticked - a marked prefab, whatever its category) AND that contain
     /// the text (case-insensitive, like the console's list filter), hides the others. Nothing
-    /// is created nor destroyed here: only SetActive, plus the scroll back to the top so the
-    /// first match is where the eye already is. Typing a letter and ticking a box both end
-    /// up here, which is why the two can never disagree about what is on screen. A null body
-    /// is a row the boxes still owe (Refilter builds it one call above) and can never match
-    /// - the boxes want it off, so it is not on screen either way.
+    /// is created nor destroyed here: only SetActive, plus - when the caller asks for it -
+    /// the scroll back to the top so the first match is where the eye already is. Typing a
+    /// letter and ticking a box both end up here, which is why the two can never disagree
+    /// about what is on screen. A null body is a row the boxes still owe (Refilter builds it
+    /// one call above) and can never match - the boxes want it off, so it is not on screen
+    /// either way.
     /// </summary>
-    private static void SetFilter(string text)
+    private static void SetFilter(string text, bool backToTop)
     {
         string needle = (text ?? string.Empty).Trim();
         int matches = 0;
@@ -497,13 +500,35 @@ internal static class GuiCreatureList
             s_noMatch.SetActive(matches == 0);
         }
 
-        ScrollRect? scroll = s_scroll;
-        if (scroll != null)
+        // Back to the top only when the caller says the eye has a NEW list to look at (a
+        // letter typed, a category box, the Clear button, the opening): a mark added or
+        // taken off is not one, the list keeps the place the pointer is standing in and
+        // Clamped brings it back inside the rows that are left (RefilterInPlace).
+        if (backToTop)
         {
-            scroll.verticalNormalizedPosition = 1f;
+            ScrollRect? scroll = s_scroll;
+            if (scroll != null)
+            {
+                scroll.verticalNormalizedPosition = 1f;
+            }
         }
 
         RefreshHighlight();
+    }
+
+    /// <summary>
+    /// Re-runs the filter exactly as Refilter does - build what the list OWES, then
+    /// SetActive - but keeps the scroll where it is instead of going back to the top: what
+    /// a mark added or taken off asks for (GuiCategories.Sync). Pressing the Favorite button
+    /// is not a new list to look at, only one row more or less behind the row whose button
+    /// was pressed - and the eye is ON that row, so jumping to the first one would throw
+    /// away the place the pointer is standing in for nothing.
+    /// </summary>
+    internal static void RefilterInPlace()
+    {
+        EnsureShownRows();
+        InputField? field = s_filter;
+        SetFilter(field != null ? field.text : string.Empty, false);
     }
 
     /// <summary>
@@ -511,13 +536,14 @@ internal static class GuiCreatureList
     /// (GuiCategories), and what a Show* value changed in ConfigurationManager asks for while
     /// the window is open - the only two things that can change which rows the list OWES.
     /// The rows a category just switched on has never had are built first, once
-    /// (EnsureShownRows), and the rest of the work is SetActive, exactly as typing a letter.
+    /// (EnsureShownRows), and the rest of the work is SetActive, exactly as typing a letter,
+    /// the list going back to the first row: a category IS another list to look at.
     /// </summary>
     internal static void Refilter()
     {
         EnsureShownRows();
         InputField? field = s_filter;
-        SetFilter(field != null ? field.text : string.Empty);
+        SetFilter(field != null ? field.text : string.Empty, true);
     }
 
     /// <summary>

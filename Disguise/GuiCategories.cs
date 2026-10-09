@@ -24,7 +24,10 @@ namespace Disguise;
 /// re-runs the filter (Refilter), which first builds the rows the list is OWING - the
 /// opening only builds what the boxes already show - and then hides or shows with the same
 /// SetActive as typing a letter: a row is never destroyed, so switching a box back and forth
-/// costs nothing a second time.
+/// costs nothing a second time. A category and a mark differ in one thing only, and it is
+/// the scroll: a category is another list to look at, so the list goes back to its first row
+/// (Refilter), while a mark is one row more or less behind the row whose Favorite button was
+/// just pressed, so the list keeps the place the pointer is standing in (RefilterInPlace).
 ///
 /// The row sits UNDER the state line and above the list it filters, left-aligned with it;
 /// GuiWindow owns those coordinates and passes them. Box and label are ONE checkbox - the
@@ -168,7 +171,9 @@ internal static class GuiCategories
     /// changed behind the window (ConfigurationManager) is pushed into its box and the list
     /// is re-filtered once - and so is a mark added or taken off, since the Favorites line is
     /// a value of the config like the others (written by the Favorite button, by a console
-    /// "disguise favorite", or by hand in the .cfg). Only a real difference does either.
+    /// "disguise favorite", or by hand in the .cfg). Only a real difference does either, and
+    /// the two never share a refilter: a category is a list to look at from its first row,
+    /// a mark only one row more or less behind the pointer (Refilter / RefilterInPlace).
     /// </summary>
     internal static void Sync()
     {
@@ -177,7 +182,7 @@ internal static class GuiCategories
         {
             return; // no window, or a partial build: never risk an index that means another box
         }
-        bool changed = false;
+        bool categories = false;
         for (int i = 0; i < count; i++)
         {
             bool want = ShownAt(i);
@@ -191,22 +196,27 @@ internal static class GuiCategories
             {
                 toggle.SetIsOnWithoutNotify(want);
             }
-            changed = true;
+            categories = true;
         }
 
         // The Favorites line is a value like the others: a mark written by the Favorite
         // button, by "disguise favorite", or by hand in the .cfg changes which rows the list
-        // owes - a favorite whose category is OFF may have no row yet, and Refilter builds it.
+        // owes - a favorite whose category is OFF may have no row yet, and the refilter
+        // below builds it.
         string favorites = DisguiseConfig.ConfigFavorites.Value ?? string.Empty;
-        if (!string.Equals(favorites, s_appliedFavorites, StringComparison.Ordinal))
+        bool marks = !string.Equals(favorites, s_appliedFavorites, StringComparison.Ordinal);
+        if (marks)
         {
             s_appliedFavorites = favorites;
-            changed = true;
         }
 
-        if (changed)
+        if (categories)
         {
             GuiCreatureList.Refilter();
+        }
+        else if (marks)
+        {
+            GuiCreatureList.RefilterInPlace();
         }
     }
 

@@ -372,7 +372,10 @@ back - `ShowFavorites`, `Favorites` in `6 - GUI`). A mark is set by the last but
 picture - with the last row the pointer was on, which is the very one on screen, so a prefab
 can be marked without being applied first - or by `disguise favorite [prefab]`, and taken off
 by the same two; the window follows
-the marks as they come and go, they being read from the config every frame while it is open.
+the marks as they come and go, they being read from the config every frame while it is open,
+and the list keeps its place while it does so - a mark is one row more or less behind the row
+whose button was pressed, not another list to look at, where a category box (and a letter
+typed in the filter) does send the eye back to the first row.
 The rows of a category that is **off** are not built at the opening at all - an opening then
 costs only what it is going to show - and are built the first time the box is switched on
 (once, in the order of the list); a row is never destroyed, so switching a box off and back
@@ -1079,7 +1082,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   OWING (the opening only builds what they owe already: the six categories, or the marks
   when `Favorites` was already ticked) and then re-runs the filter over them. The seventh
   box reads `ShowFavorites`, and `ShowRow` holds the one rule of a row: the marks alone while
-  it is on, the box of the kind otherwise.
+  it is on, the box of the kind otherwise. A category and a mark part company in one thing
+  only, the scroll: a category is another list to look at, so the list goes back to its first
+  row (`Refilter`), a mark is one row more or less behind the pointer, so the list keeps the
+  place it was in (`RefilterInPlace`).
 - `GuiCreatureList.cs` - the prefab list: Jotunn's filter field with the **Clear** button at
   its right (the field and the button share the width of the block, rows keep all of theirs;
   the button empties the field through `SetTextWithoutNotify` and asks for `Refilter` itself
@@ -1092,7 +1098,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   never creates anything. The kind of every row is kept in a third parallel list next to the
   name and the body (which checkbox owns it; the body is null while its category has never
   been shown), `Refilter` - what a checkbox and a changed `Show*` call: build what a
-  category owes, then re-run the filter over the text already typed - the orange highlight
+  category owes, then re-run the filter over the text already typed and go back to the first
+  row - and `RefilterInPlace`, the same work with the scroll left alone, which is what a
+  changed `Favorites` line calls; the orange highlight
   of the configured prefab, a row click routed to `DisguiseCommand.ApplyCreature`, and
   `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
   player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which
