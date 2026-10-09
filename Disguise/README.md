@@ -58,6 +58,8 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
 | `GuiKey` | `F8 + LeftAlt` | Open / close the Disguise window (same as `disguise gui`) |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per scroll notch; `0` holds the list still, a negative value inverts the wheel |
+| `WindowX` | `0` | Where the window sits, left to right: pixels from the CENTRE of the screen (`0` = centred, the default). Written back when the window closes, read when it opens, and kept on screen when read |
+| `WindowY` | `0` | Where the window sits, bottom to top: pixels ABOVE the centre (negative = lower). `0` = centred, remembered like `WindowX` |
 | `ShowStatic` | `true` | Show the **static** prefabs: every one **without** `ZSyncTransform` (walls, floors, furniture, trees, rocks). A machine with no DLL draws them once where their object was created and never moves them again, so a costume of that kind stays where you changed it for anyone watching on a vanilla client |
 | `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list - one checkbox per category; `disguise list` always prints every category |
 | `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) |
@@ -80,7 +82,12 @@ rotation keep their own wheel throughout.
 
 The **Disguise window** (opened and closed by `GuiKey` = `F8 + LeftAlt` - the chord is
 written on the title row, next to Close, and always read from the config - or by
-`disguise gui`) is built with **Jotunn**'s
+`disguise gui`; the panel itself is **draggable**, and the place it is dragged to is kept in
+`6 - GUI` / `WindowX` + `WindowY` - pixels from the middle of the screen, `0` + `0` being
+that middle, so a fresh install opens **centred** and a moved window comes back where it was
+left: the place goes into the config when the window closes (never during a drag - one write
+costs the whole file) and onto the panel when it opens, with a hand-typed value still kept
+on screen when read) is built with **Jotunn**'s
 Valheim-styled controls: the line under the title, the checkbox row under it, the
 prefab list, its 3D preview and
 five buttons under the

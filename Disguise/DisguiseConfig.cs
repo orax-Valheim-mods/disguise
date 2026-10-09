@@ -58,6 +58,23 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<int> ConfigGuiScrollStep = null!;
 
+    // -- 6 - GUI, the window itself: where it SITS. An offset from the middle of the screen
+    //    in pixels - 0/0 is the middle, which is what a fresh install gets and what the two
+    //    entries say until a window has been dragged. DisguiseGui reads the place every
+    //    frame the window is open and writes it back once, when the window closes;
+    //    GuiWindow puts it on the panel when the window is built.
+    internal static ConfigEntry<float> ConfigWindowX = null!;
+
+    internal static ConfigEntry<float> ConfigWindowY = null!;
+
+    /// <summary>
+    /// Where the window sits, as one place: the two entries above, an offset from the middle
+    /// of the screen in pixels - 0/0 being that middle, which is why a window nobody has
+    /// dragged opens centred. Read by GuiWindow.Place when the window is built and by
+    /// DisguiseGui every frame, so a value typed in ConfigurationManager lands at once.
+    /// </summary>
+    internal static Vector2 WindowPlace => new Vector2(ConfigWindowX.Value, ConfigWindowY.Value);
+
     // -- 6 - GUI, continued: which categories the window's list shows (the six checkboxes -
     //    one per kind, read there at every opening and at every frame, so a value typed in
     //    ConfigurationManager lands without reopening. The console's "disguise list" always
@@ -306,6 +323,30 @@ internal static class DisguiseConfig
                 + "and once every category is shown it is tens of thousands of pixels tall "
                 + "behind the 300 visible, so the 3000 default crosses ten screens of list "
                 + "per notch. 0 holds the list still, and a negative value inverts the wheel."
+        );
+
+        ConfigWindowX = config.Bind(
+            "6 - GUI",
+            "WindowX",
+            0f,
+            "Where the Disguise window sits, left to right: pixels away from the CENTRE of "
+                + "the screen. 0 is the centre, and it is the default - a window nobody has "
+                + "dragged opens in the middle. The place is written back here when the "
+                + "window closes and put on the panel when it opens, so a window dragged to "
+                + "a corner comes back in that corner. A value typed here by hand works as "
+                + "well, and is kept on screen when read, the way the drag keeps it: the "
+                + "window can never end up outside the monitor."
+        );
+
+        ConfigWindowY = config.Bind(
+            "6 - GUI",
+            "WindowY",
+            0f,
+            "Where the Disguise window sits, bottom to top: pixels ABOVE the centre of the "
+                + "screen (a negative value puts it lower). 0 is the centre, and it is the "
+                + "default. Written back when the window closes and read when it opens, "
+                + "exactly like WindowX - the two together are the place of the window, and "
+                + "the window opens centred until a drag says otherwise."
         );
 
         ConfigShowStatic = config.Bind(

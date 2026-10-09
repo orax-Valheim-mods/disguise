@@ -33,6 +33,20 @@ internal static class DisguiseGui
     private static Canvas? s_canvas;
     private static bool s_mouseHandedOver;
 
+    /// <summary>
+    /// Where the window sat the last frame it existed, where the config said it should sit
+    /// the last time that was looked at, and whether the two disagree. The place is read
+    /// every frame (Jotunn's drag writes straight into the panel, so looking at it is the
+    /// only way to keep it) and written back once, when the window goes - one write costs
+    /// the whole file (BepInEx writes the config on every set), so it never happens while
+    /// the panel is being dragged.
+    /// </summary>
+    private static Vector2 s_at;
+
+    private static Vector2 s_config;
+
+    private static bool s_atDirty;
+
     /// <summary>True while the window is on screen (a scene change can destroy it silently).</summary>
     internal static bool IsOpen => s_window != null;
 
@@ -73,6 +87,11 @@ internal static class DisguiseGui
             }
             if (IsOpen)
             {
+                // Where the window sits, read before anything else touches it: the drag
+                // moves the panel on its own, and this is the value that goes back into
+                // the config when the window closes (SavePosition).
+                RememberPosition();
+
                 // The console can change the creature while the window is on screen: the two
                 // views must agree (highlight of the row + line under the title). The same
                 // for a Show* value typed in ConfigurationManager, which decides with the
@@ -127,6 +146,7 @@ internal static class DisguiseGui
         {
             return;
         }
+        SavePosition(); // the panel is gone: the place it had was remembered every frame
         s_rect = null;
         s_canvas = null;
         GuiCreatureList.Forget();
@@ -162,6 +182,53 @@ internal static class DisguiseGui
             Input.mousePosition,
             uiCamera
         );
+    }
+
+    /// <summary>
+    /// Remembers where the window sits - Jotunn's drag moves the panel by itself, so the
+    /// only way to keep the place is to look at it, once per frame the window is on screen.
+    /// Two numbers, no write: the config is only told when the window closes, and what is
+    /// remembered here is also what survives a window destroyed by a scene change, there
+    /// being no panel left to read by then.
+    /// </summary>
+    private static void RememberPosition()
+    {
+        RectTransform? rect = s_rect;
+        if (rect == null)
+        {
+            return;
+        }
+
+        // The config can be written behind the window's back (ConfigurationManager, the .cfg
+        // by hand): the panel follows it at once, the way a Show* value lands without
+        // reopening, and follows it through the same helper that placed it when it was
+        // built - which is also what keeps it on screen (GuiWindow.Place).
+        Vector2 place = DisguiseConfig.WindowPlace;
+        if (place != s_config)
+        {
+            s_config = place;
+            GuiWindow.Place(rect);
+        }
+
+        s_at = rect.anchoredPosition;
+        s_atDirty = s_at != s_config; // the panel is somewhere the config does not know
+    }
+
+    /// <summary>
+    /// Puts the place back into the config - once, and only if it has changed, so closing a
+    /// window nobody has moved costs nothing. Called when the window goes, every way it
+    /// goes: closed, unloaded, or destroyed behind our back by a scene change (Heal).
+    /// </summary>
+    private static void SavePosition()
+    {
+        if (!s_atDirty)
+        {
+            return;
+        }
+        s_atDirty = false;
+        DisguiseConfig.ConfigWindowX.Value = s_at.x;
+        DisguiseConfig.ConfigWindowY.Value = s_at.y;
+        s_config = s_at; // the config now says what the panel said: nothing left to write
     }
 
     // ------------------------------------------------------------------ open / close
@@ -273,6 +340,7 @@ internal static class DisguiseGui
     /// <summary>Forgets everything about the current window object (scene change, failure).</summary>
     private static void DestroyWindow()
     {
+        SavePosition();
         s_window = null;
         s_rect = null;
         s_canvas = null;

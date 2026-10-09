@@ -326,7 +326,17 @@ closes it like the Close button - the pause menu stays out of that press (`Patch
 blocks `Menu.Show` for that frame only, or the game would pause on the same key) and the next
 Escape opens it as usual. The title row carries the chord itself, between the title and
 Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
-`Not set` when it is empty), so the window always says how to call it back. The window shows
+`Not set` when it is empty), so the window always says how to call it back. The whole panel
+is **draggable** (Jotunn's `DragWindowCntrl`: take hold of the wood anywhere that is not a
+control and the window follows, never leaving the monitor), and **the place it sits is kept
+in the config** - `WindowX` / `WindowY`, pixels away from the middle of the screen, `0` and
+`0` by default, so a fresh install opens the window **centred** and one dragged somewhere
+comes back there. The place is read every frame while the window is open and written back
+once when it closes (a write costs the whole config file, so it never happens during a
+drag), a window destroyed by a scene change keeping its place as well - there is no panel
+left to read by then, which is why the last frame's is remembered. A place typed into the
+`.cfg` by hand is honoured too, and kept on screen when it is read: a change of resolution
+cannot push the window out of sight. The window shows
 the line under the title, then the checkbox row under that line, the prefab list, the two pose rows under it, the 3D preview, the
 command buttons and the status line (the branch added them one step at a time): a row of five buttons
 under the picture, each one running the sub-command its label stands for
@@ -490,6 +500,8 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 |---|---|---|
 | `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
+| `WindowX` | `0` | Where the window sits, **left to right**: pixels away from the CENTRE of the screen (section `6 - GUI`). `0` = centred, and it is the default - a window nobody has dragged opens in the middle. Written back when the window closes (a drag writes it, and the place read every frame is what goes in), put on the panel when it opens, and kept on screen when read, so a hand-typed value or a change of resolution cannot leave the window outside the monitor |
+| `WindowY` | `0` | Where the window sits, **bottom to top**: pixels ABOVE the centre of the screen, a negative value putting it lower. `0` = centred (the default); with `WindowX` it is the whole place of the window, remembered from one session to the next exactly like it |
 | `ShowStatic` | `true` | Show the **static** prefabs in the window's list: every vanilla prefab **without** `ZSyncTransform` (walls, floors, furniture, trees, rocks). A machine with no DLL of ours draws them once where their object was created and never moves them again, so a costume of that kind stays where you changed it for a vanilla client (§ 3) |
 | `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list (section `6 - GUI`). One checkbox per category, one category per prefab: a category switched off only hides rows in the window, and `disguise list` keeps printing every vanilla prefab of every category |
 | `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) in the window's list |
@@ -926,7 +938,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
   `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
   share stays `private`.
-- `DisguiseConfig.cs` - the thirty-one settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the thirty-three settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
@@ -1064,11 +1076,19 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   pose fields focused), the handover of the
   mouse through Jotunn's `GUIManager.BlockInput` (balanced
   one `true` per `false`, only inside the `main` scene) and the healing of a window destroyed
-  by a scene change, which cannot release that request by itself.
-- `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
+  by a scene change, which cannot release that request by itself - and the place of the
+  window: `RememberPosition` reads the panel's offset every frame (the drag moves it on its
+  own, so looking at it is the only way to keep it), `SavePosition` writes it into `WindowX` /
+  `WindowY` once and only when it changed, both called from `DestroyWindow` and from that
+  healing, so even a window taken by a scene change keeps the corner it had been dragged to.
+- `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable, and
+  `Place` first puts it where the config says - `WindowX` / `WindowY`, an offset from the
+  middle of the screen, `0`/`0` being that middle and the default - then keeps it on screen
+  with the very rule the drag follows, so a hand-typed place or another resolution cannot
+  strand it outside the monitor), the
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
   or `Not set`), the state line directly under the title and the checkbox row in
-  the band under that line (six categories, then Favorites - this class only
+  the band under that line (Favorites first, the six categories alphabetically - this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
   (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the
   height is the raise the flight owns, in metres with one decimal, `0.0` while it is off and

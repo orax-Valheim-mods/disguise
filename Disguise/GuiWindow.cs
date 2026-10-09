@@ -11,7 +11,9 @@ namespace Disguise;
 /// <summary>
 /// Creates what goes INSIDE the Disguise window, with Jotunn's Valheim-styled controls (wood
 /// panel, AveriaSerif fonts, Valheim buttons). DisguiseGui owns the lifecycle: this class
-/// only builds, it never keeps the window alive and it never talks to the console.
+/// only builds, it never keeps the window alive and it never talks to the console. It does
+/// say where the panel SITS, though - the place the config holds, an offset from the middle
+/// of the screen (Place), which is a new window's centre.
 ///
 /// The window as the branch built it, in four steps: title and, directly under it, the line
 /// that says what is configured (with the GuiKey chord on the title row, next to Close), the
@@ -138,6 +140,16 @@ internal static class GuiWindow
             draggable: true
         );
 
+        // Where it sits: the place the config holds, which is an offset from the MIDDLE of
+        // the screen - 0/0, what both entries start at, IS the middle, so a window nobody
+        // has dragged opens centred and one that was moved comes back where it was left
+        // (DisguiseGui remembers the place every frame and writes it back on close).
+        RectTransform? panel = window.GetComponent<RectTransform>();
+        if (panel != null)
+        {
+            Place(panel);
+        }
+
         _ = Label(
             gui,
             "Disguise",
@@ -245,6 +257,36 @@ internal static class GuiWindow
         GuiStatus.Build(window.transform);
 
         return window;
+    }
+
+    /// <summary>
+    /// Puts the window where the config says, then keeps it on screen with the very rule the
+    /// drag follows (Jotunn's DragWindowCntrl clamps the panel inside the monitor on every
+    /// move): a place can also come from a hand typing into the .cfg, and from another
+    /// resolution - it is a number of pixels - and neither may be able to leave the window
+    /// where no hand could reach it. Screen coordinates, because that is what transform
+    /// position is on the overlay canvas the window lives on, and what the drag works in.
+    /// Called when the window is built, and once more for every place written into the
+    /// config while it is on screen (DisguiseGui), so a value typed in ConfigurationManager
+    /// lands without closing the window.
+    /// </summary>
+    internal static void Place(RectTransform panel)
+    {
+        panel.anchoredPosition = DisguiseConfig.WindowPlace;
+
+        Vector2 at = panel.position;
+        Rect size = panel.rect;
+        Vector2 scale = panel.lossyScale;
+        float halfWidth = (size.width * 0.5f) * scale.x;
+        float halfHeight = (size.height * 0.5f) * scale.y;
+        Vector2 keep = new Vector2(
+            Mathf.Clamp(at.x, halfWidth, Screen.width - halfWidth),
+            Mathf.Clamp(at.y, halfHeight, Screen.height - halfHeight)
+        );
+        if (keep != at)
+        {
+            panel.position = keep;
+        }
     }
 
     /// <summary>
