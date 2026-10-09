@@ -108,7 +108,7 @@ In game, open the console with **F5**:
 |---|---|
 | `disguise status` | Current state (prefab, marker, save protection) |
 | `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, and the effect prefabs (`fx_`, `sfx_`, `vfx_`), are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
-| `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it with the row the pointer is on). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
+| `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it with the last row the pointer was on). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
@@ -369,8 +369,9 @@ not a category of its own - the prefab keeps the one category it has - but a che
 own, and while `Favorites` is ticked the list shows the marked prefabs **alone**, the six
 category boxes then being ignored (one click giving a favorites list, one more the categories
 back - `ShowFavorites`, `Favorites` in `6 - GUI`). A mark is set by the last button of the
-picture - with the row the pointer is on, so a prefab can be marked without being applied
-first - or by `disguise favorite [prefab]`, and taken off by the same two; the window follows
+picture - with the last row the pointer was on, which is the very one on screen, so a prefab
+can be marked without being applied first - or by `disguise favorite [prefab]`, and taken off
+by the same two; the window follows
 the marks as they come and go, they being read from the config every frame while it is open.
 The rows of a category that is **off** are not built at the opening at all - an opening then
 costs only what it is going to show - and are built the first time the box is switched on
@@ -400,8 +401,10 @@ and the wheel moves the list by `GuiScrollStep` pixels per notch (3000 by defaul
 rows per notch; uGUI's own default is `1`). The list is **clamped
 at both ends**: an extra notch at the top or the bottom simply does nothing, instead of the
 elastic dip-and-spring-back Unity gives by default. The **3D preview** above the buttons
-shows the creature of the row the pointer is on, the configured one while the pointer is on
-no row at all.
+shows the last creature the pointer was on, and the configured one before any row has been
+pointed at in this opening: leaving the list does not take the picture back - only another
+row does - so a row can be looked at and then acted on with the same creature on screen the
+whole way.
 
 Directly under the list sit the **two rows that pose the costume**: `Offset (m)` with its
 three fields and `Rotation (deg)` with three more, in the order X, Y, Z - all six editable,
@@ -1093,7 +1096,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   of the configured prefab, a row click routed to `DisguiseCommand.ApplyCreature`, and
   `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
   player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which
-  is how the picture knows what the pointer is on. `BlockHeight(listHeight)` answers how tall
+  is how the picture knows what the pointer has been on. `BlockHeight(listHeight)` answers how tall
   the whole block is for a list of that height - the scroll view is only its lower part, the
   filter field and its gap being part of the block too - which is what GuiWindow measures the
   corner of the pose rows through.
@@ -1108,8 +1111,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   so a value set from the F5 console lands in the window without disturbing a half-typed one;
   `Focused` - the second half of `BlocksInput`, beside `FilterFocused` - hands the frame to
   the UI while one of the six has the focus.
-- `GuiRowHover.cs` - the listener on every row: pointer in, show its creature; pointer out,
-  back to the configured one. Two interfaces and no other, on purpose. Unity's `EventTrigger`
+- `GuiRowHover.cs` - the listener on every row: pointer in, show its creature - and that one
+  stays until another row comes under the pointer, so the pointer can leave the list for the
+  buttons and the picture keeps showing what was just looked at. One interface and no other,
+  on purpose. Unity's `EventTrigger`
   does the same job with two entries, but it also implements scrolling and dragging - and the
   event system only walks up to the FIRST object of a hierarchy that handles an event. An
   `EventTrigger` on a row therefore swallowed the wheel and the dragging of the list (the walk
@@ -1123,9 +1128,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   it, keeps every line.
 - `GuiPreview.cs` - the right half of the window: the `RawImage` the preview is drawn into
   (never a hit target, hidden while there is no texture - a `RawImage` with no texture draws
-  a white plate) and the rule that decides what is in it: the row under the pointer, the
-  configured creature while the pointer is on no row, the change held back 0.15 s so that a
-  pointer sweeping the list builds one copy instead of one per row crossed.
+  a white plate) and the rule that decides what is in it: the last row the pointer was on, the
+  configured creature before any row was pointed at in this opening, the change held back
+  0.15 s so that a pointer sweeping the list builds one copy instead of one per row crossed.
+  The rule feeds the Favorite button as well (one target, one name, the two always agreeing).
 - `CreaturePreview.cs` - the stage the preview is filmed from: the free layer, the camera of
   its own and its `RenderTexture`, the two lights, the inert copy of the creature
   (`GhostFactory.BuildInert`), the framing measured from the bounds of its meshes, the

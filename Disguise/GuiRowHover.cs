@@ -6,7 +6,9 @@ namespace Disguise;
 
 /// <summary>
 /// Tells GuiPreview what the row under the pointer holds, and NOTHING else: it listens to the
-/// pointer entering and leaving the row, and implements no other pointer interface.
+/// pointer entering the row, and implements no other pointer interface. There is nothing to
+/// do when it leaves one - GuiPreview keeps the last row it was told about until another
+/// comes along (Current) - so no exit handler exists to interfere with anything either.
 ///
 /// This small component exists because Unity's EventTrigger - which does the same job with
 /// two entries - also implements scrolling, dragging and the start of both. The event system
@@ -16,12 +18,10 @@ namespace Disguise;
 /// scrollbar kept working - no row stands over it. An object without the interface is passed
 /// over, so the walk reaches the ScrollRect again.
 /// </summary>
-public sealed class GuiRowHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public sealed class GuiRowHover : MonoBehaviour, IPointerEnterHandler
 {
     /// <summary>The creature this row holds: set once, by GuiPreview.WatchRow.</summary>
     internal string Creature { get; set; } = string.Empty;
 
     public void OnPointerEnter(PointerEventData eventData) => GuiPreview.Hover(Creature);
-
-    public void OnPointerExit(PointerEventData eventData) => GuiPreview.Leave();
 }

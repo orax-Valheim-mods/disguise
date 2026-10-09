@@ -87,8 +87,8 @@ internal static class DisguiseGui
                 // where nothing moved costs the line being built and compared, never a write.
                 GuiWindow.RefreshState();
 
-                // What the preview shows (the row under the pointer, else the configured
-                // creature) and the film of it - step 3 of the window.
+                // What the preview shows (the last row the pointer was on, else the
+                // configured creature) and the film of it - step 3 of the window.
                 GuiPreview.Tick();
                 CreaturePreview.Render();
 

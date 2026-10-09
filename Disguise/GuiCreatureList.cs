@@ -350,9 +350,9 @@ internal static class GuiCreatureList
             string creature = name;
             button.onClick.AddListener(() => Select(creature));
 
-            // Hovering the row shows its creature in the preview of step 3 (and stepping
-            // off any row puts the configured one back) - GuiRowHover is that listener,
-            // and GuiPreview the rule it feeds.
+            // Hovering the row shows its creature in the preview of step 3 - and it stays
+            // there once the pointer has left the list, only another row replacing it -
+            // GuiRowHover is that listener, and GuiPreview the rule it feeds.
             GuiPreview.WatchRow(body, creature);
         }
         return body;

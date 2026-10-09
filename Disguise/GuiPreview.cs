@@ -7,10 +7,12 @@ namespace Disguise;
 /// <summary>
 /// The right half of the Disguise window: the picture the 3D preview is drawn into (a
 /// RawImage over the RenderTexture CreaturePreview films), and which creature it shows -
-/// the one the row under the pointer is, or the configured one while the pointer is on no
-/// row at all. What the pointer is on comes from GuiRowHover, one small component per row -
-/// and the last row it was on is kept here too, for the Favorite button to know what to mark
-/// after the pointer has crossed the window to reach it (FavoriteTarget).
+/// the last row the pointer was on, the configured one while no row has been pointed at in
+/// this opening. What the pointer has been on comes from GuiRowHover, one small component per
+/// row, and it is KEPT: moving off the list (onto the picture, the buttons, the pose rows, out
+/// of the window) does not put the configured creature back, so a row just looked at stays on
+/// screen to be looked at - and the Favorite button acts on that very same prefab (Current),
+/// so the picture and the button can never name two different ones.
 ///
 /// Showing a creature builds an inert copy of it (GhostFactory), which is not free: a
 /// pointer sweeping the list would ask for one copy per row crossed. The change is therefore
@@ -24,9 +26,8 @@ internal static class GuiPreview
 
     private static RawImage? s_image;
 
+    /// <summary>The last row the pointer was on (empty while no row has been pointed at).</summary>
     private static string s_hovered = string.Empty;
-
-    private static string s_lastHovered = string.Empty;
 
     private static string s_pending = string.Empty;
 
@@ -73,7 +74,7 @@ internal static class GuiPreview
         s_image = image;
     }
 
-    /// <summary>Watches a row: on it, its creature; off it, back to the configured one.</summary>
+    /// <summary>Watches a row: on it, its creature - and that one stays until another row is.</summary>
     internal static void WatchRow(GameObject row, string creature)
     {
         GuiRowHover? hover = row.GetComponent<GuiRowHover>();
@@ -84,55 +85,44 @@ internal static class GuiPreview
         hover.Creature = creature;
     }
 
-    /// <summary>The pointer stepped on a row (GuiRowHover): show the creature it holds.</summary>
-    internal static void Hover(string creature)
-    {
-        s_hovered = creature;
-        s_lastHovered = creature;
-    }
-
-    /// <summary>The pointer stepped off that row: back to the creature configured right now.</summary>
-    internal static void Leave() => s_hovered = string.Empty;
+    /// <summary>
+    /// The pointer stepped on a row (GuiRowHover): show the creature it holds, and keep it
+    /// for as long as no other row comes along - stepping off a row changes nothing, which is
+    /// the whole point of the rule (Current).
+    /// </summary>
+    internal static void Hover(string creature) => s_hovered = creature;
 
     /// <summary>
-    /// The prefab the Favorite button acts on: the row under the pointer while there is one,
-    /// then the last row the pointer was on, then the configured one.
+    /// The prefab the picture shows, and the one the Favorite button acts on (GuiWindow): the
+    /// last row the pointer was on, and the configured creature while no row has been pointed
+    /// at in this opening.
     ///
-    /// The second step is what makes the button usable at all. A row clears its hover the
-    /// moment the pointer leaves it (Leave - which is also what puts the configured creature
-    /// back into the picture), and the pointer has to cross the whole window to reach the
-    /// button: without this memory every trip would end on the configured creature, and a
-    /// prefab could never be marked without being applied first. The picture keeps its own
-    /// rule (off a row, the configured one) and the button answers with the name it marked
-    /// (GuiStatus), so the two can never leave you guessing. The memory is dropped with the
-    /// window: Build forgets it, once per opening.
+    /// Keeping the last row instead of going back to the configured one when the pointer
+    /// leaves the list is what makes the list browsable: the pointer has to cross the window
+    /// to reach the buttons, and a rule that reset on every exit would put the configured
+    /// creature back between the eye and the row it just left - worse, the Favorite button
+    /// would then act on another prefab than the one on screen. The memory is dropped with
+    /// the window: Build forgets it, once per opening.
     /// </summary>
-    internal static string FavoriteTarget()
+    internal static string Current()
     {
-        if (s_hovered.Length > 0)
-        {
-            return s_hovered;
-        }
-        if (s_lastHovered.Length > 0)
-        {
-            return s_lastHovered;
-        }
-        return DisguiseConfig.ConfigCreature.Value ?? string.Empty;
+        return s_hovered.Length > 0
+            ? s_hovered
+            : DisguiseConfig.ConfigCreature.Value ?? string.Empty;
     }
 
     // ------------------------------------------------------------------ per frame
 
     /// <summary>
     /// Decides what the picture shows: DisguiseGui.Tick, once per frame while the window is
-    /// open. The hover is what the pointer asks for, the configured creature the fallback -
-    /// and the texture is put on the picture the moment the stage exists (it is built by the
-    /// first show, a fifth of a second after the window opens).
+    /// open. What it asks for is Current - the last row the pointer was on, the configured
+    /// creature before any row was pointed at - and the texture is put on the picture the
+    /// moment the stage exists (it is built by the first show, a fifth of a second after the
+    /// window opens).
     /// </summary>
     internal static void Tick()
     {
-        string hovered = s_hovered;
-        string wanted =
-            hovered.Length > 0 ? hovered : DisguiseConfig.ConfigCreature.Value ?? string.Empty;
+        string wanted = Current();
         if (!string.Equals(wanted, s_pending, System.StringComparison.Ordinal))
         {
             s_pending = wanted;
@@ -164,12 +154,11 @@ internal static class GuiPreview
         }
     }
 
-    /// <summary>Forgets the picture and the hover: the window is closing (DisguiseGui).</summary>
+    /// <summary>Forgets the picture and the last row: the window is closing (DisguiseGui).</summary>
     internal static void Forget()
     {
         s_image = null;
         s_hovered = string.Empty;
-        s_lastHovered = string.Empty;
         s_pending = string.Empty;
         s_shown = string.Empty;
         s_dueAt = 0f;

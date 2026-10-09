@@ -322,10 +322,11 @@ internal static class GuiWindow
 
     /// <summary>
     /// The Favorite button: mark the prefab it points at, or take the mark off - the very
-    /// target its label announced (DescribeFavorite): the row under the pointer, then the
-    /// last row the pointer was on, so a prefab can be marked without being applied first.
+    /// target its label announced (DescribeFavorite), and the one the picture is showing
+    /// (GuiPreview.Current): the last row the pointer was on, so a prefab can be marked
+    /// without being applied first.
     /// </summary>
-    private static void ToggleFavorite() => RunCommand("favorite " + GuiPreview.FavoriteTarget());
+    private static void ToggleFavorite() => RunCommand("favorite " + GuiPreview.Current());
 
     /// <summary>
     /// Rewrites the line under the title, the labels of the toggle and of the Favorite button,
@@ -469,17 +470,16 @@ internal static class GuiWindow
 
     /// <summary>
     /// The label of the Favorite button: what pressing it does to the prefab it will act on -
-    /// the row under the pointer, then the last row the pointer was on, then the configured
-    /// one (GuiPreview.FavoriteTarget). Rewritten by RefreshState like the line above, so a
-    /// pointer crossing the list flips the button at once: it announces its target before
-    /// anything is pressed, which is what keeps the picture - which goes back to the
-    /// configured creature the moment the pointer leaves a row - from leaving you unsure of
-    /// what is about to be marked. The name itself is never printed here (it is one button
-    /// wide): the answer does that, on the status line below.
+    /// the last row the pointer was on, and the configured one while no row has been pointed
+    /// at in this opening (GuiPreview.Current: the very prefab the picture is showing, so one
+    /// target and one name). Rewritten by RefreshState like the line above, so a pointer
+    /// crossing the list flips the button at once: it announces its target before anything is
+    /// pressed. The name itself is never printed here (it is one button wide): the answer
+    /// does that, on the status line below.
     /// </summary>
     private static string DescribeFavorite()
     {
-        string target = GuiPreview.FavoriteTarget();
+        string target = GuiPreview.Current();
         return target.Length > 0 && PrefabFavorites.Contains(target)
             ? "Remove favorite"
             : "Add favorite";
