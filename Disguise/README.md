@@ -15,7 +15,7 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 
 | Command | Effect |
 |---|---|
-| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter); a prefab a mod adds, and an effect prefab (`fx_`, `sfx_`, `vfx_`), are never listed. The whole output also goes to the BepInEx log while `Logs = true` |
+| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter); a prefab a mod adds, an effect prefab (`fx_`, `sfx_`, `vfx_`) and a prefab with **no mesh to draw** (a creature's own attack helper, a spawned zone) are never listed. The whole output also goes to the BepInEx log while `Logs = true` |
 | `disguise favorite [prefab]` | Mark a prefab as a favorite, or take the mark off (one command does both and says which; no argument = the configured prefab, which is how the window's Favorite button runs it - on the prefab selected there). Favorites live in `6 - GUI` / `Favorites`, and the window's Favorites box then lists them alone |
 | `disguise set Troll` | Change the prefab and enable the disguise |
 | `disguise enable` / `disguise disable` | Toggle the disguise |

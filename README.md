@@ -107,7 +107,7 @@ In game, open the console with **F5**:
 | Command | Effect |
 |---|---|
 | `disguise status` | Current state (prefab, marker, save protection) |
-| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, and the effect prefabs (`fx_`, `sfx_`, `vfx_`), are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
+| `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, the effect prefabs (`fx_`, `sfx_`, `vfx_`) and a prefab with **no mesh to draw** are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
 | `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it exactly that way, on the prefab selected in the window). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
 | `disguise enable` | Enable the disguise |
@@ -403,7 +403,8 @@ The
 **prefab list**: a filter field with a **Clear** button at its right - it empties the field
 and brings every row back, through the same `SetActive` re-run a checkbox asks for, then the
 list returns to the top - over a scrollable list of every **vanilla** prefab (no
-`fx_` / `sfx_` / `vfx_` effect either) - the exact
+`fx_` / `sfx_` / `vfx_` effect either, and nothing a costume could not be **drawn** as: a
+prefab with no mesh anywhere under it is left out too - `HasMesh`) - the exact
 list `disguise list` prints, minus what the checkboxes have switched off (those rows are not
 even built while their box is off, which is what keeps an opening to the cost of what it is
 about to show) - and the marked prefabs alone while `Favorites` is ticked, whatever category
@@ -961,8 +962,14 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   the walk reads the kind only for a caller that asks for it (the counts, a category mask):
   `KindOf` is up to ten component tests, the half of the walk that costs, and the window
   does that single pass itself, for its rows. One source, no disagreement. A modded name and
-  an effect name (`fx_` / `sfx_` / `vfx_`) are both cut out
-  at the top of the walk, before anything is fetched or counted.
+  an effect name (`fx_` / `sfx_` / `vfx_`) are cut out at the top of the walk, before
+  anything is fetched or counted, and a name with **no mesh to be seen through** is cut the
+  moment its prefab is fetched (`HasMesh`: a `MeshRenderer` or a `SkinnedMeshRenderer`
+  somewhere under the root, the two types the preview counts before it frames a picture) -
+  the creature's own attack helpers (`Abomination_attack1`, `wraith_melee`: registered `Item`
+  prefabs the game draws for nobody), the zones a blob or Bonemass spawns, spawners and
+  markers. They would be an empty picture in the window and an invisible viking in the
+  world, and `disguise set <name>` still takes one typed by hand, as it does an effect.
 - `VanillaPrefabs.cs` - the vanilla test behind both lists, and the only place that decides
   it: Valheim describes its **own** assets in `valheim_Data\StreamingAssets\SoftRef\manifest`
   and `manifest_extended`, plain text with one `path in bundle: Assets/.../Ghost.prefab` line
@@ -1326,6 +1333,7 @@ so the count of twenty-four stays correct.
 | The log of the player watching you fills with `Failed to find rpc method 213315071` (or `531685242`) | Harmless, and both hashes are known: `213315071` = `RPC_ResetCloth`, broadcast by the vanilla `Character.ResetCloth()` whenever your body starts moving (and on a jump); `531685242` = `SetTrigger`, the animation trigger broadcast (§ 4.7). A client without the DLL builds your costume, and a wall has neither a `Character` nor a `ZSyncAnimation` to answer with - the machine logs that it knows no such method and does nothing, which is exactly right since there is nothing to reset or to animate. A creature costume logs neither (both components are there), and a client running the DLL never does either (it builds a real `Player`) |
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
+| A prefab like `Abomination_attack1` or `wraith_melee` is missing from the list | Normal, and no accident: those are the creature's own **attack helpers** and zones - registered `Item` prefabs with **no mesh anywhere**, which is why the log says `Preview: <name> has no mesh to show.` when one is pointed at. The catalogue drops them with every other prefab nothing could be drawn of (a spawner, a blob's AoE): they would be an empty picture in the window and an invisible viking in the world (§ 6). `disguise set <name>` still takes one typed by hand |
 | Opening the window takes a noticeable moment | Two things cost, and the log says both: `GUI: <n> name(s) in <ms> ms, <built> of <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The catalogue is the walk that tags every vanilla prefab with its kind - up to ten component tests, and exactly ONCE: the walk skips them when all it was asked for is names, and the window does that one pass for its own rows. The rows are Jotunn buttons of four objects each, and only the categories the boxes have ON get one at the opening; a category switched on later is built then, once (in the order of the list), and a row is never destroyed, so switching back and forth stays a `SetActive`. The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log) |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 

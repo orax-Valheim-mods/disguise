@@ -14,11 +14,14 @@ namespace Disguise;
 /// PrefabKind): it is the difference between a costume that follows you and one that stays
 /// where you put it.
 ///
-/// Two names never enter: a MODDED one - the name is not in the game's own asset manifest,
-/// which no mod ever writes to (VanillaPrefabs holds that test) - and an EFFECT one - the
-/// name starts with "fx_", "sfx_" or "vfx_" (IsEffect: the sound and the particles a prefab
-/// spawns, not an appearance). Both are cut at the top of the walk, before anything is
-/// fetched or counted, so the counts and the names always describe the same set.
+/// Three names never enter: a MODDED one - the name is not in the game's own asset manifest,
+/// which no mod ever writes to (VanillaPrefabs holds that test) - an EFFECT one - the name
+/// starts with "fx_", "sfx_" or "vfx_" (IsEffect: the sound and the particles a prefab
+/// spawns, not an appearance) - and one with no MESH to be seen through (HasMesh: the
+/// creature's own attack helpers, the zones a blob or Bonemass spawns, every object the game
+/// uses rather than shows). The first two are cut at the top of the walk, before anything is
+/// fetched or counted; the third is read on the prefab the walk has already fetched, so the
+/// counts and the names still describe the same set.
 ///
 /// The two lists stay identical because they come out of this one class - the window only
 /// adds its two filters on top (the text field, then the checkbox row: six category boxes
@@ -154,14 +157,41 @@ internal static class PrefabCatalog
     }
 
     /// <summary>
+    /// Whether a costume could be DRAWN at all: one mesh renderer anywhere under the root - a
+    /// MeshRenderer or a SkinnedMeshRenderer, the two types the preview counts when it frames
+    /// its picture and warns "has no mesh to show" when it finds none of them
+    /// (CreaturePreview.Frame). Particles and trails count on neither side: they are effects
+    /// the costume spawns, not the costume.
+    ///
+    /// Read on the PREFAB ASSET, like every other test of this class - nothing is
+    /// instantiated to find out - and every state counts, an inactive child and a switched-off
+    /// renderer included: the asset ships the GEOMETRY, and geometry is what a costume needs
+    /// at all. What a state like that costs at runtime is the preview's business, not the
+    /// list's.
+    ///
+    /// This is the third name the two lists never show, and the reason is in the log: the
+    /// creature's own attack helpers (Abomination_attack1, wraith_melee - registered Item
+    /// prefabs the game draws for nobody), the zones a blob or Bonemass spawns, spawners and
+    /// markers. They are objects the game USES rather than appearances to wear: the picture
+    /// over there would be empty and the viking invisible in the world.
+    /// </summary>
+    private static bool HasMesh(GameObject prefab)
+    {
+        return prefab.GetComponentInChildren<MeshRenderer>(true) != null
+            || prefab.GetComponentInChildren<SkinnedMeshRenderer>(true) != null;
+    }
+
+    /// <summary>
     /// One pass over the registered prefabs: adds the matching names (when a list is given)
     /// and/or counts every match by kind. A modded name and an effect name never enter
-    /// either - both are cut before anything else, so the counts and the names agree on the
-    /// same set. The kind is read ONLY when a caller asks for it (counts, or a category
-    /// mask): KindOf is up to ten component tests, the half of this walk that costs, and a
-    /// caller here for names alone - the window, which tags its rows itself - does not need
-    /// them twice. Both callers are one-shot (a console command, the opening of the window),
-    /// so nothing is cached - a stale cache would list prefabs a modded world no longer has.
+    /// either - both are cut before anything is fetched - and neither does a prefab with no
+    /// mesh to be seen through, cut here the moment it is fetched (HasMesh), so the counts
+    /// and the names still agree on the same set. The kind is read ONLY when a caller asks
+    /// for it (counts, or a category mask): KindOf is up to ten component tests, the half of
+    /// this walk that costs, and a caller here for names alone - the window, which tags its
+    /// rows itself - does not need them twice. Both callers are one-shot (a console command,
+    /// the opening of the window), so nothing is cached - a stale cache would list prefabs a
+    /// modded world no longer has.
     /// </summary>
     private static void Walk(string? filter, bool[]? shown, List<string>? names, int[]? counts)
     {
@@ -181,8 +211,9 @@ internal static class PrefabCatalog
                 continue;
             }
             GameObject? prefab = zns.GetPrefab(name);
-            if (prefab == null)
+            if (prefab == null || !HasMesh(prefab))
             {
+                // No mesh, no costume: the picture would be empty and the viking invisible.
                 continue;
             }
             if (counts == null && shown == null)
