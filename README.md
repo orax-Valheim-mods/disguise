@@ -444,7 +444,15 @@ AI, no collider, no sound. Its skinned meshes are told to `updateWhenOffscreen` 
 every camera stops being deformed, and the picture would freeze), its animator is evaluated
 **once and switched off** - the pose is the first frame of its own default state - and the
 camera turns around the creature at 25 degrees per second instead of the creature turning, so
-the framing measured once from the bounds stays true. The camera never stands closer than
+the framing measured once from the bounds stays true. That framing fits the box of the meshes
+along **both axes** and not a sphere around them, which is what fills the picture: the camera
+goes round the object, so what it can meet at its widest is the plan diagonal (the widest a
+box ever presents while turning) against the horizontal field of view, and what it meets at
+its tallest is the height - which the turn never changes, and only the tilt adds a share of
+the plan to. Both are exact worst cases over the whole turn, so nothing is ever clipped; a
+sphere would have fitted the longest corner to corner line and left every other direction
+empty, a ship filling the picture end to end showing a third of its height, an Acorn a fifth
+of it. The camera never stands closer than
 **40 m** to what it films: the stage is 20 km from the origin, where a float keeps about two
 millimetres, and a camera a hand's width from a small prefab was carried over whole pixels of
 rounding with every step of the turntable - an Acorn or an AxeHead trembled in the picture
@@ -1151,7 +1159,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   The rule feeds the Favorite button as well (one target, one name, the two always agreeing).
 - `CreaturePreview.cs` - the stage the preview is filmed from: the free layer, the camera of
   its own and its `RenderTexture`, the two lights, the inert copy of the creature
-  (`GhostFactory.BuildInert`), the framing measured from the bounds of its meshes, the
+  (`GhostFactory.BuildInert`), the framing measured from the bounds of its meshes and fitted
+  along both axes (so the object itself fills the picture, whatever its shape or size), the
   turntable, and `Forget` - texture released, layer given back to the cameras and the lights -
   called with the window closing.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,

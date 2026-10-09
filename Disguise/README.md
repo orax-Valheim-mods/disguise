@@ -90,7 +90,8 @@ last row the pointer was on - the very one on screen - so a prefab can be marked
 being applied first), each one running its sub-command like the console would and writing
 its answer on the status line at the bottom, which holds the "click a row" hint before the
 first press (the branch added them one step at a time; the preview there shows the last
-creature the pointer was on, filmed by a camera of its own into a texture - kept there while
+creature the pointer was on, filmed by a camera of its own into a texture and framed to fill
+it whatever its shape or size - kept there while
 the pointer is anywhere else, so a row can be looked at and then acted on - and the
 configured one before any row was pointed at in this opening, and the list is a filter field -
 with a **Clear** button at its right, which empties

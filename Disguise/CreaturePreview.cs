@@ -61,23 +61,31 @@ internal static class CreaturePreview
 
     private const float TurnDegreesPerSecond = 25f;
 
-    /// <summary>How much bigger the framed sphere is than the creature, so nothing is ever clipped.</summary>
+    /// <summary>How much bigger the framed picture is than the creature, so nothing is ever clipped.</summary>
     private const float FrameMargin = 1.2f;
 
-    /// <summary>Never frame closer than this, so a tiny creature (a Neck, a Skeleton) stays clear of the near plane.</summary>
-    private const float MinRadius = 0.25f;
+    /// <summary>
+    /// The shortest distance the camera is ever framed at, and with it the most a prefab can
+    /// be grown on the stage (MinCameraDistance / it): a floor under the FIT, so a prefab
+    /// whose meshes measure nothing at all cannot ask for endless growth. It is only a
+    /// guard - nothing real is this small - and every prefab above it fills the picture
+    /// whatever its own size, which is what a floor on the RADIUS denied the smallest of
+    /// them: the 0.25 m this replaced framed an Acorn at a hand's width, and the acorn
+    /// filled a fifth of the picture.
+    /// </summary>
+    private const float MinFramedDistance = 0.05f;
 
     /// <summary>
     /// The camera never stands nearer to the creature than this, whatever the prefab. The
     /// stage is 20 km from the origin, where a float keeps about two millimetres: framed a
-    /// hand's width away - which is where MinRadius puts an Acorn or an AxeHead - the
+    /// hand's width away - which is where a small prefab without this rule is framed - the
     /// camera's own position, its line of sight and the mesh's way back from world to view
     /// space were all rounded to that grid, and the rounding differed with every step of the
     /// turntable, so small prefabs visibly trembled in the picture while creatures, metres
     /// farther off, did not. A prefab framed nearer than this is grown on the stage until it
     /// stands this far off - the picture does not change, a projection cannot tell a bigger
     /// object from a receded camera - and the rounding falls to a twentieth of a pixel. It
-    /// bounds the growth too: nothing is ever grown more than 40 / FramedDistance(MinRadius).
+    /// bounds the growth too: nothing is ever grown more than 40 / MinFramedDistance.
     /// </summary>
     private const float MinCameraDistance = 40f;
 
@@ -214,8 +222,8 @@ internal static class CreaturePreview
 
     /// <summary>
     /// Measures what stands on the stage and works out where the camera has to be to show it
-    /// whole: the sphere of every visible mesh, framed by the field of view with a margin,
-    /// grown first when it would stand nearer to the camera than MinCameraDistance.
+    /// whole: the box of every visible mesh, framed along both axes by the field of view with
+    /// a margin, grown first when it would stand nearer to the camera than MinCameraDistance.
     /// Returns false when there is nothing to draw (a prefab of effects only, say).
     /// </summary>
     private static bool Frame(GameObject clone)
@@ -258,8 +266,8 @@ internal static class CreaturePreview
             return false;
         }
 
-        float radius = Mathf.Max(bounds.extents.magnitude, MinRadius);
-        float scale = Mathf.Max(1f, MinCameraDistance / FramedDistance(radius));
+        float framed = FramedDistance(bounds);
+        float scale = Mathf.Max(1f, MinCameraDistance / framed);
         if (scale > 1f)
         {
             clone.transform.localScale *= scale;
@@ -272,8 +280,8 @@ internal static class CreaturePreview
         // small prefabs tremble (MinCameraDistance).
         Vector3 root = clone.transform.position;
         s_center = root + ((bounds.center - root) * scale);
-        s_radius = radius * scale;
-        s_distance = FramedDistance(s_radius);
+        s_radius = Mathf.Max(bounds.extents.magnitude, MinFramedDistance) * scale;
+        s_distance = framed * scale;
         s_yaw = 0f;
 
         // A near plane a hundredth of the way off, and a far plane that stops not far behind
@@ -283,10 +291,36 @@ internal static class CreaturePreview
         return true;
     }
 
-    /// <summary>How far back the camera has to stand to fit a sphere of that radius whole.</summary>
-    private static float FramedDistance(float radius)
+    /// <summary>
+    /// How far back the camera has to stand to fit what stands on the stage whole - the two
+    /// axes fitted apart, and the worse of the two winning.
+    ///
+    /// A bounding SPHERE would fit the object to its longest corner to corner line and leave
+    /// every other direction empty, which is why so much of the picture went unused: a ship
+    /// filling it end to end showed a third of its height, a deer two thirds of its own.
+    /// The camera goes round the object, so the widest it can ever meet is the plan diagonal
+    /// (size.x, size.z - the widest a box ever presents while turning), against the horizontal
+    /// field of view; and the tallest it ever meets is the height, which the turn never
+    /// changes and only the tilt adds a share of the plan to. Both are therefore exact worst
+    /// cases over the whole turntable, and the object fills its picture without ever being
+    /// clipped by it.
+    /// </summary>
+    private static float FramedDistance(Bounds bounds)
     {
-        return radius / Mathf.Tan(0.5f * VerticalFov * Mathf.Deg2Rad) * FrameMargin;
+        float x = bounds.size.x;
+        float y = bounds.size.y;
+        float z = bounds.size.z;
+        float plan = Mathf.Sqrt((x * x) + (z * z));
+        float tilt = Tilt * Mathf.Deg2Rad;
+        float height = (y * Mathf.Cos(tilt)) + (plan * Mathf.Sin(tilt));
+
+        // The horizontal field of view is the vertical one widened by the shape of the
+        // picture: 380 over 300, so a little wider than tall (a projection keeps angles).
+        float halfTan = Mathf.Tan(0.5f * VerticalFov * Mathf.Deg2Rad);
+        float horizontalTan = halfTan * (PictureWidth / PictureHeight);
+        float vertical = (height * 0.5f) / halfTan;
+        float horizontal = (plan * 0.5f) / horizontalTan;
+        return Mathf.Max(Mathf.Max(vertical, horizontal) * FrameMargin, MinFramedDistance);
     }
 
     private static void DropCreature()
