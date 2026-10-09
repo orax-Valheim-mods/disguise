@@ -13,9 +13,10 @@ namespace Disguise;
 /// panel, AveriaSerif fonts, Valheim buttons). DisguiseGui owns the lifecycle: this class
 /// only builds, it never keeps the window alive and it never talks to the console.
 ///
-/// The window as the branch built it, in four steps: title and the prefab configured right
-/// now (with the GuiKey chord on the title row, next to Close), the six category checkboxes
-/// that gate the list (GuiCategories builds them, this class only says where they sit), the
+/// The window as the branch built it, in four steps: title and, directly under it, the line
+/// that says what is configured (with the GuiKey chord on the title row, next to Close), the
+/// six category checkboxes that gate the list (GuiCategories builds them, this class only
+/// says where they sit - under that line), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
 /// films into it), under it the four command buttons, and at the bottom the status line
@@ -54,11 +55,21 @@ internal static class GuiWindow
     private const float PoseGap = 6f;
 
     /// <summary>
-    /// Centre of the checkbox row (GuiCategories): the band the layout leaves free between
-    /// the title - whose box ends at -56 - and the state line, which starts at -92. The row
-    /// is left-aligned with the list it filters, and neither of them moves for the other.
+    /// Centre of the state line (the prefab, the two toggles and now the size of the
+    /// costume): a 40 px box, so -56 to -96 - the title's own box ends at -56 and this one
+    /// starts where that one stops. Jotunn never sets a pivot (it stays in the middle), so
+    /// this position IS the centre of the box, exactly like CategoryY below.
     /// </summary>
-    private const float CategoryY = -73f;
+    private const float StateY = -76f;
+
+    /// <summary>
+    /// Centre of the checkbox row (GuiCategories), UNDER the state line and over the list
+    /// block: the band -96 to -132 is 36 px, and the row takes the middle of it - its 20 px
+    /// box lands at -104..-124 and its 24 px labels at -102..-126, six pixels clear of the
+    /// state line above and six of the filter below. The row is left-aligned with the list it
+    /// filters, and neither of them moves for the other.
+    /// </summary>
+    private const float CategoryY = -114f;
 
     // Right half: upper left corner of the 3D preview, given to GuiPreview as the list
     // block's corner is given to GuiCreatureList: it starts at the height of the filter, is
@@ -174,7 +185,7 @@ internal static class GuiWindow
             DescribeState(),
             window.transform,
             new Vector2(0.5f, 1f),
-            new Vector2(0f, -92f),
+            new Vector2(0f, StateY),
             gui.AveriaSerif,
             20,
             gui.ValheimBeige,
@@ -184,17 +195,17 @@ internal static class GuiWindow
         Text? stateText = state.GetComponent<Text>();
         if (stateText != null)
         {
-            // Four values on the line now (prefab, the toggle, the flight, the height): a
-            // long prefab name must make the text smaller rather than run past the edges of
-            // the window - the rule the chord label above already follows, at its own sizes.
+            // Five values on the line now (prefab, the toggle, the flight, the height, the
+            // size): a long prefab name must make the text smaller rather than run past the
+            // edges of the window - the rule the chord label above already follows, at its
+            // own sizes.
             stateText.resizeTextForBestFit = true;
             stateText.resizeTextMaxSize = 20;
             stateText.resizeTextMinSize = 14;
         }
         s_state = stateText;
 
-        // The six category checkboxes, in the free band above the state line: they decide
-        // which kinds of prefab the list below is allowed to show.
+        // The six category checkboxes, under the state line and over the block they filter.
         GuiCategories.Build(window.transform, ListX, CategoryY);
 
         // The filter field and the scrollable list, built by GuiCreatureList.
@@ -362,20 +373,30 @@ internal static class GuiWindow
 
     /// <summary>
     /// The line under the title: the prefab configured right now, whether the disguise is on,
-    /// whether the flight is, and how far the costume is raised above the player - the
-    /// flight's own height, in metres, with one decimal. It is called a height rather than an
-    /// offset because the Offset row below (GuiPose) is a different thing: this one is the
-    /// flight's own raise, an offset and not a position - the player never moves and neither
-    /// does its Y, only what the machines draw is lifted (FlightControl.ViewOffset on this
-    /// screen, cd_fly in the packets of every other one).
+    /// whether the flight is, how far the costume is raised above the player - the flight's
+    /// own height, in metres, with one decimal - and how big that prefab is (the size of one
+    /// box around its meshes, width x height x depth in metres, left out while it has no mesh
+    /// to measure).
+    ///
+    /// It is called a height rather than an offset because the Offset row below (GuiPose) is a
+    /// different thing: this one is the flight's own raise, an offset and not a position - the
+    /// player never moves and neither does its Y, only what the machines draw is lifted
+    /// (FlightControl.ViewOffset on this screen, cd_fly in the packets of every other one).
     /// </summary>
     private static string DescribeState()
     {
         string creature = PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash);
         string disguise = DisguiseConfig.ConfigEnabled.Value ? "on" : "off";
         string flight = FlightControl.IsFlying ? "on" : "off";
-        return $"Prefab: {creature}   -   disguise {disguise}   -   "
+        string line =
+            $"Prefab: {creature}   -   disguise {disguise}   -   "
             + $"Flight {flight}   height: {FlightHeight()}";
+        Vector3 size = PrefabResolver.CreatureSize();
+        if (size.sqrMagnitude > 0f)
+        {
+            line += $"   -   size {size.x:0.0} x {size.y:0.0} x {size.z:0.0} m";
+        }
+        return line;
     }
 
     /// <summary>

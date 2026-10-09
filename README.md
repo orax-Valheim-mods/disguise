@@ -326,7 +326,7 @@ blocks `Menu.Show` for that frame only, or the game would pause on the same key)
 Escape opens it as usual. The title row carries the chord itself, between the title and
 Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
 `Not set` when it is empty), so the window always says how to call it back. The window shows
-the category checkboxes, the prefab list, the two pose rows under it, the 3D preview, the
+the line under the title, then the category checkboxes under that line, the prefab list, the two pose rows under it, the 3D preview, the
 command buttons and the status line (the branch added them one step at a time): a row of four buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight` =
@@ -334,22 +334,27 @@ exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flig
 line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
 disguise is on and "Enable" while it is off, and both that label and the line under the title
 are rewritten after every click. The **line under the title** reads
-`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>` - the prefab
-and the toggle from the config, the flight from `FlightControl`, and the **height** that
+`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
+and the toggle from the config, the flight from `FlightControl`, the **height** that
 flight lifts the costume by, in metres with one decimal: `0.0` while the flight is off
 (`Disable` puts the height back to 0), the height it is clamped to (0..100) while it is on,
 so the figure is 0 or more and never negative - a raise, not a position: the player and its
-Y never move, only what the machines draw does. It reads `height` rather than `offset`
+Y never move, only what the machines draw does - and the **size** of that prefab, in metres:
+width, height and depth of one box around every mesh it draws (`PrefabResolver.CreatureSize`,
+the same meshes the preview frames itself with, particles and trails left out because they
+are effects the costume spawns rather than the costume), measured once on the prefab asset
+and cached against its hash - never an instance, nothing is created to find out - and left
+out of the line while the prefab has no mesh to measure. It reads `height` rather than `offset`
 because the **Offset row below** is a different thing (the pose of the costume, described
-just after the list): the line stays about the flight alone. Two of those four values move
-on their own, so the line is brought up to date **every frame** the window is on screen,
-written only when the words really changed. The status line
+just after the list): the line stays about the flight alone. The flight values are the two
+that move on their own, so the line is brought up to date **every frame** the window is on
+screen, written only when the words really changed. The status line
 holds the hint about clicking a row while no
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
 several lines, the console keeps them all, and the first one is the headline - the notes a
 command goes on printing after it stay in the console. The **category checkboxes**: six
-boxes in the band the layout leaves free between the title and the state line - `Static`,
+boxes in the band under the state line and over the list - `Static`,
 `Creatures`, `Items`, `Buildings`, `Nature`, `Other` - one per category, each
 hiding the rows of its category in the list below (the state is kept in `6 - GUI` / `Show*`,
 so a choice survives a restart, and `disguise list` prints every category whatever they say).
@@ -1004,12 +1009,16 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   by a scene change, which cannot release that request by itself.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable), the
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
-  or `Not set`), the six category checkboxes in the band above the state line (this class only
+  or `Not set`), the state line directly under the title and the six category checkboxes in
+  the band under that line (this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
-  (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>` - the
+  (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the
   height is the raise the flight owns, in metres with one decimal, `0.0` while it is off and
   never below 0 (`FlightControl` clamps it to 0..100); it is named after the flight and not
-  after the pose, whose own `Offset` row is a different thing; the Text
+  after the pose, whose own `Offset` row is a different thing; the size is width, height and
+  depth of the configured prefab's meshes, measured once on the prefab asset and cached
+  against its hash (`PrefabResolver.CreatureSize`), left out while there is no mesh to
+  measure; the Text
   is best-fit, so a long prefab name shrinks instead of running past the window, and
   `RefreshState` writes it only when the words changed: once per frame while the window is
   open, plus every click - and it hands the six pose fields their sync on the same pass), the

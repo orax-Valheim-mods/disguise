@@ -20,9 +20,9 @@ namespace Disguise;
 /// and then hides or shows with the same SetActive as typing a letter: a row is never
 /// destroyed, so switching a category back and forth costs nothing a second time.
 ///
-/// The row sits in the band the layout leaves free between the title and the state line,
-/// left-aligned with the list it filters; GuiWindow owns those coordinates and passes them.
-/// Box and label are ONE checkbox - the label carries a transitionless Button that flips the
+/// The row sits UNDER the state line and above the list it filters, left-aligned with it;
+/// GuiWindow owns those coordinates and passes them. Box and label are ONE checkbox - the
+/// label carries a transitionless Button that flips the
 /// box, so the hit target is the whole line and there is only one path to the config.
 /// </summary>
 internal static class GuiCategories

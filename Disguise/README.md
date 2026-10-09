@@ -78,7 +78,8 @@ rotation keep their own wheel throughout.
 The **Disguise window** (opened and closed by `GuiKey` = `F8 + LeftAlt` - the chord is
 written on the title row, next to Close, and always read from the config - or by
 `disguise gui`) is built with **Jotunn**'s
-Valheim-styled controls: the six category checkboxes, the prefab list, its 3D preview and
+Valheim-styled controls: the line under the title, the six category checkboxes under it, the
+prefab list, its 3D preview and
 four buttons under the
 picture - `Enable` / `Disable` (a toggle: its label is the action of the moment), `Refresh`,
 `Own view` and `Flight`, each one running its sub-command like the console would and writing
@@ -113,15 +114,19 @@ window, and typing a filter or a coordinate never walks your character away nor 
 camera.
 
 The line under the title reads
-`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>`: the prefab and
-the toggle from the config, the flight from `disguise fly` (the `5 - Flight` keys), and the
+`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m`: the prefab and
+the toggle from the config, the flight from `disguise fly` (the `5 - Flight` keys), the
 **height** that flight lifts the costume by - metres with one decimal, `0.0` while the flight
-is off, and never negative (the height is clamped to 0..100). It is a raise, not a height of
+is off, and never negative (the height is clamped to 0..100), and the **size** of that prefab
+in metres: width, height and depth of one box around its meshes, measured once on the prefab
+asset and cached (left out while it has no mesh to measure). The height is a raise, not a
+height of
 your own: your character stays on the ground, only what the other machines draw goes up. The
 line says `height` and not `offset` because the **Offset row** of the pose (above) is a
 different thing: this one is about the flight alone.
-Two of those four values move on their own, so the line is rewritten every frame the window is
-on screen, and only when something on it really changed.
+The flight values are the two that move on their own, so the line is rewritten every frame
+the window is on screen, and only when something on it really changed. The six category
+checkboxes sit under this line, above the list they filter.
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.

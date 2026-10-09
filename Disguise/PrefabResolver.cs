@@ -24,6 +24,13 @@ internal static class PrefabResolver
 
     private static int s_creatureFootStepHash;
 
+    // The size of the configured costume, and the hash it was measured for.
+    private static int s_creatureSizeHash;
+
+    private static Vector3 s_creatureSize;
+
+    private static bool s_creatureSizeMeasured;
+
     // ------------------------------------------------------------------ hashes / helpers
 
     internal static int MarkerHash
@@ -129,6 +136,9 @@ internal static class PrefabResolver
         s_creaturePrefabHash = 0;
         s_creatureFootStepHash = 0;
         s_creatureFootStep = null;
+        s_creatureSizeHash = 0;
+        s_creatureSize = Vector3.zero;
+        s_creatureSizeMeasured = false;
         s_creatureWarningLogged = false;
         Disguise.s_loggedSummary = false;
         Disguise.LogInfo($"Configured prefab: \"{DisguiseConfig.ConfigCreature.Value}\"");
@@ -160,6 +170,74 @@ internal static class PrefabResolver
             s_creatureFootStep = prefab.GetComponentInChildren<FootStep>(true);
         }
         return s_creatureFootStep;
+    }
+
+    /// <summary>
+    /// How big the configured costume is, in metres: width, height and depth of one box around
+    /// every MESH the prefab draws - the rule the preview frames its picture with, particles
+    /// and trails left out because they are effects the costume spawns, not the costume, and a
+    /// puff of smoke would otherwise report the size of the creature.
+    ///
+    /// Measured on the PREFAB ASSET, never on an instance: a registered prefab keeps the local
+    /// transforms it is shipped with, so its renderers report the box the machines will draw,
+    /// and nothing is instantiated, posed or destroyed to find out. One walk, then cached
+    /// against the hash like the FootStep above - the window's status line asks for it every
+    /// frame the window is open. Zero when the prefab is not in the scene yet (asked again
+    /// next frame) or when it has no mesh at all, and the status line then leaves the size out
+    /// rather than printing a row of zeros.
+    /// </summary>
+    internal static Vector3 CreatureSize()
+    {
+        int hash = CreaturePrefabHash;
+        if (hash == 0)
+        {
+            return Vector3.zero;
+        }
+        if (s_creatureSizeMeasured && hash == s_creatureSizeHash)
+        {
+            return s_creatureSize;
+        }
+        s_creatureSizeHash = hash;
+        s_creatureSize = Vector3.zero;
+        s_creatureSizeMeasured = true;
+
+        ZNetScene? zns = ZNetScene.instance;
+        GameObject? prefab = zns != null ? zns.GetPrefab(hash) : null;
+        if (prefab == null)
+        {
+            s_creatureSizeMeasured = false; // not loaded yet: the next call measures again
+            return Vector3.zero;
+        }
+
+        Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+        Bounds box = default;
+        bool any = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled)
+            {
+                continue;
+            }
+            if (renderer is not MeshRenderer && renderer is not SkinnedMeshRenderer)
+            {
+                continue;
+            }
+            if (!any)
+            {
+                box = renderer.bounds;
+                any = true;
+            }
+            else
+            {
+                box.Encapsulate(renderer.bounds);
+            }
+        }
+        if (any)
+        {
+            s_creatureSize = box.size;
+        }
+        return s_creatureSize;
     }
 
     /// <summary>Prefab our player ZDO should carry according to the configuration.</summary>
