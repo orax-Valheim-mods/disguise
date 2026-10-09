@@ -15,7 +15,8 @@ namespace Disguise;
 ///
 /// The window as the branch built it, in four steps: title and, directly under it, the line
 /// that says what is configured (with the GuiKey chord on the title row, next to Close), the
-/// row of checkboxes that gate the list (six categories then Favorites - GuiCategories builds
+/// row of checkboxes that gate the list (Favorites first, then the six categories
+/// alphabetically - GuiCategories builds
 /// them, this class only says where they sit - under that line), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
@@ -217,7 +218,8 @@ internal static class GuiWindow
         }
         s_state = stateText;
 
-        // The checkbox row - six categories, then Favorites - under the state line and over
+        // The checkbox row - Favorites first, then the six categories alphabetically - under
+        // the state line and over
         // the block it filters.
         GuiCategories.Build(window.transform, ListX, CategoryY);
 

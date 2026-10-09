@@ -96,13 +96,14 @@ the pointer is anywhere else, so a row can be looked at and then acted on - and 
 configured one before any row was pointed at in this opening, and the list is a filter field -
 with a **Clear** button at its right, which empties
 the field and brings every row back - over a scrollable list of every vanilla prefab -
-minus what the checkboxes have switched off (`Static`, `Creatures`, `Items`, `Buildings`,
-`Nature`, `Other`: one category each, state kept in `6 - GUI` / `Show*`, so a choice
-survives a restart; the rows a box owes are **not built** at all, and are
-built the first time it is ticked - once) - and a seventh box, `Favorites`, which is not a
+minus what the checkboxes have switched off - the first one is `Favorites`, which is not a
 category but a mark: while it is ticked the list shows the marked prefabs **alone**, the six
 category boxes then being ignored, and the marks are kept in `6 - GUI` / `Favorites` (the
-Favorite button writes them, and `disguise favorite [prefab]` as well) - the row of the prefab configured right now
+Favorite button writes them, and `disguise favorite [prefab]` as well) - and after it the six
+categories, alphabetical: `Buildings`, `Creatures`, `Items`, `Nature`, `Other`, `Static`
+(one category each, state kept in `6 - GUI` / `Show*`, so a choice survives a restart; the
+rows a box owes are **not built** at all, and are built the first time it is ticked - once)
+- the row of the prefab configured right now
 in orange on beige rows, a click on any
 row =
 `disguise set <prefab_name>` written and applied at once, and a wheel that moves the list by
@@ -137,7 +138,8 @@ line says `height` and not `offset` because the **Offset row** of the pose (abov
 different thing: this one is about the flight alone.
 The flight values are the two that move on their own, so the line is rewritten every frame
 the window is on screen, and only when something on it really changed. The checkbox row sits
-under this line, above the list it filters: six category boxes, then `Favorites`.
+under this line, above the list it filters: `Favorites` first, then the six category boxes,
+alphabetical.
 
 The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
 machines read the equipment hashes from your ZDO and attach them to the creature's model.

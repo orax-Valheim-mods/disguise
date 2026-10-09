@@ -361,11 +361,12 @@ button has been pressed, and then the **first line** of the answer of the last o
 until the next button, and the hint comes back with the next window): a command can print
 several lines, the console keeps them all, and the first one is the headline - the notes a
 command goes on printing after it stay in the console. The **checkbox row**: seven
-boxes in the band under the state line and over the list - `Static`,
-`Creatures`, `Items`, `Buildings`, `Nature`, `Other`, `Favorites` - the first six one per
+boxes in the band under the state line and over the list - `Favorites` first, then the six
+categories in alphabetical order of their label, `Buildings`, `Creatures`, `Items`, `Nature`,
+`Other`, `Static` - the last six one per
 category, each hiding the rows of its category in the list below (the state is kept in
 `6 - GUI` / `Show*`, so a choice survives a restart, and `disguise list` prints every category
-whatever they say), and the seventh about the **marks** instead of a category: a favorite is
+whatever they say), and the first about the **marks** instead of a category: a favorite is
 not a category of its own - the prefab keeps the one category it has - but a checkbox of its
 own, and while `Favorites` is ticked the list shows the marked prefabs **alone**, the six
 category boxes then being ignored (one click giving a favorites list, one more the categories
@@ -1089,14 +1090,17 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `GuiCategories.cs` - the row of seven checkboxes: Jotunn's `CreateToggle` box (the
   Valheim checkbox, orange marker) with a label measured to its own text
   (`Text.preferredWidth`, so the air before the next box is the same whatever the word), the
-  `Show*` entry of each kind as the only state of the first six - a choice survives a
+  `Show*` entry of each kind as the only state of the last six - a choice survives a
   restart, and `Sync` pushes a value typed in ConfigurationManager back into its box without
   reopening, and reacts to the `Favorites` line too (marks come and go while the window is
   open) - and `Refilter` on every change, which first builds the rows the boxes just started
   OWING (the opening only builds what they owe already: the six categories, or the marks
-  when `Favorites` was already ticked) and then re-runs the filter over them. The seventh
-  box reads `ShowFavorites`, and `ShowRow` holds the one rule of a row: the marks alone while
-  it is on, the box of the kind otherwise. A category and a mark part company in one thing
+  when `Favorites` was already ticked) and then re-runs the filter over them. The row is
+  drawn **Favorites first, the six kinds after it in alphabetical order** (`Kinds` - the
+  enum keeps the order `disguise list` prints in, and no box reads a kind by its number any
+  more); the first box reads `ShowFavorites`, and `ShowRow` holds the one rule of a row: the
+  marks alone while it is on, the box of the kind otherwise. A category and a mark part
+  company in one thing
   only, the scroll: a category is another list to look at, so the list goes back to its first
   row (`Refilter`), a mark is one row more or less behind the pointer, so the list keeps the
   place it was in (`RefilterInPlace`).

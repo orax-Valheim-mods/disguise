@@ -62,7 +62,7 @@ internal static class DisguiseConfig
     //    one per kind, read there at every opening and at every frame, so a value typed in
     //    ConfigurationManager lands without reopening. The console's "disguise list" always
     //    prints every kind: these hide rows in the window, never names from the catalogue.
-    //    The seventh box is Favorites - not a kind, but a mark kept in its own entry below,
+    //    The first box is Favorites - not a kind, but a mark kept in its own entry below,
     //    and while it is on the six Show* values are simply ignored (GuiCategories.ShowRow).
     internal static ConfigEntry<bool> ConfigShowStatic = null!;
 

@@ -13,7 +13,7 @@ namespace Disguise;
 ///
 /// A favorite is a MARK on a prefab and never a category of it. The kind PrefabCatalog gave
 /// the prefab stands (PrefabKind stays exactly one per prefab, and the six kind boxes keep
-/// their six Show* entries), and the seventh box of GuiCategories - Favorites, which is a
+/// their six Show* entries), and the first box of GuiCategories - Favorites, which is a
 /// Show* of its own - is a filter beside the kinds: while it is on, the marks are what the
 /// list shows and the six kinds are ignored (GuiCategories.ShowRow).
 ///

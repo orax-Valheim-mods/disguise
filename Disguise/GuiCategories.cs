@@ -11,10 +11,11 @@ namespace Disguise;
 /// <summary>
 /// The row of checkboxes of the Disguise window: six boxes, one per PrefabKind, which decide
 /// the categories the list shows (the console's "disguise list" always prints every kind),
-/// and a seventh - Favorites - which is not a kind at all but a mark beside them (a prefab
-/// keeps the one kind PrefabCatalog gave it). While the seventh is on, the six are ignored
-/// and the list shows the marked prefabs only: one click to leaf through a favorites list,
-/// one more to be back on the categories.
+/// and one - Favorites - which is not a kind at all but a mark beside them (a prefab keeps
+/// the one kind PrefabCatalog gave it). Favorites is drawn FIRST and the six kinds follow it
+/// in alphabetical order of their label (Kinds); while it is on, the six are ignored and the
+/// list shows the marked prefabs only: one click to leaf through a favorites list, one more
+/// to be back on the categories.
 ///
 /// The state lives in the config ([6 - GUI], the six Show* = true by default, ShowFavorites
 /// = false, the marks themselves in Favorites as one comma-separated line), so a choice
@@ -51,8 +52,26 @@ internal static class GuiCategories
     /// <summary>Kept beside the measured text so a rounded pixel can never wrap its last letter.</summary>
     private const float LabelPadding = 4f;
 
-    /// <summary>The six kind boxes, then Favorites: seven boxes, seven entries of config.</summary>
+    /// <summary>The six kind boxes, with Favorites before them: seven boxes, seven entries of config.</summary>
     private const int BoxCount = PrefabCatalog.KindCount + 1;
+
+    /// <summary>
+    /// The order the boxes are DRAWN in, left to right: Favorites first - the mark is the one
+    /// thing here that is not a category, and it is the one the window was asked for - then
+    /// the six kinds in alphabetical order of their label (Buildings, Creatures, Items,
+    /// Nature, Other, Static). The enum keeps its own order, which is the order "disguise
+    /// list" prints the categories in; no box reads a kind by its number any more, so a kind
+    /// added later has to find its place in this array.
+    /// </summary>
+    private static readonly PrefabKind[] Kinds =
+    {
+        PrefabKind.Building,
+        PrefabKind.Creature,
+        PrefabKind.Item,
+        PrefabKind.Nature,
+        PrefabKind.Other,
+        PrefabKind.Static,
+    };
 
     /// <summary>The row is placed from the top-left corner of the window, like the list.</summary>
     private static readonly Vector2 Anchor = new Vector2(0f, 1f);
@@ -225,7 +244,7 @@ internal static class GuiCategories
     /// <summary>Whether the window's list shows this category (the config behind its box).</summary>
     internal static bool Shown(PrefabKind kind) => KindEntry(kind).Value;
 
-    /// <summary>Whether the seventh box is on: the list shows marks and nothing else then.</summary>
+    /// <summary>Whether the first box is on: the list shows marks and nothing else then.</summary>
     internal static bool FavoritesOn() => DisguiseConfig.ConfigShowFavorites.Value;
 
     /// <summary>
@@ -239,16 +258,16 @@ internal static class GuiCategories
         return FavoritesOn() ? PrefabFavorites.Contains(name) : Shown(kind);
     }
 
-    /// <summary>The value a box shows: the six kinds, then Favorites (BoxCount of them).</summary>
+    /// <summary>The value a box shows: Favorites first, then the six kinds (BoxCount of them).</summary>
     private static bool ShownAt(int index)
     {
-        return index < PrefabCatalog.KindCount ? Shown((PrefabKind)index) : FavoritesOn();
+        return index == 0 ? FavoritesOn() : Shown(Kinds[index - 1]);
     }
 
-    /// <summary>The label of a box: the plural of the kind, then "Favorites".</summary>
+    /// <summary>The label of a box: "Favorites" first, then the plural of the kind.</summary>
     private static string TitleAt(int index)
     {
-        return index < PrefabCatalog.KindCount ? Title((PrefabKind)index) : "Favorites";
+        return index == 0 ? "Favorites" : Title(Kinds[index - 1]);
     }
 
     private static void OnToggled(int index, bool on)
@@ -258,12 +277,10 @@ internal static class GuiCategories
         GuiCreatureList.Refilter();
     }
 
-    /// <summary>The Show* entry of a box: the six kinds are six entries, Favorites its own.</summary>
+    /// <summary>The Show* entry of a box: Favorites has its own, the six kinds the six entries.</summary>
     private static ConfigEntry<bool> Entry(int index)
     {
-        return index < PrefabCatalog.KindCount
-            ? KindEntry((PrefabKind)index)
-            : DisguiseConfig.ConfigShowFavorites;
+        return index == 0 ? DisguiseConfig.ConfigShowFavorites : KindEntry(Kinds[index - 1]);
     }
 
     /// <summary>The Show* entry of a kind: the six boxes are the six entries, no copy anywhere.</summary>
