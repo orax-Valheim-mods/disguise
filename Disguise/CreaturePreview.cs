@@ -222,8 +222,9 @@ internal static class CreaturePreview
 
     /// <summary>
     /// Measures what stands on the stage and works out where the camera has to be to show it
-    /// whole: the box of every visible mesh, framed along both axes by the field of view with
-    /// a margin, grown first when it would stand nearer to the camera than MinCameraDistance.
+    /// whole: the box of every mesh Unity really draws (a mesh it measures and never draws
+    /// has no say in the framing), framed along both axes by the field of view with a margin,
+    /// grown first when it would stand nearer to the camera than MinCameraDistance.
     /// Returns false when there is nothing to draw (a prefab of effects only, say).
     /// </summary>
     private static bool Frame(GameObject clone)
@@ -234,9 +235,20 @@ internal static class CreaturePreview
         for (int i = 0; i < renderers.Length; i++)
         {
             Renderer renderer = renderers[i];
-            // Particles and trails are not the creature: framing on their bounds would shrink
-            // it into a corner of the picture. The meshes are what has to fit.
-            if (renderer == null || !renderer.enabled)
+            // Only what is really DRAWN is what has to fit. Particles and trails are not the
+            // creature (framing on their bounds would shrink it into a corner of the
+            // picture), and neither is a mesh Unity still measures but never draws: one on a
+            // GameObject the prefab leaves inactive (a sail kept furled, a spare part), one
+            // told to draw no colour at all, one kept for its shadow only. Those have bounds
+            // all the same, and one of them is what a chest and a ship were being framed on -
+            // the chest they really are then filling a fifth of the picture.
+            if (
+                renderer == null
+                || !renderer.enabled
+                || renderer.forceRenderingOff
+                || !renderer.gameObject.activeInHierarchy
+                || renderer.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly
+            )
             {
                 continue;
             }
@@ -288,6 +300,15 @@ internal static class CreaturePreview
         // the creature: depth stays in a ratio Unity can draw without z-fighting.
         camera.nearClipPlane = Mathf.Max(0.1f, s_distance * 0.01f);
         camera.farClipPlane = s_distance + (s_radius * 3f) + 50f;
+
+        // One line when Logs is on, so a prefab that fills its picture badly can be read off
+        // the log: what was measured, and where the camera was put for it. A long, low thing
+        // framed by its own length is not a bug - 12 m of ship in a picture 9 m tall leaves
+        // its hull a band - but a size twice the visible one is.
+        Disguise.LogDebug(
+            $"Preview: {clone.name} measures {bounds.size.x:0.##} x {bounds.size.y:0.##} x {bounds.size.z:0.##} m,"
+                + $" framed at {framed:0.##} m, grown {scale:0.#}x."
+        );
         return true;
     }
 
