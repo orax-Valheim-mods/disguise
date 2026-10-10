@@ -64,7 +64,7 @@ internal static class PauseMenuEntry
             s_menu = menu;
             if (!DisguiseConfig.ConfigShowMenuEntry.Value)
             {
-                Forget();
+                Forget("ShowMenuEntry is off");
                 return;
             }
             if (s_button == null)
@@ -175,16 +175,17 @@ internal static class PauseMenuEntry
     }
 
     /// <summary>
-    /// The line the option took off the menu: its two links are gone from the gamepad's
-    /// chain first (a link to a destroyed button is still followed), then the clone itself.
+    /// Takes the line OUT of the pause menu: its two links leave the gamepad's chain first (a
+    /// link to a destroyed button is still followed, and a D-pad then goes nowhere), then the
+    /// clone itself. `why` only says in the log which of the two callers brought it here.
     /// </summary>
-    private static void Forget()
+    private static void Forget(string why)
     {
         Button? button = s_button;
         s_button = null;
         if (button == null)
         {
-            return;
+            return; // nothing on screen: the option and this copy have nothing to undo
         }
 
         Button? settings = GameAccess.GetMenuSettingsButton(s_menu);
@@ -199,8 +200,29 @@ internal static class PauseMenuEntry
         here.selectOnDown = null;
         button.navigation = here;
 
-        Disguise.LogInfo("Pause menu: entry removed (ShowMenuEntry is off).");
+        Disguise.LogInfo($"Pause menu: entry removed ({why}).");
         UnityEngine.Object.Destroy(button.gameObject);
+        s_belowSettings = null;
+    }
+
+    /// <summary>
+    /// The plugin is unloading (ScriptEngine reloads it into a NEW assembly, statics and
+    /// all): the line has to go with this copy, or the game's own menu would keep a button
+    /// nobody owns - nothing in the game ever destroys it - and the copy loaded next would
+    /// draw a second one right beside it, because its own s_button is null and it knows
+    /// nothing of the one already standing there. Called from Disguise.OnDestroy, before the
+    /// logger goes with the plugin instance.
+    /// </summary>
+    internal static void Cleanup()
+    {
+        try
+        {
+            Forget("plugin unloaded");
+        }
+        catch (Exception ex)
+        {
+            Disguise.LogError($"Pause menu cleanup: {ex}");
+        }
     }
 
     /// <summary>

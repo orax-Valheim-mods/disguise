@@ -178,10 +178,20 @@ public class Disguise : BaseUnityPlugin
         );
     }
 
+    /// <summary>
+    /// The unload, which has to be complete: ScriptEngine reloads this mod by destroying the
+    /// object that holds every script plugin (this call runs then, before the new DLL is
+    /// loaded into a NEW assembly with fresh statics), so anything left standing belongs to
+    /// nobody - the window and the mouse it captured, the clone on your own screen, the
+    /// pause menu's line, and every Harmony patch. Nothing here is ever found by the copy
+    /// loaded next: that one is told about none of it, and would draw a second "Disguise"
+    /// line beside the first.
+    /// </summary>
     public void OnDestroy()
     {
         DisguiseGui.Shutdown();
         SelfView.Shutdown();
+        PauseMenuEntry.Cleanup();
         PatchHarmony?.UnpatchSelf();
         PatchHarmony = null;
         s_instance = null;

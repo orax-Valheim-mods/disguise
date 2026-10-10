@@ -31,6 +31,11 @@ C:\Users\a\AppData\Roaming\com.kesomannen.gale\valheim\profiles\dev\BepInEx\scri
 > This folder is the one read by the **ScriptEngine** plugin (`com.bepis.bepinex.scriptengine`),
 > loaded at startup - visible in the log:
 > `[Info :Script Engine] Loading plugins from ...\BepInEx\scripts\Disguise.dll`.
+> A reload (its `ReloadKey` chord) **unloads the running copy first** - `Destroy` on the object
+> holding every script plugin, which calls its `OnDestroy` - and only then loads the DLL again
+> into a new assembly. Everything this mod owns goes with that `OnDestroy` (§ 6, `Disguise.cs`):
+> the window, the clone on your own screen, the pause menu's line and every Harmony patch, so a
+> reload never leaves a second `Disguise` line in the menu.
 
 > ⚠️ **Jotunn is a hard dependency of this mod**: it builds the window of `disguise gui`
 > (§ 2) with Jotunn's Valheim-styled controls.
@@ -1030,9 +1035,14 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 
 - `Disguise.cs` - the plugin class: constants (`PluginGUID`, `cd_disguise`, `cd_refresh`,
   `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
-  `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
-  share stays `private`.
-- `DisguiseConfig.cs` - the thirty-four settings and their binding to `orax.Disguise.cfg`.
+  `OnDestroy` / `Update`), which wires the other classes together. `OnDestroy` is a COMPLETE
+  unload, not a formality: ScriptEngine reloads the mod by destroying the object holding every
+  script plugin and loading the new DLL into a NEW assembly (fresh statics), so whatever this
+  copy leaves standing is found by nobody - it lets go of the window and the mouse it captured
+  (`DisguiseGui`), the clone on your own screen (`SelfView`), the pause menu's line
+  (`PauseMenuEntry`) and every Harmony patch (`UnpatchSelf`), before the logger goes with the
+  instance. Everything it does not share stays `private`.
+- `DisguiseConfig.cs` - the thirty-five settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
@@ -1201,7 +1211,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   (one `Instantiate` for a whole world, a new one after a scene change, the null test being
   Unity's own - true of a destroyed object as well), and `WireNavigation` puts the entry back
   into the gamepad's up / down chain after every rewire of the menu's own, idempotently: a
-  chain that already holds the entry is left as it is.
+  chain that already holds the entry is left as it is. `Cleanup` is the same removal for the
+  other reason to make it - the plugin unloading, `OnDestroy` running while ScriptEngine
+  reloads the mod into a fresh assembly (§ 1): the clone stands in the GAME's own menu, where
+  nothing else would ever destroy it, so the copy loaded next would meet it and draw a second
+  one beside its own.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable, and
   `Place` first puts it where the config says - `WindowX` / `WindowY`, an offset from the
   middle of the screen, `0`/`0` being that middle and the default - then keeps it on screen
