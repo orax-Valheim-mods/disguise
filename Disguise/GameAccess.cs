@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Disguise;
 
@@ -556,6 +557,64 @@ internal static class GameAccess
         {
             // ZDOHelper.InitAndSet: creates the entry when the ZDO has none yet.
             saveInts.InitAndSet(zdo.m_uid, key, value);
+        }
+    }
+
+    // -- The entry of the pause menu ---------------------------------------------------
+    // Menu.m_settingsButton and Menu.Hide are PUBLIC in the game, and are reached through
+    // reflection all the same: the visibility audit lists every member reference the DLL
+    // makes, public or not, and the pause menu entry adds none to that list. The button is
+    // the one the entry is cloned from - which is what gives it the look of a menu line and
+    // its place in the list - and the method is the game's own hand for closing the pause
+    // menu, which also unpauses the game and hands the cursor back.
+
+    internal static readonly FieldInfo? s_menuSettingsButtonField = typeof(Menu).GetField(
+        "m_settingsButton",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
+    internal static readonly MethodInfo? s_menuHideMethod = typeof(Menu).GetMethod(
+        "Hide",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+        null,
+        Type.EmptyTypes,
+        null
+    );
+
+    /// <summary>The button the pause menu draws its Settings line with, or null.</summary>
+    internal static Button? GetMenuSettingsButton(Menu? menu)
+    {
+        FieldInfo? field = s_menuSettingsButtonField;
+        if (menu == null || field == null)
+        {
+            return null;
+        }
+        try
+        {
+            return field.GetValue(menu) as Button;
+        }
+        catch (Exception ex)
+        {
+            Disguise.LogError($"Cannot read Menu.m_settingsButton: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Closes the pause menu through the game's own code (Game.Unpause, the cursor).</summary>
+    internal static void HideMenu(Menu? menu)
+    {
+        MethodInfo? method = s_menuHideMethod;
+        if (menu == null || method == null)
+        {
+            return;
+        }
+        try
+        {
+            method.Invoke(menu, null);
+        }
+        catch (Exception ex)
+        {
+            Disguise.LogError($"Cannot call Menu.Hide: {ex.Message}");
         }
     }
 

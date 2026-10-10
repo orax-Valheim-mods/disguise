@@ -119,7 +119,7 @@ In game, open the console with **F5**:
 | `disguise offset <X> <Y> <Z>` | **Move the costume** that far from you - world units, `1` is one metre (no argument reports where it stands, `0 0 0` puts it back, § 3). Purely visual: your player never moves |
 | `disguise rotation <X> <Y> <Z>` | **Turn the costume** in place, in degrees **on top of** the way it already faces (no argument reports it, `0 0 0` is the normal facing, § 3). Purely visual: your player never turns |
 | `disguise setFakePosition [x z \| off]` | Show a **fake position** on the other players' map: no argument records where you stand, `off` shows the real one again (needs the DLL on the server, § 1.b) |
-| `disguise gui [on|off]` | Open / close the Disguise window (`GuiKey`, § 2): same thing as the key chord, for whoever prefers the console |
+| `disguise gui [on|off]` | Open / close the Disguise window (`GuiKey`, § 2): same thing as the key chord and as the `Disguise` line of the pause menu, for whoever prefers the console |
 | `disguise perf` | Frame time of the window since the previous call: avg / min / max in ms and FPS (the window resets at every report) |
 | `disguise help` | List of the available commands (`disguise ?` also works) |
 
@@ -340,11 +340,22 @@ server** (§ 1.b) - without it your own view still flies and everybody else keep
 ground.
 
 **GUI section** (`6 - GUI`) - the Disguise window, built with **Jotunn**'s Valheim-styled
-controls (Jotunn is a hard dependency of this mod, § 1). `GuiKey` opens and closes it
-(toggles), `disguise gui [on|off]` does exactly the same from the console, and `Escape`
-closes it like the Close button - the pause menu stays out of that press (`Patch_MenuShow`
-blocks `Menu.Show` for that frame only, or the game would pause on the same key) and the next
-Escape opens it as usual. The title row carries the chord itself, between the title and
+controls (Jotunn is a hard dependency of this mod, § 1). Three things open it: `GuiKey`
+(toggles), the console (`disguise gui [on|off]`, same thing), and a **`Disguise` line in the
+pause menu** - while `Escape` closes it like the Close button, the pause menu staying out of
+that press (`Patch_MenuShow` blocks `Menu.Show` for that frame only, or the game would pause
+on the same key) and the next Escape opening it as usual. That pause menu line is the game's
+own menu drawn one line longer (`PauseMenuEntry`): the entry is a **clone of the Settings
+button** - same look, same layout, same list, standing right after it - relabelled `Disguise`,
+with a click that closes the pause menu through the game's own code (`Menu.Hide`, which also
+unpauses the game and hands the cursor back) before the window opens exactly as the chord
+opens it. The click the clone was born with is not cleared but **replaced**: a `Button` also
+carries the listeners its prefab wired into it, which `RemoveAllListeners` leaves alone, so
+the whole event goes and Settings cannot open behind the window the entry has just opened.
+The entry is built the first time the pause menu opens and lives as long as that world's menu
+(one `Instantiate`, and a new one after a scene change), and the gamepad's up / down chain is
+wired through it after every open (`Patch_MenuNavigation`), so a D-pad reaches it exactly
+where it stands. The title row carries the chord itself, between the title and
 Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
 `Not set` when it is empty), so the window always says how to call it back. The whole panel
 is **draggable** (Jotunn's `DragWindowCntrl`: take hold of the wood anywhere that is not a
@@ -566,7 +577,7 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 
 | Option | Default | Role |
 |---|---|---|
-| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press |
+| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press - whose own list carries a `Disguise` line opening it too (§ 2) |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
 | `WindowX` | `0` | Where the window sits, **left to right**: pixels away from the CENTRE of the screen (section `6 - GUI`). `0` = centred, and it is the default - a window nobody has dragged opens in the middle. Written back when the window closes (a drag writes it, and the place read every frame is what goes in), put on the panel when it opens, and kept on screen when read, so a hand-typed value or a change of resolution cannot leave the window outside the monitor |
 | `WindowY` | `0` | Where the window sits, **bottom to top**: pixels ABOVE the centre of the screen, a negative value putting it lower. `0` = centred (the default); with `WindowX` it is the whole place of the window, remembered from one session to the next exactly like it |
@@ -1014,7 +1025,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
-  `SetZdoFloatSilent`).
+  `SetZdoFloatSilent`, `GetMenuSettingsButton`, `HideMenu`) - the last two reading the
+  pause menu's Settings button (to take the shape of) and closing the pause menu (§ 2),
+  both PUBLIC in the game and reached through reflection all the same, the audit counting
+  a public member exactly as it counts a private one.
 - `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the vanilla
   `Player` prefab hash, the configured creature hash) and `PrefabName`.
 - `PrefabKind.cs` - the six categories of the list (`Static`, `Creature`, `Item`,
@@ -1159,6 +1173,19 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   own, so looking at it is the only way to keep it), `SavePosition` writes it into `WindowX` /
   `WindowY` once and only when it changed, both called from `DestroyWindow` and from that
   healing, so even a window taken by a scene change keeps the corner it had been dragged to.
+- `PauseMenuEntry.cs` - the `Disguise` line of the pause menu (§ 2): a clone of the game's own
+  Settings button, taken with the shape and the place it has (right after Settings, by sibling
+  index, inside the very parent the original lives in), relabelled, switched on, and given a
+  click that is REPLACED rather than added - the whole `Button.onClick` event goes, prefab
+  listeners included, which `RemoveAllListeners` alone would have left standing (Settings
+  opening behind the window the entry just opened). The click closes the pause menu through
+  `GameAccess.HideMenu` - `Menu.Hide`, the game's own hand, which also unpauses and hands the
+  cursor back to the window about to open - and then opens that window with the very
+  `DisguiseGui.Toggle` the chord uses, so the two ways of opening it can never disagree. Built
+  the first time the pause menu opens (one `Instantiate` for a whole world, a new one after a
+  scene change, the null test being Unity's own - true of a destroyed object as well), and
+  `WireNavigation` puts the entry back into the gamepad's up / down chain after every rewire
+  of the menu's own, idempotently: a chain that already holds the entry is left as it is.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable, and
   `Place` first puts it where the config says - `WindowX` / `WindowY`, an offset from the
   middle of the screen, `0`/`0` being that middle and the default - then keeps it on screen
@@ -1338,8 +1365,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_SetBool.cs`, `Patch_ZDOGetPosition.cs`,
   `Patch_RPC_SetTrigger.cs`, `Patch_FootStepRPCStep.cs`, `Patch_WritePlayerInfo.cs`,
   `Patch_UpdateCamera.cs`, `Patch_GetMouseScrollWheel.cs`, `Patch_TakeInput.cs`,
-  `Patch_SetMouseLook.cs`, `Patch_MenuShow.cs` - the
-  twenty-four Harmony patches, one
+  `Patch_SetMouseLook.cs`, `Patch_MenuShow.cs`, `Patch_MenuNavigation.cs` - the
+  twenty-five Harmony patches, one
   `internal static` top-level class each. They reach the features through the `internal`
   members of the classes above (fields they swap in/out while a packet or the player list
   is being written, helpers such as `HasMarker` / `ApplyTo` / `InstantiateAs`) and log
@@ -1357,7 +1384,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Patch_MenuShow` is the third patch of that window (§ 2): a prefix on `Menu.Show` that keeps
   the pause menu off the Escape which closed it, reading `DisguiseGui.IsOpen` and the frame
   `DisguiseGui.Tick` stamped - it calls nothing either, and so cannot throw into
-  `Menu.Update`.
+  `Menu.Update` - plus a POSTFIX on that same method which hands the menu just opened over to
+  `PauseMenuEntry` (Harmony runs a postfix even when a prefix stopped the method itself).
+  `Patch_MenuNavigation` is the twin of that postfix on the private `Menu.UpdateNavigation`,
+  named rather than referenced, and calls nothing but `PauseMenuEntry.WireNavigation` - which
+  is what keeps the gamepad's chain running through an entry the menu knows nothing of.
 
 (to be read together with the game decompilation in `T:\temp\opencode\vh_dec`).
 
@@ -1409,6 +1440,11 @@ member it touches is **public** in the game (`ZoneSystem.instance`, `ZoneSystem.
 audit counts a public member just as it counts a private one - while the zone id is the
 body of `ZoneSystem.GetZone` / `GetZonePos` reimplemented in `GroundProbe` rather than
 called, so the fourth read adds no member either and the count stands at 83.
+The pause menu entry is that same rule once more: `Menu.m_settingsButton` (public - read to
+clone the shape of the entry from it) and `Menu.Hide` (public - called to close the pause
+menu with the game's own hand) are both reached through `GameAccess`, and the two patches
+name their targets with `nameof` (`Menu.Show`, the second one a **private** method, named
+rather than referenced) so that neither adds a member either - the count still stands at 83.
 Everything else of the two fixes (`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`,
 `ZNet.IsServer()`, `prefab.GetComponent("...")`, `prefab.GetComponent<Character>()`) was
 already referenced somewhere else, and neither fix added a Harmony patch: both run inside
