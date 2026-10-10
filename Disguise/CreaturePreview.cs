@@ -65,6 +65,14 @@ internal static class CreaturePreview
     private const float FrameMargin = 1.2f;
 
     /// <summary>
+    /// How far a posed box may stick out of the box Unity culls by and still be believed, as
+    /// a share of that box's own size on each axis: the two describe the same geometry, so
+    /// the whisker of difference between them is rounding, and this much tolerance is what
+    /// lets the fit take the posed box for the drawn one.
+    /// </summary>
+    private const float PoseSlack = 0.02f;
+
+    /// <summary>
     /// The shortest distance the camera is ever framed at, and with it the most a prefab can
     /// be grown on the stage (MinCameraDistance / it): a floor under the FIT, so a prefab
     /// whose meshes measure nothing at all cannot ask for endless growth. It is only a
@@ -113,6 +121,15 @@ internal static class CreaturePreview
     private static readonly List<KeyValuePair<Camera, int>> s_hiddenCameras = new();
 
     private static readonly List<KeyValuePair<Light, int>> s_hiddenLights = new();
+
+    /// <summary>
+    /// The mesh the pose of a skinned renderer is baked into, and the vertices read back out
+    /// of it: one for the whole window, reused, so walking the list of hundreds of prefabs
+    /// never allocates.
+    /// </summary>
+    private static Mesh? s_bake;
+
+    private static readonly List<Vector3> s_bakeVertices = new();
 
     private static Vector3 s_center;
 
@@ -225,6 +242,8 @@ internal static class CreaturePreview
     /// whole: the box of every mesh Unity really draws (a mesh it measures and never draws
     /// has no say in the framing), framed along both axes by the field of view with a margin,
     /// grown first when it would stand nearer to the camera than MinCameraDistance.
+    /// A skinned mesh is measured from its POSE rather than from the box it hands out - the
+    /// saved one is the bind pose, and a ragdoll is posed nothing like it (DrawnBounds).
     /// Returns false when there is nothing to draw (a prefab of effects only, say).
     /// </summary>
     private static bool Frame(GameObject clone)
@@ -232,6 +251,8 @@ internal static class CreaturePreview
         Renderer[] renderers = clone.GetComponentsInChildren<Renderer>(true);
         bool any = false;
         Bounds bounds = default;
+        int measured = 0;
+        int posed = 0;
         for (int i = 0; i < renderers.Length; i++)
         {
             Renderer renderer = renderers[i];
@@ -256,14 +277,20 @@ internal static class CreaturePreview
             {
                 continue;
             }
+            Bounds box = DrawnBounds(renderer, out bool fromPose);
+            measured++;
+            if (fromPose)
+            {
+                posed++;
+            }
             if (!any)
             {
-                bounds = renderer.bounds;
+                bounds = box;
                 any = true;
             }
             else
             {
-                bounds.Encapsulate(renderer.bounds);
+                bounds.Encapsulate(box);
             }
         }
         if (!any)
@@ -304,12 +331,148 @@ internal static class CreaturePreview
         // One line when Logs is on, so a prefab that fills its picture badly can be read off
         // the log: what was measured, and where the camera was put for it. A long, low thing
         // framed by its own length is not a bug - 12 m of ship in a picture 9 m tall leaves
-        // its hull a band - but a size twice the visible one is.
+        // its hull a band - but a size twice the visible one is, and how many meshes were
+        // measured from their pose says whether the saving boxes were believed.
         Disguise.LogDebug(
-            $"Preview: {clone.name} measures {bounds.size.x:0.##} x {bounds.size.y:0.##} x {bounds.size.z:0.##} m,"
+            $"Preview: {clone.name} measures {bounds.size.x:0.##} x {bounds.size.y:0.##} x {bounds.size.z:0.##} m"
+                + $" ({posed} of {measured} meshes measured from their pose),"
                 + $" framed at {framed:0.##} m, grown {scale:0.#}x."
         );
         return true;
+    }
+
+    /// <summary>
+    /// The box of what Unity is about to DRAW for one renderer - which for a skinned one is
+    /// not the box it hands out, and that is a bug worth a method of its own.
+    ///
+    /// Renderer.bounds comes from the bounds saved with the prefab, and those are the bounds
+    /// of the BIND pose: the arms-out stand the model was authored in. A ragdoll is posed
+    /// nothing like it - Abomination_ragdoll lies folded, its skeleton spanning half of what
+    /// the saved box says - so framing on that box put the camera twice too far back and the
+    /// creature filled a corner of its own picture. The same saving box is why the living
+    /// Abomination framed too large: 12 m saved, 7.5 m of skeleton.
+    ///
+    /// The posed vertices settle it, and this is the moment to read them: Settle has just
+    /// left the clone in the first frame of its own default state and nothing moves it again
+    /// - the strip takes Cloth and every script, the animator is off - so the box measured
+    /// here is the box of every picture the turntable takes of it.
+    /// </summary>
+    private static Bounds DrawnBounds(Renderer renderer, out bool fromPose)
+    {
+        fromPose = false;
+        Bounds culling = renderer.bounds;
+        if (renderer is SkinnedMeshRenderer skinned)
+        {
+            Bounds posed;
+            if (TryPoseBounds(skinned, culling, out posed))
+            {
+                fromPose = true;
+                return posed;
+            }
+        }
+        return culling;
+    }
+
+    /// <summary>
+    /// The box of one skinned renderer's posed vertices - false when there is nothing to bake,
+    /// or when neither reading of the bake fits inside the box Unity culls by.
+    ///
+    /// A bake is the posed mesh in the renderer's own space, and Unity says no more than that
+    /// about whether the transform's scale is already counted in those vertices. Both
+    /// readings are therefore taken, and the culling box decides between them: it has to hold
+    /// the drawn geometry whatever it is made of, so the wrong reading is either far too big
+    /// to fit inside it - the scale counted twice - or, when the scale would shrink it, the
+    /// smaller of the two that do fit: which is when the larger one is kept, and it is the
+    /// right one. Neither fits (a culling box drawn tighter than the geometry it culls), and
+    /// the saved bounds stand, as they did before any of this existed.
+    /// </summary>
+    private static bool TryPoseBounds(
+        SkinnedMeshRenderer skinned,
+        Bounds culling,
+        out Bounds bounds
+    )
+    {
+        bounds = default;
+        if (skinned.sharedMesh == null || !Bake(skinned))
+        {
+            return false;
+        }
+
+        // The whole transform, for a bake without the scale in it; and the transform with the
+        // scale taken off, for a bake with it.
+        Transform body = skinned.transform;
+        bool wholeFit = BoxOf(body.localToWorldMatrix, out Bounds whole) && Inside(whole, culling);
+        bool turnedFit =
+            BoxOf(Matrix4x4.TRS(body.position, body.rotation, Vector3.one), out Bounds turned)
+            && Inside(turned, culling);
+        if (wholeFit && turnedFit)
+        {
+            bounds = turned.size.sqrMagnitude > whole.size.sqrMagnitude ? turned : whole;
+            return true;
+        }
+        if (wholeFit || turnedFit)
+        {
+            bounds = wholeFit ? whole : turned;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Writes the current pose of one skinned renderer into the shared mesh and reads its
+    /// vertices back out; false when the renderer had none.
+    /// </summary>
+    private static bool Bake(SkinnedMeshRenderer skinned)
+    {
+        Mesh? bake = s_bake;
+        if (bake == null)
+        {
+            bake = new Mesh
+            {
+                name = "Disguise preview pose",
+                hideFlags = HideFlags.HideAndDontSave, // no scene change is going to release it
+            };
+            s_bake = bake;
+        }
+        bake.Clear();
+        skinned.BakeMesh(bake, true);
+        s_bakeVertices.Clear();
+        bake.GetVertices(s_bakeVertices);
+        return s_bakeVertices.Count > 0;
+    }
+
+    /// <summary>The box of the baked vertices pushed through a matrix; false when there are none.</summary>
+    private static bool BoxOf(Matrix4x4 matrix, out Bounds bounds)
+    {
+        bounds = default;
+        int count = s_bakeVertices.Count;
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 point = matrix.MultiplyPoint3x4(s_bakeVertices[i]);
+            if (i == 0)
+            {
+                bounds = new Bounds(point, Vector3.zero);
+            }
+            else
+            {
+                bounds.Encapsulate(point);
+            }
+        }
+        return count > 0;
+    }
+
+    /// <summary>Whether a box fits inside another, give or take PoseSlack of the outer one's size.</summary>
+    private static bool Inside(Bounds inner, Bounds outer)
+    {
+        Vector3 slack = outer.size * PoseSlack;
+        Vector3 below = inner.min - outer.min;
+        Vector3 above = outer.max - inner.max;
+        return below.x >= -slack.x
+            && below.y >= -slack.y
+            && below.z >= -slack.z
+            && above.x >= -slack.x
+            && above.y >= -slack.y
+            && above.z >= -slack.z;
     }
 
     /// <summary>
@@ -621,6 +784,14 @@ internal static class CreaturePreview
             UnityEngine.Object.Destroy(s_texture);
         }
         s_texture = null;
+        if (s_bake != null)
+        {
+            // A Mesh made at runtime is not released by a scene change, any more than the
+            // texture above it - and the next window builds another.
+            UnityEngine.Object.Destroy(s_bake);
+            s_bake = null;
+        }
+        s_bakeVertices.Clear();
         s_center = Vector3.zero;
         s_radius = 0f;
         s_distance = 0f;

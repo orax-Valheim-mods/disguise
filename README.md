@@ -513,7 +513,16 @@ AI, no collider, no sound. Its skinned meshes are told to `updateWhenOffscreen` 
 every camera stops being deformed, and the picture would freeze), its animator is evaluated
 **once and switched off** - the pose is the first frame of its own default state - and the
 camera turns around the creature at 25 degrees per second instead of the creature turning, so
-the framing measured once from the bounds stays true. That framing fits the box of the meshes
+the framing measured once from the bounds stays true. A skinned mesh is measured from its
+**pose** and not from `Renderer.bounds`, which hands out the bounds saved with the prefab -
+and those are the bounds of the **bind pose**, the arms-out stand the model was authored in.
+`Abomination_ragdoll` lies folded over half of what its saved box says (14 x 16 x 13 m saved
+against 7.5 x 6.7 x 7.9 m of skeleton), so the camera was framed twice too far back and the
+corpse filled a corner of its own picture; the living Abomination framed too large for the
+same reason (12 m saved, 7.5 m of skeleton). The pose is settled before the measure and
+nothing moves it again (the strip takes `Cloth` and every script, the animator is off), so
+the box baked at that moment is the box of every picture the turn takes. That framing fits
+the box of the meshes
 along **both axes** and not a sphere around them, which is what fills the picture: the camera
 goes round the object, so what it can meet at its widest is the plan diagonal (the widest a
 box ever presents while turning) against the horizontal field of view, and what it meets at
