@@ -165,13 +165,13 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | Option | Default | Role |
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
-| `CreaturePrefab` | `Troll` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla, non-effect ones) |
+| `CreaturePrefab` | `Greydwarf` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla, non-effect ones) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log - the whole output of `disguise list` included (§ 7); warnings and errors are always written (`disguise logs [on|off]`, § 7) |
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
-| `SeeYourDisguise` | `false` | Show the creature on **your own screen** (`4 - Own view`, local only) |
+| `SeeYourDisguise` | `true` | Show the creature on **your own screen** (`4 - Own view`, local only) |
 | `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (`4 - Own view`, local only: your own costume and the window's picture, never what another machine draws; § 2) |
 
 **Display section** (`3 - Display`) - what the **other machines** see while you are
@@ -220,7 +220,7 @@ drawing the creature, keeps it. Your relaying server follows `cd_rel` exactly li
 
 These options can also be changed in game with `disguise enable` / `disable` / `set`.
 
-**Own view section** (`4 - Own view`, `SeeYourDisguise`, `false` by default) - what **you**
+**Own view section** (`4 - Own view`, `SeeYourDisguise`, `true` by default) - what **you**
 see on your own screen. Your viking is substituted - its renderers and its cloth switched
 off - by an inert local clone of the creature, so your screen renders one character: what a
 vanilla client renders. That comes from your position, your rotation, and the animation
@@ -292,11 +292,13 @@ difference between the third and the second is what the clone costs on your scre
 exactly what the other machines pay to render you.
 
 **Flight section** (`5 - Flight`) - making the **creature** rise, while your player never
-leaves the ground (§ 3, and § 4.8 for what it means in game). `FlyEnableKey` starts it (the
-creature is raised by 2 m straight away), `FlyUpKey` / `FlyDownKey` climb and descend
-**while held**, at `FlySpeed` metres per second, and `FlyDisableKey` lands it. The same two
-states are reached from the console with `disguise fly [on|off]`, and `disguise status`
-reports the current height.
+leaves the ground (§ 3, and § 4.8 for what it means in game). The four keys ship
+**unbound**: `FlyEnableKey` starts it (the creature is raised by 2 m straight away),
+`FlyUpKey` / `FlyDownKey` climb and descend **while held**, at `FlySpeed` metres per second,
+and `FlyDisableKey` lands it - while the console reaches the same two states at any time with
+`disguise fly [on|off]`, which is all a fresh install needs before a shortcut is recorded
+(the wheel, below, drives the climb and the descent too). `disguise status` reports the
+current height.
 
 The **mouse wheel** climbs and descends too while the flight is on (`FlyScrollWheel`, one
 notch = `FlyScrollStep` metres), and the camera then waits: the wheel belongs to the creature
@@ -305,10 +307,10 @@ ends, and the minimap and the build rotation keep their own wheel throughout.
 
 | Option | Default | Role |
 |---|---|---|
-| `FlyEnableKey` | `Home + LeftAlt` | Start the flight: the creature is raised for everyone who renders you |
-| `FlyDisableKey` | `End + LeftAlt` | Land it: back on the ground |
-| `FlyUpKey` | `UpArrow + LeftAlt` | Climb while held (only once the flight is on), up to 100 m |
-| `FlyDownKey` | `DownArrow + LeftAlt` | Descend while held, down to the ground and never below it |
+| `FlyEnableKey` | *(none)* | Start the flight: the creature is raised for everyone who renders you |
+| `FlyDisableKey` | *(none)* | Land it: back on the ground |
+| `FlyUpKey` | *(none)* | Climb while held (only once the flight is on), up to 100 m |
+| `FlyDownKey` | *(none)* | Descend while held, down to the ground and never below it |
 | `FlySpeed` | `5` | Metres per second while a climb / descent key is held |
 | `FlyScrollWheel` | `true` | Wheel raises / lowers the creature while the flight is on (the camera zoom waits) |
 | `FlyScrollStep` | `0.2` | Metres per scroll notch; `0` gives the wheel back to the camera, a negative value reverses climb and descent |
@@ -322,9 +324,12 @@ source is read every frame, so a change applies immediately. A value written by 
 version (`LeftAlt+Home`, main key **last**) would be read reversed: re-record it, or swap the
 two keys.
 
-They default to `LeftAlt` on purpose - never `AltGr`, which is the RightAlt of a French
-keyboard and types characters all day. Every key of a shortcut must be held at once, in
-whatever order, and nothing else is required: the chords are read directly instead of through
+They ship **unbound**, which is a `KeyboardShortcut` with no main key at all: every chord
+test answers false to one, so nothing here can fire by accident, and the console and the
+wheel are enough before anything is recorded. A chord recorded by hand should keep away from
+`AltGr`, which is the RightAlt of a French keyboard and types characters all day. Every key of
+a shortcut must be held at once, in whatever order, and nothing else is required: the chords
+are read directly instead of through
 BepInEx's `KeyboardShortcut.IsDown`, which would refuse them while W, A, S or D is held. The
 climb / descent keys only act **while the flight is on**, so a shortcut pressed by accident
 never moves the creature.
@@ -577,16 +582,16 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 
 | Option | Default | Role |
 |---|---|---|
-| `GuiKey` | `F8 + LeftAlt` | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself). `Escape` also closes it, and the pause menu waits for the next press - whose own list carries a `Disguise` line opening it too (§ 2) |
+| `GuiKey` | *(none)* | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself - **unbound** by default, the pause menu's `Disguise` line and `disguise gui` opening it instead). `Escape` also closes it, and the pause menu waits for the next press - whose own list carries a `Disguise` line opening it too (§ 2) |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
 | `WindowX` | `0` | Where the window sits, **left to right**: pixels away from the CENTRE of the screen (section `6 - GUI`). `0` = centred, and it is the default - a window nobody has dragged opens in the middle. Written back when the window closes (a drag writes it, and the place read every frame is what goes in), put on the panel when it opens, and kept on screen when read, so a hand-typed value or a change of resolution cannot leave the window outside the monitor |
 | `WindowY` | `0` | Where the window sits, **bottom to top**: pixels ABOVE the centre of the screen, a negative value putting it lower. `0` = centred (the default); with `WindowX` it is the whole place of the window, remembered from one session to the next exactly like it |
-| `ShowStatic` | `true` | Show the **static** prefabs in the window's list: every vanilla prefab **without** `ZSyncTransform` (walls, floors, furniture, trees, rocks). A machine with no DLL of ours draws them once where their object was created and never moves them again, so a costume of that kind stays where you changed it for a vanilla client (§ 3) |
+| `ShowStatic` | `false` | Show the **static** prefabs in the window's list: every vanilla prefab **without** `ZSyncTransform` (walls, floors, furniture, trees, rocks). A machine with no DLL of ours draws them once where their object was created and never moves them again, so a costume of that kind stays where you changed it for a vanilla client (§ 3) |
 | `ShowCreatures` | `true` | Show the creature prefabs (a `Character`) in the window's list (section `6 - GUI`). One checkbox per category, one category per prefab: a category switched off only hides rows in the window, and `disguise list` keeps printing every vanilla prefab of every category |
-| `ShowItems` | `true` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) in the window's list |
-| `ShowBuildings` | `true` | Show the buildable prefabs that **do** move (a `Piece` carrying `ZSyncTransform`: a cart, a raft, a training dummy). Walls, floors and furniture have none of it and are listed under `ShowStatic` |
-| `ShowNature` | `true` | Show the natural prefabs that do move (trees, plants, pickables, rocks, ore veins - the static majority of them is under `ShowStatic`) |
-| `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) in the window's list. Off, the list only holds what the five other checkboxes show - nothing is ever dropped from the catalogue itself |
+| `ShowItems` | `false` | Show the dropped-item prefabs (an `ItemDrop`: materials, weapons, food, trophies) in the window's list |
+| `ShowBuildings` | `false` | Show the buildable prefabs that **do** move (a `Piece` carrying `ZSyncTransform`: a cart, a raft, a training dummy). Walls, floors and furniture have none of it and are listed under `ShowStatic` |
+| `ShowNature` | `false` | Show the natural prefabs that do move (trees, plants, pickables, rocks, ore veins - the static majority of them is under `ShowStatic`) |
+| `ShowOther` | `false` | Show the prefabs no other category claims (spawners, markers, terrain objects) in the window's list. Off, the list only holds what the five other checkboxes show - nothing is ever dropped from the catalogue itself |
 | `ShowFavorites` | `false` | Tick the window's **Favorites** box: the list then shows **only** the prefabs marked in `Favorites`, and the six category boxes are ignored while it is ticked (untick it to be back on the categories). One click gets a favorites list, one more gets the categories back; a row hidden this way is hidden in the window only, and `disguise list` keeps printing every prefab of every category |
 | `Favorites` | *(empty)* | Comma-separated names of the prefabs marked as favorites (e.g. `Troll,Draugr,Wolf`), written by the window's Favorite button or by `disguise favorite [prefab]`, read by its Favorites box. The names are the ones `disguise list` prints; a name no catalogue holds simply never matches a row, and nothing here is ever dropped from the catalogue itself |
 

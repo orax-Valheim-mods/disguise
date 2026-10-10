@@ -113,7 +113,7 @@ internal static class DisguiseConfig
         ConfigCreature = config.Bind(
             "1 - General",
             "CreaturePrefab",
-            "Troll",
+            "Greydwarf",
             "Exact name of the creature prefab (e.g. Troll, Draugr, Wolf, Greydwarf, Blob, Skeleton, Neck, Boar, Eikthyr...). "
                 + "Console command: disguise list to see the available names."
         );
@@ -228,7 +228,7 @@ internal static class DisguiseConfig
         ConfigSeeYourDisguise = config.Bind(
             "4 - Own view",
             "SeeYourDisguise",
-            false,
+            true,
             "Show your disguise on your own screen: your viking is hidden and the creature is drawn in "
                 + "your place, exactly like the other clients see you. Local visuals only - it never "
                 + "changes what the other machines receive. Console command: disguise view [on|off]."
@@ -251,14 +251,18 @@ internal static class DisguiseConfig
         // The keys are BepInEx KeyboardShortcut values: the .cfg stores them as
         // "main key + modifiers" (e.g. Home + LeftAlt), and ConfigurationManager (Alt+F10 by
         // default) records a new one by simply pressing it - no manual text to type. They
-        // default to LeftAlt, which never fires while text is entered (AltGr is the RightAlt
-        // of a French keyboard).
+        // ship UNBOUND, which is a KeyboardShortcut with no main key at all: every chord test
+        // answers false to one, so nothing here can fire by accident, and the flight is
+        // driven by the mouse wheel and by the console until a shortcut is recorded. A chord
+        // recorded by hand should keep away from AltGr, the RightAlt of a French keyboard,
+        // which types characters all day.
         ConfigFlyEnableKey = config.Bind(
             "5 - Flight",
             "FlyEnableKey",
-            new KeyboardShortcut(KeyCode.Home, KeyCode.LeftAlt),
+            new KeyboardShortcut(KeyCode.None),
             "Start the flight: the creature is raised for the other machines (your player "
-                + "stays on the ground). Same as \"disguise fly on\". "
+                + "stays on the ground). Same as \"disguise fly on\". Unbound by default: "
+                + "no key can fire by accident, and the console starts the flight. "
                 + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
                 + "value, then press the wanted keys."
         );
@@ -266,8 +270,9 @@ internal static class DisguiseConfig
         ConfigFlyDisableKey = config.Bind(
             "5 - Flight",
             "FlyDisableKey",
-            new KeyboardShortcut(KeyCode.End, KeyCode.LeftAlt),
+            new KeyboardShortcut(KeyCode.None),
             "End the flight: the creature is back on the ground. Same as \"disguise fly off\". "
+                + "Unbound by default, like the three other flight keys. "
                 + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
                 + "value, then press the wanted keys."
         );
@@ -275,9 +280,10 @@ internal static class DisguiseConfig
         ConfigFlyUpKey = config.Bind(
             "5 - Flight",
             "FlyUpKey",
-            new KeyboardShortcut(KeyCode.UpArrow, KeyCode.LeftAlt),
+            new KeyboardShortcut(KeyCode.None),
             "Raise the creature while the flight is on (hold it: the creature climbs "
-                + "continuously at FlySpeed metres per second, up to 100 m). "
+                + "continuously at FlySpeed metres per second, up to 100 m). Unbound by "
+                + "default: the mouse wheel climbs instead (FlyScrollWheel). "
                 + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
                 + "value, then press the wanted keys."
         );
@@ -285,9 +291,10 @@ internal static class DisguiseConfig
         ConfigFlyDownKey = config.Bind(
             "5 - Flight",
             "FlyDownKey",
-            new KeyboardShortcut(KeyCode.DownArrow, KeyCode.LeftAlt),
+            new KeyboardShortcut(KeyCode.None),
             "Lower the creature while the flight is on (hold it: down to the ground, "
-                + "never below it). "
+                + "never below it). Unbound by default: the mouse wheel descends instead "
+                + "(FlyScrollWheel). "
                 + "To change it: ConfigurationManager (Alt+F10) -> 5 - Flight -> click this "
                 + "value, then press the wanted keys."
         );
@@ -322,8 +329,10 @@ internal static class DisguiseConfig
         ConfigGuiKey = config.Bind(
             "6 - GUI",
             "GuiKey",
-            new KeyboardShortcut(KeyCode.F8, KeyCode.LeftAlt),
+            new KeyboardShortcut(KeyCode.None),
             "Open / close the Disguise window: prefab list, preview and command buttons. "
+                + "Unbound by default: the pause menu's Disguise line (Escape, then that "
+                + "line) and \"disguise gui\" open it, and Escape closes it. "
                 + "To change it: ConfigurationManager (Alt+F10) -> 6 - GUI -> click this "
                 + "value, then press the wanted keys."
         );
@@ -368,7 +377,7 @@ internal static class DisguiseConfig
         ConfigShowStatic = config.Bind(
             "6 - GUI",
             "ShowStatic",
-            true,
+            false,
             "Show the static prefabs in the window's list: every prefab without ZSyncTransform "
                 + "(walls, floors, furniture, trees, rocks - most of what a world is made of). "
                 + "A machine running no DLL of ours - a vanilla client, which is the machine a "
@@ -389,28 +398,28 @@ internal static class DisguiseConfig
         ConfigShowItems = config.Bind(
             "6 - GUI",
             "ShowItems",
-            true,
+            false,
             "Show the dropped-item prefabs (an ItemDrop: materials, weapons, food, trophies) "
                 + "in the window's list."
         );
         ConfigShowBuildings = config.Bind(
             "6 - GUI",
             "ShowBuildings",
-            true,
+            false,
             "Show the buildable prefabs (a Piece: walls, floors, doors, furniture, crafting "
                 + "stations) in the window's list."
         );
         ConfigShowNature = config.Bind(
             "6 - GUI",
             "ShowNature",
-            true,
+            false,
             "Show the natural prefabs (trees, plants, pickables, rocks, ore veins) in the "
                 + "window's list."
         );
         ConfigShowOther = config.Bind(
             "6 - GUI",
             "ShowOther",
-            true,
+            false,
             "Show the prefabs no other category claims (spawners, markers, whatever a world "
                 + "mod adds) in the window's list. Off, the list only holds what the five "
                 + "other checkboxes show - nothing is ever dropped from the catalogue itself."
