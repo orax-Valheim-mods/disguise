@@ -49,6 +49,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `HideHeldItems` | `false` | Hide the items in your hands and on your back |
 | `ShowAsAlly` | `false` | Show the creature to the others with the green health bar of an ally instead of the red one of an enemy |
 | `SeeYourDisguise` | `false` | Show the creature on your own screen instead of your viking (local only) |
+| `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (Wood, Stone, a coin). A box under the command buttons of the window; purely local, it changes your own costume and the window's picture, never what another machine draws |
 | `FlyEnableKey` | `Home + LeftAlt` | Start the flight: the creature is raised for everyone who renders you |
 | `FlyDisableKey` | `End + LeftAlt` | Land it: back on the ground |
 | `FlyUpKey` | `UpArrow + LeftAlt` | Climb while held (once the flight is on), up to 100 m |
@@ -96,7 +97,11 @@ picture - `Enable` / `Disable` (a toggle: its label is the action of the moment)
 prefab selected in the window - the one the state line names, and the very call
 `disguise favorite` makes with no name), each one running its sub-command like the console would and writing
 its answer on the status line at the bottom, which holds the "click a row" hint before the
-first press (the branch added them one step at a time; the preview there shows the last
+first press - between those buttons and that line sits the **`Hide item sparkle` box**, the
+same checkbox as the row above though it gates no list: it writes `HideItemSparkle` (`4 - Own
+view`), so an **item** costume then stands without the shimmer every dropped-item prefab
+carries, on your own screen and in the picture - those two only, a machine running no DLL
+keeping the vanilla one because it builds your real item prefab from the network (the branch added them one step at a time; the preview there shows the last
 creature the pointer was on, filmed by a camera of its own into a texture and framed to fill
 it whatever its shape or size - kept there while
 the pointer is anywhere else, so a row can be looked at and then acted on - and the
@@ -164,6 +169,14 @@ own view, the game rules or your equipment.
 viking's renderers and cloth are switched off and a purely local, inert copy of the creature
 takes its place - no ZDO, no collision, no AI, nothing sent to the server. It never changes
 what the other machines see.
+
+`HideItemSparkle` (the `Hide item sparkle` box under the command buttons) takes the shimmer
+off an **item** costume: every dropped-item prefab carries that looping particle on its root,
+and so does the copy your own screen draws. Only the drawing is switched off (the particle
+system itself is left alone), only an `Item` is concerned - a creature or a piece keeps every
+effect it carries - and only what **this machine** draws: your own costume and the picture of
+the window. A machine running no DLL builds your real item prefab from the network and keeps
+its vanilla sparkle, and a machine running the DLL draws a real `Player` for you.
 
 ## Installation
 

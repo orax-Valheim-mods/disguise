@@ -17,6 +17,9 @@ namespace Disguise;
 /// pointer sweeping the list would ask for one copy per row crossed. The change is therefore
 /// held back HoverDelay seconds - the preview follows a pointer that has stopped, not one
 /// that is crossing the list - and the copy is only rebuilt when the name really changed.
+///
+/// One more reason to build a copy again: the sparkle option (HideItemSparkle), which the
+/// factory reads at build time - the picture then shows the costume as the screen draws it.
 /// </summary>
 internal static class GuiPreview
 {
@@ -33,6 +36,17 @@ internal static class GuiPreview
     private static string s_shown = string.Empty;
 
     private static float s_dueAt;
+
+    /// <summary>
+    /// What the stage was built WITH (the answer of HideSparkle for its creature) and the
+    /// option itself at that moment: a value of the option that moves while the picture
+    /// stands - typed into ConfigurationManager, written by the window's box - is what makes
+    /// the creature be shown again, and only when it can matter (an item). The test runs on
+    /// the move of the option, never per frame; the pair is dropped with the window.
+    /// </summary>
+    private static bool s_shownSparkle;
+
+    private static bool s_shownOption;
 
     // ------------------------------------------------------------------ build
 
@@ -126,12 +140,32 @@ internal static class GuiPreview
             s_dueAt = Time.unscaledTime + HoverDelay;
         }
 
+        // The sparkle option moved under a picture that is already standing: the stage was
+        // built the old way, so the creature is shown AGAIN - which only costs anything when
+        // the difference can show, i.e. for an item (HideSparkle). s_shown is emptied rather
+        // than the show called straight away, so the rebuild goes through the same delay and
+        // the same guard as any other change of creature; a creature costume changes
+        // nothing, and the stage is left exactly where it is.
+        bool sparkleOption = DisguiseConfig.ConfigHideItemSparkle.Value;
+        if (sparkleOption != s_shownOption)
+        {
+            s_shownOption = sparkleOption;
+            if (
+                string.Equals(s_pending, s_shown, System.StringComparison.Ordinal)
+                && s_shownSparkle != GhostFactory.HideSparkle(s_pending)
+            )
+            {
+                s_shown = string.Empty;
+            }
+        }
+
         if (
             Time.unscaledTime >= s_dueAt
             && !string.Equals(s_pending, s_shown, System.StringComparison.Ordinal)
         )
         {
             s_shown = s_pending;
+            s_shownSparkle = GhostFactory.HideSparkle(s_shown);
             CreaturePreview.Show(s_pending);
         }
 
@@ -159,5 +193,7 @@ internal static class GuiPreview
         s_pending = string.Empty;
         s_shown = string.Empty;
         s_dueAt = 0f;
+        s_shownSparkle = false;
+        s_shownOption = false;
     }
 }

@@ -40,6 +40,8 @@ internal static class DisguiseConfig
     // -- 4 - Own view: what YOU see on your own screen ----------------------------------
     internal static ConfigEntry<bool> ConfigSeeYourDisguise = null!;
 
+    internal static ConfigEntry<bool> ConfigHideItemSparkle = null!;
+
     internal static ConfigEntry<KeyboardShortcut> ConfigFlyEnableKey = null!;
 
     internal static ConfigEntry<KeyboardShortcut> ConfigFlyDisableKey = null!;
@@ -220,8 +222,9 @@ internal static class DisguiseConfig
         ConfigHideHeldItems.SettingChanged += HideSettingChanged;
         ConfigShowAsAlly.SettingChanged += (_, _) => AllyView.OnSettingChanged();
 
-        // -- 4 - Own view: purely local rendering, polled every frame by SelfView.Tick(),
-        // so no SettingChanged handler is needed here.
+        // -- 4 - Own view: purely local rendering, polled every frame by SelfView.Tick() and
+        // (while the window is open) by GuiPreview.Tick, so no SettingChanged handler is
+        // needed here: a clone already standing rebuilds itself when the setting moves.
         ConfigSeeYourDisguise = config.Bind(
             "4 - Own view",
             "SeeYourDisguise",
@@ -229,6 +232,19 @@ internal static class DisguiseConfig
             "Show your disguise on your own screen: your viking is hidden and the creature is drawn in "
                 + "your place, exactly like the other clients see you. Local visuals only - it never "
                 + "changes what the other machines receive. Console command: disguise view [on|off]."
+        );
+
+        ConfigHideItemSparkle = config.Bind(
+            "4 - Own view",
+            "HideItemSparkle",
+            false,
+            "Hide the shimmer the game draws beside a dropped item: the looping particle system every "
+                + "Item prefab carries on its root (Wood, Stone, a coin - the sparkle that makes a "
+                + "dropped item findable). Local visuals only, like SeeYourDisguise: it changes what "
+                + "THIS machine draws - your own costume and the window's picture - and never what "
+                + "another machine receives. A machine without this DLL keeps the vanilla sparkle: it "
+                + "builds the real item prefab from the network and has no setting to read. Window: "
+                + "the 'Hide item sparkle' box under the command buttons."
         );
 
         // -- 5 - Flight: purely visual, the player never leaves the ground (FlightControl).

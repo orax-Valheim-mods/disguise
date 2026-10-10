@@ -172,6 +172,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 | `SeeYourDisguise` | `false` | Show the creature on **your own screen** (`4 - Own view`, local only) |
+| `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (`4 - Own view`, local only: your own costume and the window's picture, never what another machine draws; § 2) |
 
 **Display section** (`3 - Display`) - what the **other machines** see while you are
 disguised. `VisEquipment` reads the equipment hashes from your ZDO and
@@ -230,6 +231,25 @@ that carries no `ZNetView` at all: `Patch_SetTrigger` hands them over, already r
 against the creature's own controller (`CreatureTriggers`), so your own screen swings, jumps
 and staggers with the creature like everyone else. Console command: `disguise view [on|off]`,
 which switches it on the spot.
+
+The other setting of this section is **`HideItemSparkle`** (`false` by default, the
+`Hide item sparkle` box under the command buttons of the window). Every Item prefab of the
+game carries a `ParticleSystem` **on its root** - the shimmer the vanilla game draws beside a
+dropped item so it can be found - and a costume built from an item shimmers exactly like one
+(while it is being filmed by the preview, and on your own screen with `SeeYourDisguise` on).
+Ticking the box switches the **drawing** of every particle system of an Item costume off
+(`GhostFactory.HideSparkles`: the renderer, not the object - that object is the costume
+itself - and not the system either, which would start again at activation), so the costume
+stands there without a shimmer while everything else it has is left alone: only an `Item` is
+concerned, a creature, a piece or a ship keeps every effect it carries. Like everything of
+`4 - Own view` it is **purely local**, and the reach of that is worth being precise about:
+your own costume and the picture of the window are drawn by this machine, so they follow the
+setting; a machine running no DLL of ours builds your **real item prefab** from the network
+and has the sparkle baked into it, with no setting of ours inside to turn it off; and a
+machine running the DLL draws no costume of yours at all (it builds a real `Player`, § 3).
+A clone already standing rebuilds itself the moment the value moves - one bool watched per
+frame, the expensive test made only when it can matter - and the box, the `.cfg` and
+ConfigurationManager are the three ways to write it.
 
 The clone is **purely local**: no ZDO, no collision, no AI, no network component.
 `GhostFactory` builds it from a prefab deactivated for the duration of the instantiation,
@@ -338,7 +358,7 @@ left to read by then, which is why the last frame's is remembered. A place typed
 `.cfg` by hand is honoured too, and kept on screen when it is read: a change of resolution
 cannot push the window out of sight. The window shows
 the line under the title, then the checkbox row under that line, the prefab list, the two pose rows under it, the 3D preview, the
-command buttons and the status line (the branch added them one step at a time): a row of five buttons
+command buttons, the sparkle box and the status line (the branch added them one step at a time): a row of five buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight`,
 `Add favorite` / `Remove favorite` =
@@ -349,7 +369,14 @@ are rewritten after every click. The last one is a toggle the same way - "Add fa
 prefab with no mark, "Remove favorite" over one that has - and it acts on the prefab
 **selected** in the window, the one the state line names: the console's own
 `disguise favorite` with no name, so the button and the command are one single call and the
-answer it writes on the status line always names the prefab it changed. The **line under the
+answer it writes on the status line always names the prefab it changed. Under those five
+buttons sits the **sparkle box** - `Hide item sparkle`, the one checkbox that is not in the row
+above, because it gates no list: it writes `HideItemSparkle` (`4 - Own view`) and nothing
+else, the same control the row above is made of (box and label are one hit target,
+`GuiCategories.BuildBox`), starting at the picture's own left edge so the right half keeps one
+edge all the way down; a click on it takes the shimmer off an item costume at once, on your
+own screen and in the picture (both rebuild themselves, § 2), and a value written in
+ConfigurationManager is pushed back into the box every frame like every other label. The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -939,7 +966,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
   `OnDestroy` / `Update`), which wires the other classes together. Everything it does not
   share stays `private`.
-- `DisguiseConfig.cs` - the thirty-three settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the thirty-four settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
@@ -1116,6 +1143,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
   two toggles among them - the first from the config, the Favorite one from the configured
   prefab and its mark; their text is best-fit, five buttons now sharing the width of the picture), the
+  **sparkle box** under those buttons (`SparkleBox`: the very control `GuiCategories.BuildBox`
+  puts in the row above, starting at the picture's own left edge and centred in the 94 px the
+  right half has between the buttons and the status line - its listener writes
+  `HideItemSparkle` and the cache `RefreshState` compares against, so a value typed in
+  ConfigurationManager is pushed back into the box while a click never is), the
   status line below them, and the coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
 - `GuiCategories.cs` - the row of seven checkboxes: Jotunn's `CreateToggle` box (the
@@ -1134,7 +1166,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   company in one thing
   only, the scroll: a category is another list to look at, so the list goes back to its first
   row (`Refilter`), a mark is one row more or less behind the pointer, so the list keeps the
-  place it was in (`RefilterInPlace`).
+  place it was in (`RefilterInPlace`). One box of that row is a method the window borrows:
+  `BuildBox` builds a single checkbox (box, label measured to its text, the label carrying the
+  Button that flips the box) and hands the cursor on, so the row is seven calls of it and the
+  sparkle box of `GuiWindow` is the eighth with its own listener.
 - `GuiCreatureList.cs` - the prefab list: Jotunn's filter field with the **Clear** button at
   its right (the field and the button share the width of the block, rows keep all of theirs;
   the button empties the field through `SetTextWithoutNotify` and asks for `Refilter` itself
@@ -1194,7 +1229,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   (never a hit target, hidden while there is no texture - a `RawImage` with no texture draws
   a white plate) and the rule that decides what is in it: the last row the pointer was on, the
   configured creature before any row was pointed at in this opening, the change held back
-  0.15 s so that a pointer sweeping the list builds one copy instead of one per row crossed.
+  0.15 s so that a pointer sweeping the list builds one copy instead of one per row crossed -
+  and one more reason to build the copy again, the sparkle option (`HideItemSparkle`) having
+  been read by the factory at build time: a value that moves while the picture stands shows
+  the creature once more, and only when it can matter (an item, `GhostFactory.HideSparkle`).
 - `CreaturePreview.cs` - the stage the preview is filmed from: the free layer, the camera of
   its own and its `RenderTexture`, the two lights, the inert copy of the creature
   (`GhostFactory.BuildInert`), the framing measured from the bounds of its meshes and fitted
@@ -1334,6 +1372,7 @@ so the count of twenty-four stays correct.
 | A prefab a mod adds is missing from the list | Normal: both lists only show **vanilla** prefabs - the names come from the game's own asset manifest (`valheim_Data\StreamingAssets\SoftRef\manifest` and `manifest_extended`), which no mod ever writes to (§ 6). `disguise set <name>` still accepts a modded name typed by hand, and a configured modded prefab still works |
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
 | A prefab like `Abomination_attack1` or `wraith_melee` is missing from the list | Normal, and no accident: those are the creature's own **attack helpers** and zones - registered `Item` prefabs with **no mesh anywhere**, which is why the log says `Preview: <name> has no mesh to show.` when one is pointed at. The catalogue drops them with every other prefab nothing could be drawn of (a spawner, a blob's AoE): they would be an empty picture in the window and an invisible viking in the world (§ 6). `disguise set <name>` still takes one typed by hand |
+| The shimmer beside an item costume is still there | `HideItemSparkle` only reaches what **this machine** draws: your own costume (`SeeYourDisguise`, § 2) and the picture of the window - so tick `Hide item sparkle` under the command buttons (or write `HideItemSparkle = true` in the `.cfg`) and both drop it at once, the clone being rebuilt rather than repaired. A machine with no DLL of ours builds your **real item prefab** from the network, where the particle system is baked into the prefab and no setting of ours exists to turn it off; a machine running the DLL draws a real `Player` for you and never your costume (§ 3), so there is nothing of yours there to shimmer |
 | Opening the window takes a noticeable moment | Two things cost, and the log says both: `GUI: <n> name(s) in <ms> ms, <built> of <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The catalogue is the walk that tags every vanilla prefab with its kind - up to ten component tests, and exactly ONCE: the walk skips them when all it was asked for is names, and the window does that one pass for its own rows. The rows are Jotunn buttons of four objects each, and only the categories the boxes have ON get one at the opening; a category switched on later is built then, once (in the order of the list), and a row is never destroyed, so switching back and forth stays a `SetActive`. The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log) |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 

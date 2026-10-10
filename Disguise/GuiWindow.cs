@@ -22,8 +22,10 @@ namespace Disguise;
 /// them, this class only says where they sit - under that line), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
-/// films into it), under it the five command buttons, and at the bottom the status line
-/// (GuiStatus), which is the hint while no button has been pressed and the answer of the
+/// films into it), under it the five command buttons and, under those, the sparkle box
+/// (HideItemSparkle - the one checkbox that is not in the row above, because it gates
+/// nothing: it is the costume itself that is drawn differently), and at the bottom the status
+/// line (GuiStatus), which is the hint while no button has been pressed and the answer of the
 /// last one after that.
 /// </summary>
 internal static class GuiWindow
@@ -98,6 +100,16 @@ internal static class GuiWindow
     private const float ButtonY = ButtonTop - (ButtonHeight * 0.5f);
 
     /// <summary>
+    /// Centre of the sparkle box (HideItemSparkle): the right half of the window has 94 px
+    /// between the bottom of the command row (-478) and the band the status line takes
+    /// (-572), and the box takes the upper part of them - 14 px under the buttons, 56 above
+    /// that line - starting at the picture's own left edge, which is where the button row
+    /// above starts as well. The same control as the checkbox row (GuiCategories builds it),
+    /// standing alone here with its own entry to write and no list to re-filter.
+    /// </summary>
+    private const float SparkleY = -504f;
+
+    /// <summary>
     /// The label of the first command button, kept here because it is a toggle: RefreshState
     /// rewrites it after every change, the same way it rewrites the state line. Unity-null
     /// once the window is gone, which is the whole safety of both.
@@ -121,12 +133,24 @@ internal static class GuiWindow
     /// </summary>
     private static Text? s_state;
 
+    /// <summary>
+    /// The sparkle box under the command row, and what it showed last: the entry can also be
+    /// written by ConfigurationManager while the window is open, and RefreshState pushes that
+    /// back into the box the same way it rewrites the labels above (a click writes the cache
+    /// itself, so it is never pushed back). Unity-null once the window is gone, which is the
+    /// whole safety of it.
+    /// </summary>
+    private static Toggle? s_sparkle;
+
+    private static bool s_sparkleApplied;
+
     internal static GameObject Build(Transform parent)
     {
         GUIManager gui = GUIManager.Instance;
         s_state = null;
         s_power = null;
         s_favorite = null;
+        s_sparkle = null;
 
         // Draggable: Jotunn puts its DragWindowCntrl on the panel, and the whole background
         // forwards the gesture, so there is no dedicated title bar to grab.
@@ -251,12 +275,45 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        // The five command buttons under the picture, then the line they answer on (which
-        // still holds the hint about clicking a row while no button has been pressed).
+        // The five command buttons under the picture, the sparkle box under them, then the
+        // line they answer on (which still holds the hint about clicking a row while no
+        // button has been pressed).
         CommandButtons(gui, window.transform);
+        SparkleBox(window.transform);
         GuiStatus.Build(window.transform);
 
         return window;
+    }
+
+    /// <summary>
+    /// The box under the command row: HideItemSparkle, the option that takes the shimmer of
+    /// a dropped item off an Item costume (GhostFactory reads it at every build of a clone).
+    /// The control itself comes from GuiCategories.BuildBox - the very one the checkbox row
+    /// is made of - and the listener here writes the entry and the cache, and nothing else:
+    /// there is no list to re-filter, and the clones standing rebuild themselves when the
+    /// value moves (SelfView, GuiPreview). Placed at the picture's own left edge, where the
+    /// row of buttons above starts, so the right half keeps one edge all the way down.
+    /// </summary>
+    private static void SparkleBox(Transform parent)
+    {
+        s_sparkleApplied = DisguiseConfig.ConfigHideItemSparkle.Value;
+
+        // The preview anchors on the MIDDLE of the window and starts PreviewX right of it
+        // (GuiPreview), while the box anchors on its top-left corner (BuildBox): the two
+        // corners are the same x once this much is added to it.
+        float cursor = (Width * 0.5f) + PreviewX;
+        s_sparkle = GuiCategories.BuildBox(
+            parent,
+            ref cursor,
+            SparkleY,
+            "Hide item sparkle",
+            s_sparkleApplied,
+            on =>
+            {
+                s_sparkleApplied = on;
+                DisguiseConfig.ConfigHideItemSparkle.Value = on;
+            }
+        );
     }
 
     /// <summary>
@@ -377,17 +434,19 @@ internal static class GuiWindow
 
     /// <summary>
     /// Rewrites the line under the title, the labels of the toggle and of the Favorite button,
-    /// and the six pose fields, writing NONE of them when it is unchanged: called once per
-    /// frame while the window is open (DisguiseGui.Tick), by GuiCreatureList after a row was
-    /// clicked or after a change the console made while the window was open, and by the
-    /// command buttons after they ran their sub-command. Two of the four values on the line
-    /// move on their own - the flight and its height - so the ordinary frame costs the line
-    /// being built and compared, never a write to the Text (which would lay it out again for
-    /// the same words); the Favorite label follows the configured prefab, which costs a look
-    /// at the config and one at the marks (both a string compare and a set lookup); the pose
-    /// fields cost six more string comparisons, and skip the one being typed in (GuiPose).
-    /// Does nothing without a window, which is every frame it is closed and every frame after
-    /// a scene change destroyed it.
+    /// the sparkle box and the six pose fields, writing NONE of them when it is unchanged:
+    /// called once per frame while the window is open (DisguiseGui.Tick), by GuiCreatureList
+    /// after a row was clicked or after a change the console made while the window was open,
+    /// and by the command buttons after they ran their sub-command. Two of the four values
+    /// on the line move on their own - the flight and its height - so the ordinary frame
+    /// costs the line being built and compared, never a write to the Text (which would lay it
+    /// out again for the same words); the Favorite label follows the configured prefab, which
+    /// costs a look at the config and one at the marks (both a string compare and a set
+    /// lookup); the pose fields cost six more string comparisons, and skip the one being typed
+    /// in (GuiPose); the sparkle box costs one bool - a click on it writes that cache itself,
+    /// so only a value from outside (ConfigurationManager) is ever pushed back. Does nothing
+    /// without a window, which is every frame it is closed and every frame after a scene
+    /// change destroyed it.
     /// </summary>
     internal static void RefreshState()
     {
@@ -418,6 +477,17 @@ internal static class GuiWindow
             if (!string.Equals(favorite.text, mark, StringComparison.Ordinal))
             {
                 favorite.text = mark;
+            }
+        }
+
+        Toggle? sparkle = s_sparkle;
+        if (sparkle != null)
+        {
+            bool hide = DisguiseConfig.ConfigHideItemSparkle.Value;
+            if (hide != s_sparkleApplied)
+            {
+                s_sparkleApplied = hide;
+                sparkle.SetIsOnWithoutNotify(hide);
             }
         }
 

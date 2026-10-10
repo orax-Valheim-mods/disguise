@@ -25,6 +25,18 @@ internal static class SelfView
 
     private static int s_ghostPrefabHash;
 
+    /// <summary>
+    /// What the clone was built WITH (the answer of HideSparkle for its prefab) and the
+    /// option itself at that moment: the pair is how a value changed while the clone stands
+    /// - typed into ConfigurationManager, written by the window's box - reaches a clone
+    /// already on screen. Only the move of the OPTION is watched (one bool per frame): the
+    /// costume cannot change its kind behind our back, and the expensive test - ten component
+    /// runs - is then made once per change, on a change that can matter only for an item.
+    /// </summary>
+    private static bool s_ghostHideSparkle;
+
+    private static bool s_ghostSparkleOption;
+
     /// <summary>Working buffers for the scan (reused, never allocated per frame).</summary>
     private static readonly List<Renderer> s_renderers = new();
 
@@ -85,6 +97,21 @@ internal static class SelfView
                 Remove(); // the disguise changed: drop the previous creature
             }
 
+            // The sparkle option moved under a clone that is already standing: it was built
+            // the old way, so it is built again - which only costs anything when the
+            // difference can show, i.e. for an item (HideSparkle). With the option standing
+            // still this is one bool, and with a creature costume the answer is false twice,
+            // whatever the option says.
+            bool sparkleOption = DisguiseConfig.ConfigHideItemSparkle.Value;
+            if (s_ghost != null && sparkleOption != s_ghostSparkleOption)
+            {
+                s_ghostSparkleOption = sparkleOption;
+                if (s_ghostHideSparkle != GhostFactory.HideSparkle(wanted))
+                {
+                    Remove(); // rebuilt by the block below, within this same frame
+                }
+            }
+
             if (s_ghost == null)
             {
                 if (s_failedPrefabHash == wanted && Time.unscaledTime < s_nextBuildAttempt)
@@ -109,6 +136,8 @@ internal static class SelfView
                 }
                 s_ghost = ghost;
                 s_ghostPrefabHash = wanted;
+                s_ghostHideSparkle = GhostFactory.HideSparkle(wanted);
+                s_ghostSparkleOption = DisguiseConfig.ConfigHideItemSparkle.Value;
                 s_failedPrefabHash = 0;
                 s_nextRendererScan = 0f;
                 Disguise.LogInfo(
@@ -259,6 +288,8 @@ internal static class SelfView
         }
         s_ghost = null;
         s_ghostPrefabHash = 0;
+        s_ghostHideSparkle = false;
+        s_ghostSparkleOption = false;
         s_nextRendererScan = 0f;
         GhostAnimation.Reset();
     }

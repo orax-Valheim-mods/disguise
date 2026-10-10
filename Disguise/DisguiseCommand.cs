@@ -746,6 +746,10 @@ internal static class DisguiseCommand
         );
         Say(
             ctx,
+            $"  Item sparkle on your screen: {(DisguiseConfig.ConfigHideItemSparkle.Value ? "hidden" : "shown")} (HideItemSparkle, 4 - Own view)"
+        );
+        Say(
+            ctx,
             $"  Info logs: {(DisguiseConfig.ConfigLogs.Value ? "on" : "off")} (disguise logs)"
                 + (
                     DisguiseConfig.ConfigLogs.Value

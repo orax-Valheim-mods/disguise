@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Disguise;
@@ -25,6 +26,9 @@ namespace Disguise;
 /// collider, no rigidbody, no audio, no CharacterAnimEvent (its Awake needs a Character and
 /// its callbacks drive game logic). The clone cannot move, cannot be seen by any game system
 /// and never reaches the network.
+///
+/// One thing a clone is then TAKEN off, when the config asks for it: the shimmer of an item
+/// (HideItemSparkle - HideSparkles, the particle systems of an Item costume draw nothing).
 /// </summary>
 internal static class GhostFactory
 {
@@ -117,6 +121,10 @@ internal static class GhostFactory
             clone.name = prefab.name + " (Disguise copy)";
 
             Strip(clone);
+            if (HideSparkle(prefab))
+            {
+                HideSparkles(clone);
+            }
             if (!IsInert(clone))
             {
                 UnityEngine.Object.Destroy(clone);
@@ -144,6 +152,70 @@ internal static class GhostFactory
             Disguise.LogWarning($"Prefab not found ({PrefabResolver.PrefabName(prefabHash)}).");
         }
         return prefab;
+    }
+
+    /// <summary>
+    /// Whether a costume built from this prefab has to be drawn WITHOUT its sparkle
+    /// (HideItemSparkle): asked at every build (BuildInert) and whenever the option moves
+    /// under a clone already standing (SelfView, GuiPreview).
+    ///
+    /// An ITEM test and nothing else - the shimmer is the game's own dropped-item particle,
+    /// the ParticleSystem every item prefab carries on its root (Wood, Stone, a coin), so a
+    /// creature, a piece or a ship keeps every effect it has, whatever this option says. The
+    /// option comes second on purpose: with it off, which is what it starts at, the whole
+    /// answer is one field read and KindOf - up to ten component tests - never runs.
+    /// </summary>
+    internal static bool HideSparkle(GameObject? prefab)
+    {
+        return prefab != null
+            && DisguiseConfig.ConfigHideItemSparkle.Value
+            && PrefabCatalog.KindOf(prefab) == PrefabKind.Item;
+    }
+
+    /// <summary>
+    /// The same answer for the two live clones, which hold a hash (SelfView) or a name
+    /// (GuiPreview) instead of a prefab. Nothing is warned about here: a prefab that cannot
+    /// be resolved carries no particle system either, and the build itself complains.
+    /// </summary>
+    internal static bool HideSparkle(int prefabHash)
+    {
+        ZNetScene? zns = ZNetScene.instance;
+        return HideSparkle(zns != null ? zns.GetPrefab(prefabHash) : null);
+    }
+
+    internal static bool HideSparkle(string prefabName)
+    {
+        ZNetScene? zns = ZNetScene.instance;
+        return HideSparkle(zns != null ? zns.GetPrefab(prefabName) : null);
+    }
+
+    /// <summary>Working buffer of HideSparkles (reused, never allocated per build).</summary>
+    private static readonly List<ParticleSystemRenderer> s_sparkles = new();
+
+    /// <summary>
+    /// Switches the DRAWING of every particle system of the clone off - the renderer, not
+    /// the object it sits on (that object is the root of an item, the costume itself, so
+    /// switching it off would switch the costume off too) and not the system either (a
+    /// stopped one starts again the moment its object is activated: playOnAwake is the
+    /// prefab's own). The renderer is what a picture is made of, so nothing of the shimmer
+    /// reaches the screen while the system keeps simulating invisibly - one switch, no
+    /// structure touched, and the clone is still inactive here, so the state is set before
+    /// the first frame it could be seen in. Nothing has to remember what was switched off:
+    /// a later change of the option builds a new clone (SelfView, GuiPreview) rather than
+    /// repairing this one, from the pristine prefab.
+    /// </summary>
+    private static void HideSparkles(GameObject clone)
+    {
+        s_sparkles.Clear();
+        clone.GetComponentsInChildren(true, s_sparkles);
+        foreach (ParticleSystemRenderer renderer in s_sparkles)
+        {
+            if (renderer != null)
+            {
+                renderer.enabled = false;
+            }
+        }
+        s_sparkles.Clear();
     }
 
     /// <summary>The strip repeats while it still manages to destroy something (dependency chains).</summary>
