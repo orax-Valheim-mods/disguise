@@ -168,7 +168,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `CreaturePrefab` | `Greydwarf` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla, non-effect ones) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
-| `Logs` | `true` | Write the mod's own **Info/Debug** messages to the BepInEx log - the whole output of `disguise list` included (§ 7); warnings and errors are always written (`disguise logs [on|off]`, § 7) |
+| `Logs` | `false` | Write the mod's own **Info/Debug** messages to the BepInEx log - the whole output of `disguise list` included (§ 7). **Off by default**: a working install keeps its log quiet, and `disguise logs [on|off]` switches it (the command writes the value back, so the choice stays for the next start). Warnings and errors are always written (§ 7) |
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 | `SeeYourDisguise` | `true` | Show the creature on **your own screen** (`4 - Own view`, local only) |
@@ -1474,8 +1474,10 @@ so the count of twenty-four stays correct.
 > **Before reading any `Info` line quoted below** (`Attack bridge: ...`,
 > `Observer refresh ...`, `Map position spoof ...`, `Local player (ZDO ...)`, the output of
 > `disguise list`, ...): those are
-> only written while **`Logs = true`** (default, § 2). Run `disguise logs on` first - or set
-> it in the `.cfg`. Warnings and errors are written whatever that value is.
+> only written while **`Logs = true`** (§ 2) - **off by default since 0.1.0**, a working
+> install keeping its log quiet. Run `disguise logs on` first - or set it in the `.cfg`; the
+> command writes the value back, so it stays for the next start. Warnings and errors are
+> written whatever that value is.
 
 | Symptom | Check |
 |---|---|

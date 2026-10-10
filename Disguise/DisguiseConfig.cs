@@ -141,10 +141,13 @@ internal static class DisguiseConfig
         ConfigLogs = config.Bind(
             "1 - General",
             "Logs",
-            true,
+            false,
             "Write the mod's own informational messages (Info / Debug) to the BepInEx log "
-                + "(BepInEx\\LogOutput.log). Warnings and errors are always written, whatever this "
-                + "value is: they are what tells a broken install from a working one. "
+                + "(BepInEx\\LogOutput.log). Off by default: a working install keeps its log "
+                + "quiet, and \"disguise logs on\" switches these lines on - the command "
+                + "writes the value back, so it stays for the next start. "
+                + "Warnings and errors are always written, whatever this value is: they are "
+                + "what tells a broken install from a working one. "
                 + "Console command: disguise logs [on|off]."
         );
 
