@@ -342,9 +342,31 @@ internal static class CreaturePreview
         return renderer != null
             && renderer.enabled
             && !renderer.forceRenderingOff
-            && renderer.gameObject.activeInHierarchy
+            && SwitchedOn(renderer.transform)
             && renderer.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly
             && (renderer is MeshRenderer || renderer is SkinnedMeshRenderer);
+    }
+
+    /// <summary>
+    /// Whether this GameObject and every one above it are switched on.
+    ///
+    /// It reads activeSelf rather than activeInHierarchy because the answer has to be the
+    /// same for a prefab ASSET and for a copy standing on the stage, and an asset is not in a
+    /// scene: activeInHierarchy says no for every object of one however the prefab ships it,
+    /// so the size on the status line - measured on the asset - went blank for every prefab
+    /// there was when the two were measured with that one call. Walking the parents reads the
+    /// prefab's own idea of what is on, which is the one a copy is built with.
+    /// </summary>
+    private static bool SwitchedOn(Transform transform)
+    {
+        for (Transform? node = transform; node != null; node = node.parent)
+        {
+            if (!node.gameObject.activeSelf)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>
