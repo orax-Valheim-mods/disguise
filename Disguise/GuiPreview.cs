@@ -78,12 +78,20 @@ internal static class GuiPreview
         rect.anchoredPosition = new Vector2(x, y);
 
         RawImage image = plate.GetComponent<RawImage>();
-        // Never a hit target: the window measures the pointer on its own rectangle, and a
-        // picture over the right half must not eat what is clicked there later. It also starts
-        // hidden, because a RawImage with no texture draws a white plate.
-        image.raycastTarget = false;
+        // A hit target for the help line and for nothing else (GuiHelp.Watch below): the
+        // picture handles Enter and Exit alone, and an event it does not handle walks up to
+        // the panel, which owns the drag - so nothing that was ever clicked on the right
+        // half is eaten by it. The window measures the pointer on its own rectangle
+        // (DisguiseGui.PointerOnWindow), never on this. It starts hidden, because a
+        // RawImage with no texture draws a white plate - and a hidden Graphic is not
+        // raycast either, so the picture only answers the pointer once it is drawn.
+        image.raycastTarget = true;
         image.enabled = false;
         image.color = Color.white;
+        GuiHelp.Watch(
+            plate,
+            "What the costume looks like now: the last row the pointer was on, else the configured one - it turns while the pointer leaves it alone."
+        );
         s_image = image;
     }
 

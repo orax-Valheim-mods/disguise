@@ -358,12 +358,12 @@ left to read by then, which is why the last frame's is remembered. A place typed
 `.cfg` by hand is honoured too, and kept on screen when it is read: a change of resolution
 cannot push the window out of sight. The window shows
 the line under the title, then the checkbox row under that line, the prefab list, the two pose rows under it, the 3D preview, the
-command buttons, the sparkle box and the status line (the branch added them one step at a time): a row of five buttons
+command buttons, the sparkle box, the status line and, closing the window, the help line under it (the branch added them one step at a time): a row of five buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight`,
 `Add favorite` / `Remove favorite` =
 `disguise enable` / `disable`, `refresh`, `view`, `fly`, `favorite <prefab>`), and reporting its answer on the
-line at the bottom of the window. The first button is a toggle: it reads "Disable" while the
+status line, the line above the help line that closes the window. The first button is a toggle: it reads "Disable" while the
 disguise is on and "Enable" while it is off, and both that label and the line under the title
 are rewritten after every click. The last one is a toggle the same way - "Add favorite" over a
 prefab with no mark, "Remove favorite" over one that has - and it acts on the prefab
@@ -397,7 +397,32 @@ holds the hint about clicking a row while no
 button has been pressed, and then the **first line** of the answer of the last one (it stays
 until the next button, and the hint comes back with the next window): a command can print
 several lines, the console keeps them all, and the first one is the headline - the notes a
-command goes on printing after it stay in the console. The **checkbox row**: seven
+command goes on printing after it stay in the console. Closing the window under that line is
+the **help line**: it holds what the element the pointer is on is FOR - one sentence for the
+five buttons and the sub-command each of them runs, for the seven boxes and the filter they
+ask of the list, for the filter field and Clear, for the two pose rows and their six fields,
+for the picture, the sparkle box, the state line, the chord, Close and the answer line
+itself - and an idle line while the pointer rests on nothing that describes itself
+(`Drag the panel to move the window - this line describes whatever the pointer rests on.`).
+It is written by the element the pointer ENTERS and put back by the one it LEAVES, and the
+words belong to the component that wrote them: a `Clear` is only obeyed from the component
+the line belongs to, so the order Unity sends those two events in cannot leave a stale line
+up, and the words are compared before they are written, so a pointer resting on one control
+for a whole frame costs nothing. Each element carries its own `GuiHover` - one component
+with Enter and Exit and no other interface, the same rule `GuiRowHover` was written with
+(Unity's `EventTrigger`, which does this job with two entries, also implements scrolling,
+dragging and the start of both, and an `EventTrigger` on a row swallowed the wheel and the
+dragging of the list) - while the rows of the list need none of their own: they reuse
+`GuiRowHover`, which already listens to the pointer for the preview. Being listened to is
+also what makes an element hoverable at all: Jotunn switches raycasting off on every label,
+so `GuiHelp.Watch` turns the object into a hit target, and that changes nothing else - an
+event an object does not handle itself still walks up to the panel, which owns the drag, and
+a Button keeps its own Enter and Exit (every component of one object is called). The picture
+was the one element that was never a hit target; it is one now, for this and nothing else,
+and not even while it has no texture (a hidden Graphic is not raycast), so its help arrives
+with the picture itself. The panel is 670 px tall for these two lines: it grew DOWNWARDS by
+the help line's 40, so nothing above the status line moved, and `GuiStatus.StatusY` grew by
+the same 40 to keep that line's box at `-572..-616`. The **checkbox row**: seven
 boxes in the band under the state line and over the list - `Favorites` first, then the six
 categories in alphabetical order of their label, `Buildings`, `Creatures`, `Items`, `Nature`,
 `Other`, `Static` - the last six one per
@@ -1137,8 +1162,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   corner of the two pose rows (`GuiPose.Build` gets the band the layout leaves under the
   list BLOCK - the scroll view is only its lower part, the filter field and its gap being
   part of the block too, measured through `GuiCreatureList.BlockHeight`, which is what keeps
-  the rows off the last rows of the list; the panel is 630 px tall because of them, and the
-  status line is anchored to its bottom edge, so nothing above moves when it grows), the
+  the rows off the last rows of the list; the panel is 670 px tall because of them and of the
+  two lines that close it, the status line being anchored to the bottom edge (nothing above
+  moves when the panel grows, and `StatusY` is the number that keeps its own box where it was
+  across the 40 px it grew by for the help line)), the
   row of five command buttons under the picture (each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
   two toggles among them - the first from the config, the Favorite one from the configured
@@ -1148,7 +1175,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   right half has between the buttons and the status line - its listener writes
   `HideItemSparkle` and the cache `RefreshState` compares against, so a value typed in
   ConfigurationManager is pushed back into the box while a click never is), the
-  status line below them, and the coordinates of the list block. It only builds,
+  status line below them, the **help line** closing the window under that one (`GuiHelp.Build`
+  - the words of every control are handed to `GuiHelp.Watch` as it is built: Close, the chord,
+  the state line, the five buttons and the sparkle box here, and the same call made by
+  `GuiStatus`, `GuiPose`, `GuiCreatureList` and `GuiCategories` for their own), and the
+  coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
 - `GuiCategories.cs` - the row of seven checkboxes: Jotunn's `CreateToggle` box (the
   Valheim checkbox, orange marker) with a label measured to its own text
@@ -1169,7 +1200,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   place it was in (`RefilterInPlace`). One box of that row is a method the window borrows:
   `BuildBox` builds a single checkbox (box, label measured to its text, the label carrying the
   Button that flips the box) and hands the cursor on, so the row is seven calls of it and the
-  sparkle box of `GuiWindow` is the eighth with its own listener.
+  sparkle box of `GuiWindow` is the eighth with its own listener - the caller giving each one
+  the help to show on the bottom line, which `BuildBox` puts on BOTH halves of the checkbox:
+  the box and its label are two objects, and the event system stops at the first one that
+  handles the pointer, so the label - the one that carries the Button - is where the pointer
+  usually is.
 - `GuiCreatureList.cs` - the prefab list: Jotunn's filter field with the **Clear** button at
   its right (the field and the button share the width of the block, rows keep all of theirs;
   the button empties the field through `SetTextWithoutNotify` and asks for `Refilter` itself
@@ -1195,7 +1230,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `DisguiseCommand.ApplyCreature`, and
   `FilterFocused` - the half of `BlocksInput` that hands the frame to the UI while the
   player types. Each row is given the listener of the preview (`GuiPreview.WatchRow`), which
-  is how the picture knows what the pointer has been on. `BlockHeight(listHeight)` answers how tall
+  is how the picture knows what the pointer has been on - and, since `GuiHelp`, how the bottom
+  line knows what to say about it (the same component writes both). The filter field and the
+  Clear button are watched the same way. `BlockHeight(listHeight)` answers how tall
   the whole block is for a list of that height - the scroll view is only its lower part, the
   filter field and its gap being part of the block too - which is what GuiWindow measures the
   corner of the pose rows through.
@@ -1209,30 +1246,63 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   a value back only when the words really differ and **never in the field being typed in**,
   so a value set from the F5 console lands in the window without disturbing a half-typed one;
   `Focused` - the second half of `BlocksInput`, beside `FilterFocused` - hands the frame to
-  the UI while one of the six has the focus.
+  the UI while one of the six has the focus. The two labels and the six fields all carry their
+  help on the bottom line (`GuiHelp.Watch`), the label saying what its whole row is for.
 - `GuiRowHover.cs` - the listener on every row: pointer in, show its creature - and that one
   stays until another row comes under the pointer, so the pointer can leave the list for the
-  buttons and the picture keeps showing what was just looked at. One interface and no other,
+  buttons and the picture keeps showing what was just looked at; and, since `GuiHelp`, pointer
+  in also puts that row's help on the bottom line and pointer out puts the idle line back -
+  the exit being the one thing the picture never needed (it keeps what it was told) and the
+  help line does, because leaving one row for the next must not leave the first one's words
+  up. Two pointer interfaces and no other,
   on purpose. Unity's `EventTrigger`
   does the same job with two entries, but it also implements scrolling and dragging - and the
   event system only walks up to the FIRST object of a hierarchy that handles an event. An
   `EventTrigger` on a row therefore swallowed the wheel and the dragging of the list (the walk
   stopped on the row, the `ScrollRect` above it never heard of either, and only the scrollbar
   - which no row stands over - kept working), while an object without the interface is simply
-  passed over.
-- `GuiStatus.cs` - the line at the bottom of the window: the hint about clicking a row while
+  passed over. The two interfaces below cost nothing of the kind: the row keeps its own Button
+  handlers (they are components of this very object, and Unity calls all of them), and a wheel
+  over a row still walks up to the `ScrollRect`.
+- `GuiStatus.cs` - the line under the pose rows: the hint about clicking a row while
   no button has been pressed, and the answer of the last command button after that. One line
   holds one message, so `DisguiseCommand.Run` clears it before running and only the first
   line written after that (the headline) is kept; the console, which has a terminal behind
-  it, keeps every line.
+  it, keeps every line. It is watched like any control (`GuiHelp.Watch`), so hovering it
+  says what it is; the help line closes the window UNDER it.
+- `GuiHelp.cs` - the line at the very bottom of the window, under the status line: what the
+  element the pointer is on is FOR, and an idle line (`Drag the panel to move the window -
+  this line describes whatever the pointer rests on.`) while it rests on nothing that
+  describes itself. Exactly two events write it - `Show` from the element entered, `Clear`
+  from the one left - and the words are OWNED: a `Clear` is only obeyed from the component
+  the line belongs to, so the order Unity sends the two events in cannot leave a stale line
+  up, and the words are compared before they are written, so hovering one control for a
+  whole frame costs nothing. `Watch` is the other half of the class: it puts a `GuiHover` -
+  one small component with `IPointerEnterHandler` and `IPointerExitHandler` and no other
+  interface, the same rule `GuiRowHover` was written with (Unity's `EventTrigger`, which
+  does this job with two entries, also implements scrolling, dragging and the start of
+  both, and the event system only calls the handlers of the FIRST object of a hierarchy
+  that handles an event - an `EventTrigger` on a row swallowed the wheel and the dragging
+  of the list) - on the element, and turns the element into a hit target as well: Jotunn
+  switches raycasting off on every label, and an object the pointer cannot reach is an
+  object whose help can never be shown. The rows of the list need no second component - they
+  reuse `GuiRowHover`, which already listens to the pointer for the preview - and nothing
+  else changes hands: an event an object does not handle itself still walks up to the panel,
+  which owns the drag, and a Button keeps its own Enter and Exit (every component of one
+  object is called). Dropped with the window (`Forget`, beside `GuiStatus`'s).
 - `GuiPreview.cs` - the right half of the window: the `RawImage` the preview is drawn into
-  (never a hit target, hidden while there is no texture - a `RawImage` with no texture draws
-  a white plate) and the rule that decides what is in it: the last row the pointer was on, the
+  (a hit target for the help line and for nothing else - `GuiHelp.Watch` makes it one, it
+  handles Enter and Exit alone and every other event walks up to the panel, which owns the
+  drag; hidden while there is no texture - a `RawImage` with no texture draws
+  a white plate, and a hidden Graphic is not raycast either, so the picture answers the
+  pointer only once it is drawn) and the rule that decides what is in it: the last row the pointer was on, the
   configured creature before any row was pointed at in this opening, the change held back
   0.15 s so that a pointer sweeping the list builds one copy instead of one per row crossed -
   and one more reason to build the copy again, the sparkle option (`HideItemSparkle`) having
   been read by the factory at build time: a value that moves while the picture stands shows
   the creature once more, and only when it can matter (an item, `GhostFactory.HideSparkle`).
+  The pointer reaching a row is `GuiRowHover`, one component per row, which now also writes
+  that row's help on the bottom line.
 - `CreaturePreview.cs` - the stage the preview is filmed from: the free layer, the camera of
   its own and its `RenderTexture`, the two lights, the inert copy of the creature
   (`GhostFactory.BuildInert`), the framing measured from the bounds of its meshes and fitted

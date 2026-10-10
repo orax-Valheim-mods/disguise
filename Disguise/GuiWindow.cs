@@ -24,9 +24,11 @@ namespace Disguise;
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
 /// films into it), under it the five command buttons and, under those, the sparkle box
 /// (HideItemSparkle - the one checkbox that is not in the row above, because it gates
-/// nothing: it is the costume itself that is drawn differently), and at the bottom the status
-/// line (GuiStatus), which is the hint while no button has been pressed and the answer of the
-/// last one after that.
+/// nothing: it is the costume itself that is drawn differently), then the status line
+/// (GuiStatus), which is the hint while no button has been pressed and the answer of the
+/// last one after that - and, closing the window under it, the help line (GuiHelp), which
+/// holds what the element the pointer is on is for and the idle line while it is on
+/// nothing.
 /// </summary>
 internal static class GuiWindow
 {
@@ -36,13 +38,17 @@ internal static class GuiWindow
     /// <summary>
     /// Height of the panel. The list block takes 338 of them (filter 36 + gap 2 + 300 of
     /// list, GuiCreatureList.BlockHeight) under the -132 it starts at, so it ends at -470;
-    /// the two pose rows (GuiPose) take 78 more with their gaps, -476 down to -554; and the
-    /// status line - anchored to the bottom edge, its box ending 58 px above it - follows
-    /// this down, so nothing above ever moves when it changes. 630 is what leaves those two
-    /// rows their band above that line: 540 left 50 px under the list, which fit neither of
-    /// them, and 600 put the Offset row back over the last rows of the list.
+    /// the two pose rows (GuiPose) take 78 more with their gaps, -476 down to -554; the
+    /// status line keeps the band it has always had under them (-572..-616); and the help
+    /// line (GuiHelp) closes the window below that band. 630 is what left those two rows
+    /// their band above the status line: 540 left 50 px under the list, which fit neither of
+    /// them, and 600 put the Offset row back over the last rows of the list. The help line
+    /// then asked for 40 px at the BOTTOM, and the panel grew downwards for them - so
+    /// nothing above moved a pixel, the status line alone following its own edge (it is
+    /// anchored to the bottom one, which is why GuiStatus.StatusY grew by the same 40 and
+    /// its box stands at -572..-616 exactly as before).
     /// </summary>
-    internal const float Height = 630f;
+    internal const float Height = 670f;
 
     // Left half of the window: top-left corner of the filter + list block, and its size.
     private const float ListX = 24f;
@@ -201,6 +207,10 @@ internal static class GuiWindow
         {
             button.onClick.AddListener(DisguiseGui.Hide);
         }
+        GuiHelp.Watch(
+            closeButton,
+            "Close the window - the chord written on the title row opens it again."
+        );
 
         // The chord on the title row, between the title and Close: the window shows the keys
         // that call it back after it is closed, read from the config at every open (the same
@@ -228,6 +238,10 @@ internal static class GuiWindow
             chordText.resizeTextMaxSize = 16;
             chordText.resizeTextMinSize = 10;
         }
+        GuiHelp.Watch(
+            chord,
+            "The keys that call this window back and send it away - read from the config at every open, \"Not set\" while the chord is empty."
+        );
 
         GameObject state = Label(
             gui,
@@ -253,6 +267,10 @@ internal static class GuiWindow
             stateText.resizeTextMinSize = 14;
         }
         s_state = stateText;
+        GuiHelp.Watch(
+            state,
+            "What is configured right now: the prefab, the disguise on or off, the flight with the height it lifts the costume by, and the size of that prefab in metres (left out while it has no mesh to measure)."
+        );
 
         // The checkbox row - Favorites first, then the six categories alphabetically - under
         // the state line and over
@@ -275,12 +293,13 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        // The five command buttons under the picture, the sparkle box under them, then the
+        // The five command buttons under the picture, the sparkle box under them, the
         // line they answer on (which still holds the hint about clicking a row while no
-        // button has been pressed).
+        // button has been pressed), and the help line closing the window under that one.
         CommandButtons(gui, window.transform);
         SparkleBox(window.transform);
         GuiStatus.Build(window.transform);
+        GuiHelp.Build(window.transform);
 
         return window;
     }
@@ -307,6 +326,7 @@ internal static class GuiWindow
             ref cursor,
             SparkleY,
             "Hide item sparkle",
+            "Takes the shimmer off an item costume on THIS machine - your own costume and the picture above; what another machine draws is never touched.",
             s_sparkleApplied,
             on =>
             {
@@ -359,19 +379,59 @@ internal static class GuiWindow
             (CreaturePreview.PictureWidth - ((CommandCount - 1) * ButtonGap)) / CommandCount;
         float centre = PreviewX + (width * 0.5f);
 
-        s_power = Command(gui, parent, DescribePower(), centre, width, TogglePower);
+        s_power = Command(
+            gui,
+            parent,
+            DescribePower(),
+            "Turn the disguise on for everyone - your ZDO then carries the configured prefab instead of your viking - or stop it (disguise enable / disable).",
+            centre,
+            width,
+            TogglePower
+        );
 
         centre += width + ButtonGap;
-        _ = Command(gui, parent, "Refresh", centre, width, () => RunCommand("refresh"));
+        _ = Command(
+            gui,
+            parent,
+            "Refresh",
+            "Read the costume and the list again from the network (disguise refresh).",
+            centre,
+            width,
+            () => RunCommand("refresh")
+        );
 
         centre += width + ButtonGap;
-        _ = Command(gui, parent, "Own view", centre, width, () => RunCommand("view"));
+        _ = Command(
+            gui,
+            parent,
+            "Own view",
+            "Draw the costume on YOUR screen instead of your viking - purely local, no machine is told anything (SeeYourDisguise, disguise view).",
+            centre,
+            width,
+            () => RunCommand("view")
+        );
 
         centre += width + ButtonGap;
-        _ = Command(gui, parent, "Flight", centre, width, () => RunCommand("fly"));
+        _ = Command(
+            gui,
+            parent,
+            "Flight",
+            "Raise the costume for everyone who draws you, up to 100 m - your own body stays on the ground (disguise fly).",
+            centre,
+            width,
+            () => RunCommand("fly")
+        );
 
         centre += width + ButtonGap;
-        s_favorite = Command(gui, parent, DescribeFavorite(), centre, width, ToggleFavorite);
+        s_favorite = Command(
+            gui,
+            parent,
+            DescribeFavorite(),
+            "Mark the prefab named on the line above, or take the mark off - favorites are what the Favorites box shows (disguise favorite).",
+            centre,
+            width,
+            ToggleFavorite
+        );
     }
 
     /// <summary>One button of the command row; its label Text is returned for the toggle.</summary>
@@ -379,6 +439,7 @@ internal static class GuiWindow
         GUIManager gui,
         Transform parent,
         string label,
+        string help,
         float centreX,
         float width,
         UnityAction onClick
@@ -393,6 +454,7 @@ internal static class GuiWindow
             width,
             ButtonHeight
         );
+        GuiHelp.Watch(body, help);
         Button? button = body.GetComponent<Button>();
         if (button != null)
         {

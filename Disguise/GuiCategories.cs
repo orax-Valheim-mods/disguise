@@ -109,8 +109,23 @@ internal static class GuiCategories
             bool shown = ShownAt(i);
             s_applied[i] = shown;
             int captured = i;
+
+            // What this box is for, on the help line (GuiHelp): the first one is about marks
+            // rather than a category and says so, the six others are the list's filter.
+            string help =
+                i == 0
+                    ? "Show the marked prefabs only - the six boxes are ignored while this one is on, so the list becomes a favorites list."
+                    : $"Filter the list to {TitleAt(i)}: every box can be on at once, and \"disguise list\" in the console prints every category whatever the boxes say.";
             s_toggles.Add(
-                BuildBox(parent, ref cursor, y, TitleAt(i), shown, on => OnToggled(captured, on))
+                BuildBox(
+                    parent,
+                    ref cursor,
+                    y,
+                    TitleAt(i),
+                    help,
+                    shown,
+                    on => OnToggled(captured, on)
+                )
             );
         }
     }
@@ -124,14 +139,18 @@ internal static class GuiCategories
     /// the box, so the hit target is the whole line and there is only one path to what the
     /// box writes. The listener comes from the caller: this is also how GuiWindow builds the
     /// sparkle box, the same control standing on its own with its own entry to write and no
-    /// list to re-filter. Returns null when Jotunn's box carries no Toggle, which is a build
-    /// that could never be clicked and is therefore worth no entry in the row either.
+    /// list to re-filter. Both halves of the line are given the help they describe (GuiHelp):
+    /// they are two objects, and the event system stops at the first one that handles the
+    /// pointer - the label, which carries the Button. Returns null when Jotunn's box carries
+    /// no Toggle, which is a build that could never be clicked and is therefore worth no
+    /// entry in the row either.
     /// </summary>
     internal static Toggle? BuildBox(
         Transform parent,
         ref float cursor,
         float y,
         string title,
+        string help,
         bool value,
         Action<bool> onToggled
     )
@@ -181,6 +200,12 @@ internal static class GuiCategories
             }
         }
         cursor += labelWidth + ItemGap;
+
+        // The help line, on both halves of the checkbox: the pointer lands on whichever of
+        // the two it really is over, and the event system stops at the first object that
+        // handles it (the label, which carries the Button).
+        GuiHelp.Watch(box, help);
+        GuiHelp.Watch(label, help);
 
         Toggle? toggle = box.GetComponent<Toggle>();
         if (toggle == null)

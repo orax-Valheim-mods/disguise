@@ -154,6 +154,7 @@ internal static class DisguiseGui
         GuiPreview.Forget();
         GuiPose.Forget();
         GuiStatus.Forget();
+        GuiHelp.Forget();
         CreaturePreview.Forget();
         ReleaseMouse();
     }
@@ -350,6 +351,7 @@ internal static class DisguiseGui
         GuiPreview.Forget();
         GuiPose.Forget();
         GuiStatus.Forget();
+        GuiHelp.Forget();
         CreaturePreview.Forget();
         ReleaseMouse();
     }

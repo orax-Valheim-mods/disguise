@@ -40,6 +40,14 @@ internal static class GuiPose
 
     private const float FieldGap = 6f;
 
+    /// <summary>
+    /// What the six fields are for, one line for both rows: the axis letters are all a field
+    /// says by itself, and what it does with a number is the same in the two rows (the help
+    /// line, GuiHelp).
+    /// </summary>
+    private const string FieldHelp =
+        "One axis: a number - \"1.5\" and \"1,5\" both land - applied as you type, while a half-typed one keeps the value the field had.";
+
     private static readonly InputField?[] s_offsetFields = new InputField?[3];
 
     private static readonly InputField?[] s_rotationFields = new InputField?[3];
@@ -66,13 +74,24 @@ internal static class GuiPose
         Forget();
 
         GUIManager gui = GUIManager.Instance;
-        BuildRow(gui, parent, x, y, "Offset (m)", s_offsetFields, PoseControl.Offset, OnOffset);
+        BuildRow(
+            gui,
+            parent,
+            x,
+            y,
+            "Offset (m)",
+            "Where the costume stands, in metres, away from your player - your own body never moves, only what the machines draw of it.",
+            s_offsetFields,
+            PoseControl.Offset,
+            OnOffset
+        );
         BuildRow(
             gui,
             parent,
             x,
             y - RowHeight - RowGap,
             "Rotation (deg)",
+            "How far the costume turns around each axis, in degrees - the player itself is never turned.",
             s_rotationFields,
             PoseControl.Euler,
             OnRotation
@@ -91,12 +110,13 @@ internal static class GuiPose
         float x,
         float y,
         string label,
+        string help,
         InputField?[] fields,
         Vector3 value,
         Action<int, string> onText
     )
     {
-        _ = GuiWindow.Label(
+        GameObject labelBody = GuiWindow.Label(
             gui,
             label,
             parent,
@@ -112,6 +132,7 @@ internal static class GuiPose
             LabelWidth,
             RowHeight
         );
+        GuiHelp.Watch(labelBody, help);
 
         for (int axis = 0; axis < 3; axis++)
         {
@@ -140,6 +161,7 @@ internal static class GuiPose
                 rect.pivot = new Vector2(0f, 1f);
                 rect.anchoredPosition = new Vector2(fieldX, y);
             }
+            GuiHelp.Watch(body, FieldHelp);
 
             InputField? field = body.GetComponent<InputField>();
             if (field == null)

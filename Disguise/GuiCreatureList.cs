@@ -191,6 +191,10 @@ internal static class GuiCreatureList
         RectTransform fieldRect = field.GetComponent<RectTransform>();
         fieldRect.pivot = new Vector2(0f, 1f);
         fieldRect.anchoredPosition = new Vector2(x, y);
+        GuiHelp.Watch(
+            field,
+            "Keep only the rows whose name contains what you type - a new list starts at its first row."
+        );
 
         // The Clear button, at the right of the field and as tall as it: Jotunn's own button
         // (the Valheim style the command row uses), its position the CENTRE of the box - the
@@ -211,6 +215,7 @@ internal static class GuiCreatureList
         {
             clearButton.onClick.AddListener(ClearFilter);
         }
+        GuiHelp.Watch(clear, "Erase the filter and show every row the boxes allow.");
 
         float listY = y - FilterHeight - Spacing;
         GameObject scroll = gui.CreateScrollView(

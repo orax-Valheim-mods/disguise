@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace Disguise;
 
 /// <summary>
-/// The line at the bottom of the window: the hint about clicking a row while nothing has
+/// The line under the pose rows: the hint about clicking a row while nothing has
 /// happened yet, and the answer of the last command button after that.
 ///
 /// One command can print several lines to the console - "disguise disable" goes on with two
@@ -16,7 +16,10 @@ namespace Disguise;
 /// read.
 ///
 /// The answer stays until the next button, and the hint comes back with the next window, so
-/// there is nothing to do per frame: this class only holds the label.
+/// there is nothing to do per frame: this class only holds the label. The help line
+/// (GuiHelp) closes the window under it, which is the reason the panel is 40 px taller than
+/// it was - this box sits at the very same -572..-616 it has always had (StatusY grew by
+/// those 40, the box being anchored to the bottom edge).
 /// </summary>
 internal static class GuiStatus
 {
@@ -25,10 +28,14 @@ internal static class GuiStatus
         "Click a row: the creature is set and applied at once - the same as \"disguise set <name>\".";
 
     /// <summary>
-    /// Bottom line of the window, centred: 44 px are two lines of 16 px, so a long answer
-    /// wraps instead of being cut in the middle of its first one.
+    /// The centre of the box as a height from the BOTTOM edge of the panel, which is what it
+    /// is anchored to: 44 px are two lines of 16 px, so a long answer wraps instead of being
+    /// cut in the middle of its first one. 76 puts the box at -572..-616 on a panel 670 tall
+    /// - the very place 36 gave it on the 630 it used to be, this being the 40 px the help
+    /// line (GuiHelp) took under it: anchored to the edge, the line would otherwise have
+    /// moved down with it and stood in the band the help line needs.
     /// </summary>
-    private const float StatusY = 36f;
+    private const float StatusY = 76f;
 
     private const float StatusWidth = 800f;
 
@@ -57,6 +64,10 @@ internal static class GuiStatus
             StatusHeight
         );
         s_line = label.GetComponent<Text>();
+        GuiHelp.Watch(
+            label,
+            "The answer of the last command button - the \"click a row\" hint while none has been pressed yet, and the notes a command goes on printing after its headline stay in the console."
+        );
     }
 
     /// <summary>

@@ -96,8 +96,11 @@ picture - `Enable` / `Disable` (a toggle: its label is the action of the moment)
 `Own view`, `Flight` and `Add favorite` / `Remove favorite` (a toggle as well, acting on the
 prefab selected in the window - the one the state line names, and the very call
 `disguise favorite` makes with no name), each one running its sub-command like the console would and writing
-its answer on the status line at the bottom, which holds the "click a row" hint before the
-first press - between those buttons and that line sits the **`Hide item sparkle` box**, the
+its answer on the status line under them, which holds the "click a row" hint before the
+first press - and, closing the window under that line, the **help line**, which holds what
+the element the pointer is on is for (one sentence per control, and an idle line about
+dragging the panel while the pointer rests on nothing that describes itself) - between those
+buttons and the status line sits the **`Hide item sparkle` box**, the
 same checkbox as the row above though it gates no list: it writes `HideItemSparkle` (`4 - Own
 view`), so an **item** costume then stands without the shimmer every dropped-item prefab
 carries, on your own screen and in the picture - those two only, a machine running no DLL
