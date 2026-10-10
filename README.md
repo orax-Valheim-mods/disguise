@@ -384,10 +384,16 @@ flight lifts the costume by, in metres with one decimal: `0.0` while the flight 
 (`Disable` puts the height back to 0), the height it is clamped to (0..100) while it is on,
 so the figure is 0 or more and never negative - a raise, not a position: the player and its
 Y never move, only what the machines draw does - and the **size** of that prefab, in metres:
-width, height and depth of one box around every mesh it draws (`PrefabResolver.CreatureSize`,
-the same meshes the preview frames itself with, particles and trails left out because they
-are effects the costume spawns rather than the costume), measured once on the prefab asset
-and cached against its hash - never an instance, nothing is created to find out - and left
+width, height and depth of one box around every mesh it really draws
+(`PrefabResolver.CreatureSize`, which shares the preview's own rule - `CreaturePreview.DrawsMesh`
+and `DrawnBounds`: particles and trails are effects the costume spawns rather than the costume,
+a mesh on a GameObject the prefab leaves inactive is drawn by nothing, and a skinned mesh is
+measured from its pose and not from the bind-pose box saved with the prefab), measured once on
+the prefab asset and cached against its hash - never an instance, nothing is created to find
+out. The box is taken where the machines will draw the costume, its root at the origin and its
+scale still in it, rather than where the authoring scene parked the asset: `CookedEgg` stands
+50 m up with a spare mesh 50 m below itself, and a box measured in the scene's units called
+that egg 50 m tall. It is left
 out of the line while the prefab has no mesh to measure. It reads `height` rather than `offset`
 because the **Offset row below** is a different thing (the pose of the costume, described
 just after the list): the line stays about the flight alone. The flight values are the two
@@ -1162,8 +1168,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   height is the raise the flight owns, in metres with one decimal, `0.0` while it is off and
   never below 0 (`FlightControl` clamps it to 0..100); it is named after the flight and not
   after the pose, whose own `Offset` row is a different thing; the size is width, height and
-  depth of the configured prefab's meshes, measured once on the prefab asset and cached
-  against its hash (`PrefabResolver.CreatureSize`), left out while there is no mesh to
+  depth of the meshes the configured prefab really draws, measured once on the prefab asset
+  and cached against its hash (`PrefabResolver.CreatureSize`, which shares the preview's rule
+  with it and takes the box in the costume's own space, so the asset's parking place has no
+  say), left out while there is no mesh to
   measure; the Text
   is best-fit, so a long prefab name shrinks instead of running past the window, and
   `RefreshState` writes it only when the words changed: once per frame while the window is

@@ -256,24 +256,7 @@ internal static class CreaturePreview
         for (int i = 0; i < renderers.Length; i++)
         {
             Renderer renderer = renderers[i];
-            // Only what is really DRAWN is what has to fit. Particles and trails are not the
-            // creature (framing on their bounds would shrink it into a corner of the
-            // picture), and neither is a mesh Unity still measures but never draws: one on a
-            // GameObject the prefab leaves inactive (a sail kept furled, a spare part), one
-            // told to draw no colour at all, one kept for its shadow only. Those have bounds
-            // all the same, and one of them is what a chest and a ship were being framed on -
-            // the chest they really are then filling a fifth of the picture.
-            if (
-                renderer == null
-                || !renderer.enabled
-                || renderer.forceRenderingOff
-                || !renderer.gameObject.activeInHierarchy
-                || renderer.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly
-            )
-            {
-                continue;
-            }
-            if (renderer is not MeshRenderer && renderer is not SkinnedMeshRenderer)
+            if (!DrawsMesh(renderer))
             {
                 continue;
             }
@@ -342,6 +325,29 @@ internal static class CreaturePreview
     }
 
     /// <summary>
+    /// Whether this renderer draws something the picture has to fit: a mesh Unity really
+    /// draws - not a particle or a trail (those are effects the costume spawns, not the
+    /// costume, and a puff of smoke would otherwise be the size of the creature), and not a
+    /// mesh Unity still measures but never draws: one on a GameObject the prefab leaves
+    /// inactive (a sail kept furled, a spare part, the second mesh of an item), one told to
+    /// draw no colour at all, one kept for its shadow only. Those have bounds all the same,
+    /// and one of them is what a chest and a ship were being framed on - the chest they
+    /// really are then filling a fifth of the picture.
+    ///
+    /// The size on the status line promises this very rule (PrefabResolver.CreatureSize), so
+    /// it lives where both of them can reach it rather than being written twice.
+    /// </summary>
+    internal static bool DrawsMesh(Renderer renderer)
+    {
+        return renderer != null
+            && renderer.enabled
+            && !renderer.forceRenderingOff
+            && renderer.gameObject.activeInHierarchy
+            && renderer.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly
+            && (renderer is MeshRenderer || renderer is SkinnedMeshRenderer);
+    }
+
+    /// <summary>
     /// The box of what Unity is about to DRAW for one renderer - which for a skinned one is
     /// not the box it hands out, and that is a bug worth a method of its own.
     ///
@@ -357,7 +363,7 @@ internal static class CreaturePreview
     /// - the strip takes Cloth and every script, the animator is off - so the box measured
     /// here is the box of every picture the turntable takes of it.
     /// </summary>
-    private static Bounds DrawnBounds(Renderer renderer, out bool fromPose)
+    internal static Bounds DrawnBounds(Renderer renderer, out bool fromPose)
     {
         fromPose = false;
         Bounds culling = renderer.bounds;
