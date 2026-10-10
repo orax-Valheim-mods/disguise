@@ -60,6 +60,11 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<int> ConfigGuiScrollStep = null!;
 
+    // -- 6 - GUI: the OTHER way to the window - the Disguise line of the pause menu. Read
+    //    when that menu opens (PauseMenuEntry.Add) and applied at once when the value moves
+    //    (the handler bound below), which builds the line or takes it out again.
+    internal static ConfigEntry<bool> ConfigShowMenuEntry = null!;
+
     // -- 6 - GUI, the window itself: where it SITS. An offset from the middle of the screen
     //    in pixels - 0/0 is the middle, which is what a fresh install gets and what the two
     //    entries say until a window has been dragged. DisguiseGui reads the place every
@@ -337,6 +342,18 @@ internal static class DisguiseConfig
                 + "value, then press the wanted keys."
         );
 
+        ConfigShowMenuEntry = config.Bind(
+            "6 - GUI",
+            "ShowMenuEntry",
+            true,
+            "Show the \"Disguise\" line in the game's pause menu (Escape), right under the "
+                + "game's own Settings line: it opens the Disguise window, exactly like "
+                + "GuiKey and \"disguise gui\". On by default, so a player who has bound no "
+                + "shortcut at all still has a way to reach the window from the game itself. "
+                + "Off, the pause menu only holds the game's own lines. Read every time that "
+                + "menu opens, and applied at once when this changes."
+        );
+
         ConfigGuiScrollStep = config.Bind(
             "6 - GUI",
             "GuiScrollStep",
@@ -447,6 +464,8 @@ internal static class DisguiseConfig
         );
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
+
+        ConfigShowMenuEntry.SettingChanged += (_, _) => PauseMenuEntry.OnSettingChanged();
     }
 
     /// <summary>

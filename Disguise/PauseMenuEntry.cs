@@ -8,7 +8,8 @@ namespace Disguise;
 
 /// <summary>
 /// The Disguise line of the pause menu: one more entry in the list Escape draws, opening
-/// the same window the GuiKey chord opens and "disguise gui" opens.
+/// the same window the GuiKey chord opens and "disguise gui" opens. `ShowMenuEntry` (6 - GUI,
+/// on by default) decides whether the line is there at all.
 ///
 /// The entry is a CLONE of the game's own Settings button - same look, same layout, same
 /// place in the list (right after it) - relabelled, and given the click it opens with. That
@@ -17,10 +18,12 @@ namespace Disguise;
 /// whole UnityEvent is thrown away and a new one put in its place. Without that, the entry
 /// would open Settings behind the window it just opened.
 ///
-/// Building it is done the first time the pause menu opens and costs one Instantiate for the
-/// whole session: the Menu of a world is built with that world, and a button built here dies
-/// with it - which the null test answers for, being Unity's own, the one that is also true
-/// of a destroyed object.
+/// The option is read every time the pause menu opens, and applied at once when it changes
+/// (the handler DisguiseConfig binds) - which is a build, or a removal with the two links of
+/// the gamepad's chain put back. An entry the option takes away is DESTROYED rather than
+/// switched off, and the chain is rewound first: Unity follows an explicit
+/// selectOnDown whether the button it points at still exists or not, so a D-pad sent to a
+/// hidden entry would simply go nowhere.
 ///
 /// Every game member this needs is PUBLIC, and all are still reached through GameAccess: the
 /// visibility audit lists every member reference the DLL makes, public or not, and this adds
@@ -38,25 +41,40 @@ internal static class PauseMenuEntry
 
     private static Menu? s_menu;
 
+    /// <summary>
+    /// What Settings pointed down to while the entry is not in the gamepad's chain: the link
+    /// the game itself wrote, kept so that taking the entry out can put it back.
+    /// </summary>
+    private static Selectable? s_belowSettings;
+
     /// <summary>True once something went wrong building the entry: the log is then silent.</summary>
     private static bool s_failed;
 
     /// <summary>
-    /// Makes sure the entry stands in the pause menu that was just opened, and that the
-    /// gamepad's up / down chain runs through it. Called from the postfix of Menu.Show, which
-    /// is also the case where the prefix stopped the menu from opening (the window was on
-    /// screen): the entry is then built or rewired inside a menu that is not shown, which
-    /// costs nothing and shows nothing.
+    /// Makes sure the pause menu that was just opened holds the entry the option asks for,
+    /// and that the gamepad's up / down chain runs through it. Called from the postfix of
+    /// Menu.Show, which is also the case where the prefix stopped the menu from opening (the
+    /// window was on screen): the entry is then built or rewired inside a menu that is not
+    /// shown, which costs nothing and shows nothing.
     /// </summary>
     internal static void Add(Menu menu)
     {
         try
         {
+            s_menu = menu;
+            if (!DisguiseConfig.ConfigShowMenuEntry.Value)
+            {
+                Forget();
+                return;
+            }
             if (s_button == null)
             {
                 s_button = Build(menu);
             }
-            WireNavigation();
+            if (s_button != null)
+            {
+                WireNavigation();
+            }
         }
         catch (Exception ex)
         {
@@ -65,6 +83,20 @@ internal static class PauseMenuEntry
                 s_failed = true;
                 Disguise.LogError($"Pause menu entry: {ex}");
             }
+        }
+    }
+
+    /// <summary>
+    /// The option moved (ConfigurationManager, the .cfg by hand): the line follows it at
+    /// once, which is one build or one removal. Nothing to do before the first Show - it
+    /// reads the option itself, and there is no menu to draw in yet.
+    /// </summary>
+    internal static void OnSettingChanged()
+    {
+        Menu? menu = s_menu;
+        if (menu != null)
+        {
+            Add(menu);
         }
     }
 
@@ -88,11 +120,12 @@ internal static class PauseMenuEntry
         {
             return; // no Settings to stand after, or the chain already holds the entry
         }
+        s_belowSettings = settings.navigation.selectOnDown;
 
         Navigation here = button.navigation;
         here.mode = Navigation.Mode.Explicit;
         here.selectOnUp = settings;
-        here.selectOnDown = settings.navigation.selectOnDown;
+        here.selectOnDown = s_belowSettings;
         button.navigation = here;
 
         Navigation after = settings.navigation;
@@ -114,7 +147,7 @@ internal static class PauseMenuEntry
         Transform? parent = settings != null ? settings.transform.parent : null;
         if (settings == null || parent == null)
         {
-            return Fail(menu, "Menu carries no Settings button to take the shape of.");
+            return Fail("Menu carries no Settings button to take the shape of.");
         }
 
         GameObject entry = UnityEngine.Object.Instantiate(settings.gameObject, parent);
@@ -125,7 +158,7 @@ internal static class PauseMenuEntry
         if (button == null)
         {
             UnityEngine.Object.Destroy(entry);
-            return Fail(menu, "The button taken as a shape carries no Button.");
+            return Fail("The button taken as a shape carries no Button.");
         }
 
         button.onClick = new Button.ButtonClickedEvent(); // the prefab's own clicks go with it
@@ -137,9 +170,37 @@ internal static class PauseMenuEntry
         // is laid out by sibling index, and the chain above is written with the same shape.
         entry.transform.SetSiblingIndex(settings.transform.GetSiblingIndex() + 1);
 
-        s_menu = menu;
         Disguise.LogInfo($"Pause menu: entry added ({EntryLabel}).");
         return button;
+    }
+
+    /// <summary>
+    /// The line the option took off the menu: its two links are gone from the gamepad's
+    /// chain first (a link to a destroyed button is still followed), then the clone itself.
+    /// </summary>
+    private static void Forget()
+    {
+        Button? button = s_button;
+        s_button = null;
+        if (button == null)
+        {
+            return;
+        }
+
+        Button? settings = GameAccess.GetMenuSettingsButton(s_menu);
+        if (settings != null && settings.navigation.selectOnDown == button)
+        {
+            Navigation after = settings.navigation;
+            after.selectOnDown = s_belowSettings;
+            settings.navigation = after;
+        }
+        Navigation here = button.navigation;
+        here.selectOnUp = null;
+        here.selectOnDown = null;
+        button.navigation = here;
+
+        Disguise.LogInfo("Pause menu: entry removed (ShowMenuEntry is off).");
+        UnityEngine.Object.Destroy(button.gameObject);
     }
 
     /// <summary>
@@ -165,14 +226,13 @@ internal static class PauseMenuEntry
     }
 
     /// <summary>One line in the log, and no entry at all.</summary>
-    private static Button? Fail(Menu menu, string reason)
+    private static Button? Fail(string reason)
     {
         if (!s_failed)
         {
             s_failed = true;
             Disguise.LogWarning($"Pause menu: no Disguise entry - {reason}");
         }
-        s_menu = menu;
         return null;
     }
 }

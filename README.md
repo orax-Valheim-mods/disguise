@@ -347,7 +347,8 @@ ground.
 **GUI section** (`6 - GUI`) - the Disguise window, built with **Jotunn**'s Valheim-styled
 controls (Jotunn is a hard dependency of this mod, § 1). Three things open it: `GuiKey`
 (toggles), the console (`disguise gui [on|off]`, same thing), and a **`Disguise` line in the
-pause menu** - while `Escape` closes it like the Close button, the pause menu staying out of
+pause menu** (`ShowMenuEntry`, `true` by default: off, the pause menu only holds the game's
+own lines) - while `Escape` closes it like the Close button, the pause menu staying out of
 that press (`Patch_MenuShow` blocks `Menu.Show` for that frame only, or the game would pause
 on the same key) and the next Escape opening it as usual. That pause menu line is the game's
 own menu drawn one line longer (`PauseMenuEntry`): the entry is a **clone of the Settings
@@ -357,10 +358,14 @@ unpauses the game and hands the cursor back) before the window opens exactly as 
 opens it. The click the clone was born with is not cleared but **replaced**: a `Button` also
 carries the listeners its prefab wired into it, which `RemoveAllListeners` leaves alone, so
 the whole event goes and Settings cannot open behind the window the entry has just opened.
-The entry is built the first time the pause menu opens and lives as long as that world's menu
-(one `Instantiate`, and a new one after a scene change), and the gamepad's up / down chain is
-wired through it after every open (`Patch_MenuNavigation`), so a D-pad reaches it exactly
-where it stands. The title row carries the chord itself, between the title and
+The option is read every time the pause menu opens and applied at once when it changes -
+ConfigurationManager over the pause menu moves the line on the spot. The entry is built the
+first time the menu opens and lives as long as that world's menu (one `Instantiate`, and a new
+one after a scene change), and a line the option takes away is **destroyed** rather than
+switched off: the gamepad's chain is rewound first, because Unity follows an explicit
+`selectOnDown` whether the button at its other end still exists or not, so a D-pad sent to a
+hidden entry would simply go nowhere. That chain runs through the entry after every open
+(`Patch_MenuNavigation`), so a D-pad reaches it exactly where it stands. The title row carries the chord itself, between the title and
 Close: `Open / close` over the current value of `GuiKey` (read from the config at every open,
 `Not set` when it is empty), so the window always says how to call it back. The whole panel
 is **draggable** (Jotunn's `DragWindowCntrl`: take hold of the wood anywhere that is not a
@@ -584,6 +589,7 @@ count on its own, and one exit to the menu would leave the cursor free in every 
 |---|---|---|
 | `GuiKey` | *(none)* | Open / close the window (a BepInEx shortcut like the flight keys, recorded in ConfigurationManager, section `6 - GUI`, and shown on the title row of the window itself - **unbound** by default, the pause menu's `Disguise` line and `disguise gui` opening it instead). `Escape` also closes it, and the pause menu waits for the next press - whose own list carries a `Disguise` line opening it too (§ 2) |
 | `GuiScrollStep` | `3000` | Pixels the prefab list moves per mouse wheel notch (section `6 - GUI`). Read every frame while the window is open, so a change takes effect at once; `0` holds the list still and a negative value inverts the wheel. uGUI defaults to `1` - one pixel per notch, which is what makes an unconfigured list crawl |
+| `ShowMenuEntry` | `true` | Show the `Disguise` line of the **pause menu** (§ 2), standing right under the game's own Settings line and opening the window - the way a player who has bound no `GuiKey` reaches it. Off, the pause menu holds only the game's own lines. Read when the menu opens, and applied at once when it changes |
 | `WindowX` | `0` | Where the window sits, **left to right**: pixels away from the CENTRE of the screen (section `6 - GUI`). `0` = centred, and it is the default - a window nobody has dragged opens in the middle. Written back when the window closes (a drag writes it, and the place read every frame is what goes in), put on the panel when it opens, and kept on screen when read, so a hand-typed value or a change of resolution cannot leave the window outside the monitor |
 | `WindowY` | `0` | Where the window sits, **bottom to top**: pixels ABOVE the centre of the screen, a negative value putting it lower. `0` = centred (the default); with `WindowX` it is the whole place of the window, remembered from one session to the next exactly like it |
 | `ShowStatic` | `false` | Show the **static** prefabs in the window's list: every vanilla prefab **without** `ZSyncTransform` (walls, floors, furniture, trees, rocks). A machine with no DLL of ours draws them once where their object was created and never moves them again, so a costume of that kind stays where you changed it for a vanilla client (§ 3) |
@@ -1186,11 +1192,16 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   opening behind the window the entry just opened). The click closes the pause menu through
   `GameAccess.HideMenu` - `Menu.Hide`, the game's own hand, which also unpauses and hands the
   cursor back to the window about to open - and then opens that window with the very
-  `DisguiseGui.Toggle` the chord uses, so the two ways of opening it can never disagree. Built
-  the first time the pause menu opens (one `Instantiate` for a whole world, a new one after a
-  scene change, the null test being Unity's own - true of a destroyed object as well), and
-  `WireNavigation` puts the entry back into the gamepad's up / down chain after every rewire
-  of the menu's own, idempotently: a chain that already holds the entry is left as it is.
+  `DisguiseGui.Toggle` the chord uses, so the two ways of opening it can never disagree. The
+  line is only there while `ShowMenuEntry` (`6 - GUI`, on by default) is: the value is read at
+  every open of the menu and applied at once when it changes, which builds the line or takes it
+  out - DESTROYED, not hidden, and with the two links it had in the gamepad's chain rewound
+  first to the ones the menu wrote itself (a chain pointing at a button that no longer exists
+  is still followed, and a D-pad then goes nowhere). Built the first time the pause menu opens
+  (one `Instantiate` for a whole world, a new one after a scene change, the null test being
+  Unity's own - true of a destroyed object as well), and `WireNavigation` puts the entry back
+  into the gamepad's up / down chain after every rewire of the menu's own, idempotently: a
+  chain that already holds the entry is left as it is.
 - `GuiWindow.cs` - what goes INSIDE the window and where: Jotunn's wood panel (draggable, and
   `Place` first puts it where the config says - `WindowX` / `WindowY`, an offset from the
   middle of the screen, `0`/`0` being that middle and the default - then keeps it on screen
@@ -1505,6 +1516,7 @@ so the count of twenty-four stays correct.
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
 | A prefab like `Abomination_attack1` or `wraith_melee` is missing from the list | Normal, and no accident: those are the creature's own **attack helpers** and zones - registered `Item` prefabs with **no mesh anywhere**, which is why the log says `Preview: <name> has no mesh to show.` when one is pointed at. The catalogue drops them with every other prefab nothing could be drawn of (a spawner, a blob's AoE): they would be an empty picture in the window and an invisible viking in the world (§ 6). `disguise set <name>` still takes one typed by hand |
 | The shimmer beside an item costume is still there | `HideItemSparkle` only reaches what **this machine** draws: your own costume (`SeeYourDisguise`, § 2) and the picture of the window - so tick `Hide item sparkle` under the command buttons (or write `HideItemSparkle = true` in the `.cfg`) and both drop it at once, the clone being rebuilt rather than repaired. A machine with no DLL of ours builds your **real item prefab** from the network, where the particle system is baked into the prefab and no setting of ours exists to turn it off; a machine running the DLL draws a real `Player` for you and never your costume (§ 3), so there is nothing of yours there to shimmer |
+| The pause menu has no `Disguise` line | `ShowMenuEntry` is off (`6 - GUI`, on by default). Set it back to `true` and the line comes back at the next opening of the pause menu - at once, if that menu is on screen while ConfigurationManager changes it. The line is there in the main menu too, where the window only says `the prefab list is available in game` until a world is loaded |
 | Opening the window takes a noticeable moment | Two things cost, and the log says both: `GUI: <n> name(s) in <ms> ms, <built> of <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The catalogue is the walk that tags every vanilla prefab with its kind - up to ten component tests, and exactly ONCE: the walk skips them when all it was asked for is names, and the window does that one pass for its own rows. The rows are Jotunn buttons of four objects each, and only the categories the boxes have ON get one at the opening; a category switched on later is built then, once (in the order of the list), and a row is never destroyed, so switching back and forth stays a `SetActive`. The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log) |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
 
