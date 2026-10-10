@@ -357,7 +357,7 @@ internal static class CreaturePreview
     /// there was when the two were measured with that one call. Walking the parents reads the
     /// prefab's own idea of what is on, which is the one a copy is built with.
     /// </summary>
-    private static bool SwitchedOn(Transform transform)
+    internal static bool SwitchedOn(Transform transform)
     {
         for (Transform? node = transform; node != null; node = node.parent)
         {

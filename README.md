@@ -660,7 +660,11 @@ Visual synchronisation on vanilla clients:
   while its uphill edge is buried. The relaying server therefore raises that same position
   to where the costume actually **rests**, and lays it on the ground it rests on
   (`RestOffset`): everything its colliders carry below the level your feet stand on
-  (measured once per prefab - the meshes are read only to be logged beside them), plus the
+  (measured once per prefab, and only over what the machines really **simulate**: a collider
+  on an object the prefab leaves inactive touches nothing, so it is not the ground it stands
+  on - `CookedEgg` and `MushroomYellow` each ship such a spare with a collider fifty metres
+  below themselves, which asked for the lift of a costume a metre deep and left both
+  floating - the meshes are read only to be logged beside them), plus the
   part of the ground under that footprint which the plane fitted over it cannot explain,
   plus the clearance that keeps it from touching at all. Two different asks of the ground:
   the **tilt** follows the fitted plane only while the terrain is what the costume rests on

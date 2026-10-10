@@ -890,6 +890,14 @@ internal static class RestOffset
     /// are left out entirely - they carry no MeshFilter, their bounds live in bind space
     /// rather than in the object's, and what they hang lowest (a sail, a cape) is never the
     /// resting point.
+    ///
+    /// Only what the machines really SIMULATE is measured, which is a narrower thing than
+    /// everything the prefab carries: a collider on a GameObject the prefab leaves inactive
+    /// touches nothing and can never push a costume out of the ground, and one switched off is
+    /// not in the solver's shapes either. Items ship such a spare all the same - CookedEgg and
+    /// MushroomYellow each carry a second mesh, "pie (1)", with a collider fifty metres below
+    /// their own pivot - and counting those asked for the lift of a costume a metre deep: the
+    /// cap, every time, with the costume floating over the ground it should rest on.
     /// </summary>
     private static Vector2 Measure(GameObject prefab, out float meshLowest)
     {
@@ -901,11 +909,19 @@ internal static class RestOffset
 
         foreach (Transform child in prefab.GetComponentsInChildren<Transform>(true))
         {
+            if (!CreaturePreview.SwitchedOn(child))
+            {
+                continue;
+            }
             Matrix4x4 local = toRoot * child.localToWorldMatrix;
 
             Collider[] colliders = child.GetComponents<Collider>();
             for (int i = 0; i < colliders.Length; i++)
             {
+                if (!colliders[i].enabled)
+                {
+                    continue;
+                }
                 if (
                     !TryShape(
                         colliders[i],
