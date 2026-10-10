@@ -79,7 +79,7 @@ internal static class GuiCategories
     /// <summary>Jotunn never sets a pivot: it stays in the middle, so a position IS a centre.</summary>
     private static readonly Vector2 Centre = new Vector2(0.5f, 0.5f);
 
-    private static readonly List<Toggle> s_toggles = new();
+    private static readonly List<Toggle?> s_toggles = new();
 
     /// <summary>What the boxes showed last, so Sync only reacts to a real change.</summary>
     private static readonly bool[] s_applied = new bool[BoxCount];
@@ -95,12 +95,12 @@ internal static class GuiCategories
     /// gap before the next box is the same whatever the word is). The row grows right from
     /// the list's x and stops well inside the window: seven short labels never reach
     /// GuiWindow.Width - 24 of margin (the widest of them, "Creatures" or "Favorites", is
-    /// the one to watch).
+    /// the one to watch). One box per entry is built by BuildBox, which this row shares with
+    /// GuiWindow's sparkle box.
     /// </summary>
     internal static void Build(Transform parent, float x, float y)
     {
         Forget();
-        GUIManager gui = GUIManager.Instance;
         s_appliedFavorites = DisguiseConfig.ConfigFavorites.Value ?? string.Empty;
 
         float cursor = x;
@@ -108,73 +108,100 @@ internal static class GuiCategories
         {
             bool shown = ShownAt(i);
             s_applied[i] = shown;
-
-            GameObject box = gui.CreateToggle(parent, BoxSize, BoxSize);
-            RectTransform boxRect = box.GetComponent<RectTransform>();
-            if (boxRect != null)
-            {
-                // CreateToggle parents with worldPositionStays, which leaves the box wherever
-                // the window happens to be: anchors and position are written afterwards, the
-                // way GuiCreatureList corrects its own field.
-                boxRect.anchorMin = Anchor;
-                boxRect.anchorMax = Anchor;
-                boxRect.pivot = Centre;
-                boxRect.anchoredPosition = new Vector2(cursor + (BoxSize * 0.5f), y);
-            }
-            cursor += BoxSize + InnerGap;
-
-            GameObject label = GuiWindow.Label(
-                gui,
-                TitleAt(i),
-                parent,
-                Anchor,
-                new Vector2(cursor, y),
-                gui.AveriaSerif,
-                LabelFontSize,
-                gui.ValheimBeige,
-                40f,
-                LabelHeight
+            int captured = i;
+            s_toggles.Add(
+                BuildBox(parent, ref cursor, y, TitleAt(i), shown, on => OnToggled(captured, on))
             );
-            Text? text = label.GetComponent<Text>();
-            float labelWidth = 40f;
-            if (text != null)
+        }
+    }
+
+    /// <summary>
+    /// Builds ONE checkbox - its box, then its label sized to the text it really has
+    /// (measured through Text.preferredWidth, so the gap before the next box is the same
+    /// whatever the word is) - starting at the cursor given, with y the CENTRE of the row,
+    /// and returns the cursor after it: the rhythm the row above walks, one call per box.
+    /// Box and label are ONE checkbox - the label carries a transitionless Button that flips
+    /// the box, so the hit target is the whole line and there is only one path to what the
+    /// box writes. The listener comes from the caller: this is also how GuiWindow builds the
+    /// sparkle box, the same control standing on its own with its own entry to write and no
+    /// list to re-filter. Returns null when Jotunn's box carries no Toggle, which is a build
+    /// that could never be clicked and is therefore worth no entry in the row either.
+    /// </summary>
+    internal static Toggle? BuildBox(
+        Transform parent,
+        ref float cursor,
+        float y,
+        string title,
+        bool value,
+        Action<bool> onToggled
+    )
+    {
+        GUIManager gui = GUIManager.Instance;
+
+        GameObject box = gui.CreateToggle(parent, BoxSize, BoxSize);
+        RectTransform boxRect = box.GetComponent<RectTransform>();
+        if (boxRect != null)
+        {
+            // CreateToggle parents with worldPositionStays, which leaves the box wherever
+            // the window happens to be: anchors and position are written afterwards, the
+            // way GuiCreatureList corrects its own field.
+            boxRect.anchorMin = Anchor;
+            boxRect.anchorMax = Anchor;
+            boxRect.pivot = Centre;
+            boxRect.anchoredPosition = new Vector2(cursor + (BoxSize * 0.5f), y);
+        }
+        cursor += BoxSize + InnerGap;
+
+        GameObject label = GuiWindow.Label(
+            gui,
+            title,
+            parent,
+            Anchor,
+            new Vector2(cursor, y),
+            gui.AveriaSerif,
+            LabelFontSize,
+            gui.ValheimBeige,
+            40f,
+            LabelHeight
+        );
+        Text? text = label.GetComponent<Text>();
+        float labelWidth = 40f;
+        if (text != null)
+        {
+            // Measured, so the air before the next box is the same whatever the word is;
+            // and a hit target again (Jotunn switches raycasting off on every label), so
+            // the whole line - the word too - is the checkbox, not only the little box.
+            text.raycastTarget = true;
+            labelWidth = Mathf.Max(text.preferredWidth, 8f) + LabelPadding;
+            RectTransform labelRect = label.GetComponent<RectTransform>();
+            if (labelRect != null)
             {
-                // Measured, so the air before the next box is the same whatever the word is;
-                // and a hit target again (Jotunn switches raycasting off on every label), so
-                // the whole line - the word too - is the checkbox, not only the little box.
-                text.raycastTarget = true;
-                labelWidth = Mathf.Max(text.preferredWidth, 8f) + LabelPadding;
-                RectTransform labelRect = label.GetComponent<RectTransform>();
-                if (labelRect != null)
-                {
-                    labelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, labelWidth);
-                    labelRect.anchoredPosition = new Vector2(cursor + (labelWidth * 0.5f), y);
-                }
-            }
-            cursor += labelWidth + ItemGap;
-
-            Toggle? maybeToggle = box.GetComponent<Toggle>();
-            if (maybeToggle != null)
-            {
-                Toggle toggle = maybeToggle;
-
-                // isOn first, the listener after: writing the value must not fire the toggle.
-                toggle.isOn = shown;
-                int captured = i;
-                toggle.onValueChanged.AddListener(on => OnToggled(captured, on));
-                s_toggles.Add(toggle);
-
-                // The label flips the box instead of carrying a second path of its own: the
-                // box's listener then does what it always does (config, list, one Refilter).
-                // No transition of any kind - the word must not look like a button.
-                Button labelButton = label.AddComponent<Button>();
-                labelButton.transition = Selectable.Transition.None;
-                labelButton.onClick.AddListener(() =>
-                {
-                    toggle.isOn = !toggle.isOn;
-                });
+                labelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, labelWidth);
+                labelRect.anchoredPosition = new Vector2(cursor + (labelWidth * 0.5f), y);
             }
         }
+        cursor += labelWidth + ItemGap;
+
+        Toggle? toggle = box.GetComponent<Toggle>();
+        if (toggle == null)
+        {
+            return null;
+        }
+
+        // isOn first, the listener after: writing the value must not fire the toggle.
+        toggle.isOn = value;
+        toggle.onValueChanged.AddListener(on => onToggled(on));
+
+        // The label flips the box instead of carrying a second path of its own: the
+        // box's listener then does what it always does (whatever the caller wrote).
+        // No transition of any kind - the word must not look like a button.
+        Button labelButton = label.AddComponent<Button>();
+        labelButton.transition = Selectable.Transition.None;
+        labelButton.onClick.AddListener(() =>
+        {
+            toggle.isOn = !toggle.isOn;
+        });
+        return toggle;
     }
 
     /// <summary>Drops the boxes (the window is gone: Unity-null is the whole safety here).</summary>
