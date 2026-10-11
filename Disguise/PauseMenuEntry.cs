@@ -235,16 +235,8 @@ internal static class PauseMenuEntry
     /// </summary>
     private static void SetLabel(GameObject entry)
     {
-        TMP_Text? mesh = entry.GetComponentInChildren<TMP_Text>(true);
-        if (mesh != null && !string.Equals(mesh.text, EntryLabel, StringComparison.Ordinal))
-        {
-            mesh.text = EntryLabel;
-        }
-        Text? text = entry.GetComponentInChildren<Text>(true);
-        if (text != null && !string.Equals(text.text, EntryLabel, StringComparison.Ordinal))
-        {
-            text.text = EntryLabel;
-        }
+        GuiText.Set(entry.GetComponentInChildren<TMP_Text>(true), EntryLabel);
+        GuiText.Set(entry.GetComponentInChildren<Text>(true), EntryLabel);
     }
 
     /// <summary>One line in the log, and no entry at all.</summary>

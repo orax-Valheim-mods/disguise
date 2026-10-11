@@ -272,7 +272,7 @@ internal static class GuiCreatureList
             18,
             gui.ValheimBeige,
             width,
-            40f
+            GuiMetrics.RowHeight
         );
         s_noMatch = noMatch;
         noMatch.SetActive(false);
@@ -445,11 +445,7 @@ internal static class GuiCreatureList
             {
                 continue;
             }
-            string wanted = Label(name);
-            if (!string.Equals(label.text, wanted, StringComparison.Ordinal))
-            {
-                label.text = wanted;
-            }
+            GuiText.Set(label, Label(name));
         }
     }
 

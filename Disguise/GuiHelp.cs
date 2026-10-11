@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using Jotunn.Managers;
 using UnityEngine;
 using UnityEngine.UI;
@@ -46,10 +45,6 @@ internal static class GuiHelp
     /// </summary>
     private const float HelpY = 28f;
 
-    private const float HelpWidth = 800f;
-
-    private const float HelpHeight = 40f;
-
     private const int HelpFontSize = 15;
 
     /// <summary>Unity-null once the window is gone, which is the whole safety of Show.</summary>
@@ -81,8 +76,8 @@ internal static class GuiHelp
             gui.AveriaSerif,
             HelpFontSize,
             gui.ValheimBeige,
-            HelpWidth,
-            HelpHeight
+            GuiMetrics.LineWidth,
+            GuiMetrics.RowHeight
         );
         Text? text = label.GetComponent<Text>();
         if (text != null)
@@ -143,7 +138,7 @@ internal static class GuiHelp
             return;
         }
         s_owner = owner;
-        Set(label, help);
+        GuiText.Set(label, help);
     }
 
     /// <summary>
@@ -160,7 +155,7 @@ internal static class GuiHelp
             return;
         }
         s_owner = null;
-        Set(label, Idle);
+        GuiText.Set(label, Idle);
     }
 
     /// <summary>Drops the line (the window is gone: Unity-null is the whole safety here).</summary>
@@ -171,14 +166,4 @@ internal static class GuiHelp
     }
 
     // ------------------------------------------------------------------ helpers
-
-    /// <summary>Writes a line only when the words really changed.</summary>
-    private static void Set(Text label, string text)
-    {
-        if (string.Equals(label.text, text, StringComparison.Ordinal))
-        {
-            return;
-        }
-        label.text = text;
-    }
 }

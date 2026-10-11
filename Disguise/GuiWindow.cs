@@ -50,6 +50,10 @@ internal static class GuiWindow
     /// </summary>
     internal const float Height = 670f;
 
+    // The band at the very top: the title, Close and the chord all sit on it, 34 px under
+    // the top edge - one Y for the three, so the row stays a row when one of them moves.
+    private const float TitleRowY = -34f;
+
     // Left half of the window: top-left corner of the filter + list block, and its size.
     private const float ListX = 24f;
 
@@ -96,14 +100,12 @@ internal static class GuiWindow
     // The command row, as wide as the picture above it: CommandCount buttons of equal width.
     private const int CommandCount = 5;
 
-    private const float ButtonHeight = 40f;
-
     private const float ButtonGap = 6f;
 
     private const float ButtonTop = PreviewY - CreaturePreview.PictureHeight - PreviewGap;
 
     /// <summary>Centre of the row, given to CreateButton as a position of the window.</summary>
-    private const float ButtonY = ButtonTop - (ButtonHeight * 0.5f);
+    private const float ButtonY = ButtonTop - (GuiMetrics.RowHeight * 0.5f);
 
     /// <summary>
     /// Centre of the sparkle box (HideItemSparkle): the right half of the window has 94 px
@@ -185,7 +187,7 @@ internal static class GuiWindow
             "Disguise",
             window.transform,
             new Vector2(0.5f, 1f),
-            new Vector2(-70f, -34f),
+            new Vector2(-70f, TitleRowY),
             gui.AveriaSerifBold,
             30,
             gui.ValheimOrange,
@@ -198,7 +200,7 @@ internal static class GuiWindow
             window.transform,
             new Vector2(1f, 1f),
             new Vector2(1f, 1f),
-            new Vector2(-72f, -34f),
+            new Vector2(-72f, TitleRowY),
             110f,
             42f
         );
@@ -222,7 +224,7 @@ internal static class GuiWindow
             "Open / close\n" + DescribeChord(),
             window.transform,
             new Vector2(1f, 1f),
-            new Vector2(-240f, -34f),
+            new Vector2(-240f, TitleRowY),
             gui.AveriaSerif,
             16,
             gui.ValheimBeige,
@@ -252,8 +254,8 @@ internal static class GuiWindow
             gui.AveriaSerif,
             20,
             gui.ValheimBeige,
-            800f,
-            40f
+            GuiMetrics.LineWidth,
+            GuiMetrics.RowHeight
         );
         Text? stateText = state.GetComponent<Text>();
         if (stateText != null)
@@ -452,7 +454,7 @@ internal static class GuiWindow
             new Vector2(0.5f, 1f),
             new Vector2(centreX, ButtonY),
             width,
-            ButtonHeight
+            GuiMetrics.RowHeight
         );
         GuiHelp.Watch(body, help);
         Button? button = body.GetComponent<Button>();
@@ -512,35 +514,9 @@ internal static class GuiWindow
     /// </summary>
     internal static void RefreshState()
     {
-        Text? label = s_state;
-        if (label != null)
-        {
-            string line = DescribeState();
-            if (!string.Equals(label.text, line, StringComparison.Ordinal))
-            {
-                label.text = line;
-            }
-        }
-
-        Text? power = s_power;
-        if (power != null)
-        {
-            string toggle = DescribePower();
-            if (!string.Equals(power.text, toggle, StringComparison.Ordinal))
-            {
-                power.text = toggle;
-            }
-        }
-
-        Text? favorite = s_favorite;
-        if (favorite != null)
-        {
-            string mark = DescribeFavorite();
-            if (!string.Equals(favorite.text, mark, StringComparison.Ordinal))
-            {
-                favorite.text = mark;
-            }
-        }
+        GuiText.Set(s_state, DescribeState);
+        GuiText.Set(s_power, DescribePower);
+        GuiText.Set(s_favorite, DescribeFavorite);
 
         Toggle? sparkle = s_sparkle;
         if (sparkle != null)

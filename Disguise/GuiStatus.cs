@@ -37,8 +37,6 @@ internal static class GuiStatus
     /// </summary>
     private const float StatusY = 76f;
 
-    private const float StatusWidth = 800f;
-
     private const float StatusHeight = 44f;
 
     /// <summary>Unity-null once the window is gone, which is the whole safety of Show.</summary>
@@ -60,7 +58,7 @@ internal static class GuiStatus
             gui.AveriaSerif,
             16,
             gui.ValheimBeige,
-            StatusWidth,
+            GuiMetrics.LineWidth,
             StatusHeight
         );
         s_line = label.GetComponent<Text>();
