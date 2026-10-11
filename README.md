@@ -1040,7 +1040,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   script plugin and loading the new DLL into a NEW assembly (fresh statics), so whatever this
   copy leaves standing is found by nobody - it lets go of the window and the mouse it captured
   (`DisguiseGui`), the clone on your own screen (`SelfView`), the pause menu's line
-  (`PauseMenuEntry`) and every Harmony patch (`UnpatchSelf`), before the logger goes with the
+  (`PauseMenuEntry`), the terrain tiles it built to read the ground (`GroundProbe`), and every
+  Harmony patch (`UnpatchSelf`), before the logger goes with the
   instance. Everything it does not share stays `private`.
 - `DisguiseConfig.cs` - the thirty-five settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection

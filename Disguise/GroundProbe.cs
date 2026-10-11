@@ -303,6 +303,29 @@ internal static class GroundProbe
     }
 
     /// <summary>
+    /// The plugin is unloading (ScriptEngine reloads it into a NEW assembly, statics and all):
+    /// every zone root built here goes with this copy, or the game keeps a Heightmap it had
+    /// registered on its own for a tile the copy loaded next builds a SECOND one for - two
+    /// heightmaps on one tile, and the ground reads answering from either of them, one more
+    /// orphan per reload. Sweep cannot be the one doing this job: it only runs from a READ,
+    /// and an unload comes precisely when there is none left to make.
+    /// </summary>
+    internal static void Cleanup()
+    {
+        foreach (
+            KeyValuePair<Vector2Int, (GameObject Root, Component Map, float Used)> entry in s_zones
+        )
+        {
+            if (entry.Value.Root != null)
+            {
+                // Heightmap.OnDestroy takes it back out of the game's own map list.
+                UnityEngine.Object.Destroy(entry.Value.Root);
+            }
+        }
+        s_zones.Clear();
+    }
+
+    /// <summary>
     /// The zone a point lies in: the body of ZoneSystem.GetZone, whose 64 m tile and +32 are
     /// hard-coded there. Replicated rather than called because the audit counts every member
     /// reference, public or not - and because the game's own position for that zone is the
