@@ -48,6 +48,14 @@ internal static class GuiPreview
 
     private static bool s_shownOption;
 
+    /// <summary>
+    /// The level the stage was dressed for (LevelSkin, at its build): a level that moves
+    /// while the picture stands makes the creature be shown again, through the same delay
+    /// and the same guard as any other change of creature - one int compared per frame, and
+    /// a new stage only on the move.
+    /// </summary>
+    private static int s_shownLevel;
+
     // ------------------------------------------------------------------ build
 
     /// <summary>
@@ -167,6 +175,20 @@ internal static class GuiPreview
             }
         }
 
+        // The level moved under a picture that is already standing: the stage was dressed
+        // for the old one, so the creature is shown AGAIN - through the same delay and the
+        // same guard as any other change of creature (s_shown emptied rather than the show
+        // called straight away, exactly like the sparkle above).
+        int level = DisguiseConfig.ConfigCreatureLevel.Value;
+        if (level != s_shownLevel)
+        {
+            s_shownLevel = level;
+            if (string.Equals(s_pending, s_shown, System.StringComparison.Ordinal))
+            {
+                s_shown = string.Empty;
+            }
+        }
+
         if (
             Time.unscaledTime >= s_dueAt
             && !string.Equals(s_pending, s_shown, System.StringComparison.Ordinal)
@@ -203,5 +225,6 @@ internal static class GuiPreview
         s_dueAt = 0f;
         s_shownSparkle = false;
         s_shownOption = false;
+        s_shownLevel = 0;
     }
 }

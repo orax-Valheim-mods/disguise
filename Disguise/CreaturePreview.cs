@@ -210,6 +210,10 @@ internal static class CreaturePreview
                 mesh.updateWhenOffscreen = true;
             }
         }
+        // The picture shows the costume as the world draws it: dressed for the configured
+        // level, its scale included - and measured by the frame that fits it to the picture,
+        // so a big one still fits.
+        LevelSkin.Apply(clone, prefab, DisguiseConfig.ConfigCreatureLevel.Value);
         return clone;
     }
 

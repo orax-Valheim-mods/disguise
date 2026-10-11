@@ -26,6 +26,14 @@ internal static class SelfView
     private static int s_ghostPrefabHash;
 
     /// <summary>
+    /// The level the clone was dressed for (LevelSkin, at its build): a level that moves
+    /// while it stands reaches the screen through a rebuild, the same way the prefab hash
+    /// above does - one int comparison per frame, and the frame the config moves on costs
+    /// one new clone.
+    /// </summary>
+    private static int s_ghostLevel;
+
+    /// <summary>
     /// What the clone was built WITH (the answer of HideSparkle for its prefab) and the
     /// option itself at that moment: the pair is how a value changed while the clone stands
     /// - typed into ConfigurationManager, written by the window's box - reaches a clone
@@ -92,9 +100,11 @@ internal static class SelfView
                 return;
             }
 
-            if (s_ghost != null && s_ghostPrefabHash != wanted)
+            int level = DisguiseConfig.ConfigCreatureLevel.Value;
+
+            if (s_ghost != null && (s_ghostPrefabHash != wanted || s_ghostLevel != level))
             {
-                Remove(); // the disguise changed: drop the previous creature
+                Remove(); // the disguise or its level changed: drop the previous creature
             }
 
             // The sparkle option moved under a clone that is already standing: it was built
@@ -138,6 +148,7 @@ internal static class SelfView
                 s_ghostPrefabHash = wanted;
                 s_ghostHideSparkle = GhostFactory.HideSparkle(wanted);
                 s_ghostSparkleOption = DisguiseConfig.ConfigHideItemSparkle.Value;
+                s_ghostLevel = level;
                 s_failedPrefabHash = 0;
                 s_nextRendererScan = 0f;
                 Disguise.LogInfo(
@@ -290,6 +301,7 @@ internal static class SelfView
         s_ghostPrefabHash = 0;
         s_ghostHideSparkle = false;
         s_ghostSparkleOption = false;
+        s_ghostLevel = 0;
         s_nextRendererScan = 0f;
         GhostAnimation.Reset();
     }

@@ -66,6 +66,11 @@ internal static class GhostFactory
             clone.transform.SetPositionAndRotation(position, rotation);
             clone.SetActive(true);
             GhostAnimation.Bind(clone.GetComponentInChildren<Animator>(true));
+            // Dressed for its level once awake, the way the game dresses its own creatures:
+            // LevelEffects.Start ran in the activation above, found no Character (the strip
+            // removed it) and stood down, which leaves its field free for LevelSkin to lend
+            // it the prefab's own.
+            LevelSkin.Apply(clone, prefab, DisguiseConfig.ConfigCreatureLevel.Value);
             return clone;
         }
         catch (Exception ex)
@@ -298,6 +303,13 @@ internal static class GhostFactory
             || component is Renderer
             || component is ParticleSystem
             || component is MeshFilter
-            || component is Light;
+            || component is Light
+            // LevelEffects dresses a creature for its level - the skin of a starred one - and
+            // can do nothing at all without a Character above it: no Awake to fear, no Update
+            // to run. It is the one thing here that draws without being a renderer, so the
+            // copy of a starred creature keeps the skin its level calls for (LevelSkin hands
+            // it the level). By NAME, like everything the audit counts: an "is" test would be
+            // one more game type in the number the README documents.
+            || component.GetType().Name == "LevelEffects";
     }
 }
