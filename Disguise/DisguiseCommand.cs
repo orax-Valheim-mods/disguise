@@ -30,7 +30,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
+                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -57,6 +57,7 @@ internal static class DisguiseCommand
             "help",
             "enable",
             "disable",
+            "level",
             "refresh",
             "view",
             "logs",
@@ -182,13 +183,25 @@ internal static class DisguiseCommand
             case "set":
                 if (words.Length < 3)
                 {
-                    Say(ctx, "Usage: disguise set <prefab_name>   (disguise list for the names)");
+                    Say(
+                        ctx,
+                        "Usage: disguise set <prefab_name> [level 1-9]   (disguise list for the names)"
+                    );
                     break;
                 }
+                int setLevel = 1; // set without a level starts every costume at 1
+                if (words.Length > 3 && !TryParseLevel(words[3], out setLevel))
+                {
+                    Say(ctx, NotALevel(words[3]));
+                    break;
+                }
+                // The level moves WITH the creature and before it, so the costume is applied
+                // once, with both values already in the config.
+                DisguiseConfig.ConfigCreatureLevel.Value = setLevel;
                 bool applied = ApplyCreature(words[2], "set");
                 Say(
                     ctx,
-                    $"[Disguise] Prefab set to \"{DisguiseConfig.ConfigCreature.Value}\" (resolved prefab: {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)})."
+                    $"[Disguise] Prefab set to \"{DisguiseConfig.ConfigCreature.Value}\" at level {DisguiseConfig.ConfigCreatureLevel.Value} (resolved prefab: {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)})."
                 );
                 if (!applied)
                 {
@@ -201,6 +214,29 @@ internal static class DisguiseCommand
                 {
                     Say(ctx, "Warning: this prefab does not exist here (see disguise list).");
                 }
+                break;
+
+            case "level":
+                if (words.Length < 3)
+                {
+                    Say(
+                        ctx,
+                        $"[Disguise] Current level: {DisguiseConfig.ConfigCreatureLevel.Value}."
+                    );
+                    Say(ctx, "Usage: disguise level <1-9>   (2 and 3 are the starred creatures)");
+                    break;
+                }
+                if (!TryParseLevel(words[2], out int level))
+                {
+                    Say(ctx, NotALevel(words[2]));
+                    break;
+                }
+                DisguiseConfig.ConfigCreatureLevel.Value = level;
+                Say(
+                    ctx,
+                    $"[Disguise] Level set to {DisguiseConfig.ConfigCreatureLevel.Value}: the costume is drawn as a creature of that level - another skin at 2 and 3 where the prefab has one, a star, and the health of one."
+                );
+                ApplyNow(ctx, "level");
                 break;
 
             case "list":
@@ -240,7 +276,10 @@ internal static class DisguiseCommand
         Say(ctx, "  disguise favorite [name]  mark / unmark a favorite (the window's Favorite");
         Say(ctx, "                            button does this, on the selected prefab)");
         Say(ctx, "  disguise set <prefab>     change the prefab and enable the disguise");
-        Say(ctx, "                            (a click on a row of the window does this too)");
+        Say(ctx, "                            ([level 1-9] with it, and 1 when it is left out;");
+        Say(ctx, "                            a row of the window does the same, at your level)");
+        Say(ctx, "  disguise level <1-9>      the level the costume is drawn at: 2 and 3 are the");
+        Say(ctx, "                            starred creatures (the window's -/+ row does this)");
         Say(ctx, "  disguise enable           enable the disguise");
         Say(ctx, "  disguise disable          disable it: you become a normal viking again");
         Say(ctx, "  disguise refresh          force other players to re-create your object now");
@@ -706,6 +745,25 @@ internal static class DisguiseCommand
         }
         return float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
     }
+
+    /// <summary>
+    /// A level as the game takes one: a WHOLE number, kept inside the span the game's own
+    /// spawn command uses for a creature (DisguiseConfig.LevelMax) - a costume of any level
+    /// is drawn, but above the skins a prefab carries only its health keeps growing.
+    /// </summary>
+    private static bool TryParseLevel(string text, out int level)
+    {
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out level))
+        {
+            return false;
+        }
+        level = Mathf.Clamp(level, DisguiseConfig.LevelMin, DisguiseConfig.LevelMax);
+        return true;
+    }
+
+    /// <summary>What a word that is not a level is answered with, wherever it was typed.</summary>
+    private static string NotALevel(string text) =>
+        $"[Disguise] \"{text}\" is not a level: a whole number from {DisguiseConfig.LevelMin} to {DisguiseConfig.LevelMax}.";
 
     /// <summary>The height at this very moment: only X and Z are asked for, Y is carried over.</summary>
     private static float CurrentHeight()

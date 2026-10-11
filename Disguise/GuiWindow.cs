@@ -134,6 +134,19 @@ internal static class GuiWindow
     private static Text? s_favorite;
 
     /// <summary>
+    /// The level row's number and its two buttons, on the band the sparkle box stands on:
+    /// the number is rewritten per frame like the state line (RefreshState), and the buttons
+    /// stop being clickable at the ends of the span the game itself keeps a creature inside
+    /// (1 to 9) instead of running a command that could not move the level. Unity-null once
+    /// the window is gone, the same safety as everything above.
+    /// </summary>
+    private static Text? s_level;
+
+    private static Button? s_levelDown;
+
+    private static Button? s_levelUp;
+
+    /// <summary>
     /// The line under the title, kept here so it can be rewritten after a click on a row or a
     /// change made by the console while the window is open - and once per frame while it is
     /// open, because the flight and its offset move on their own (DisguiseGui.Tick).
@@ -300,6 +313,7 @@ internal static class GuiWindow
         // button has been pressed), and the help line closing the window under that one.
         CommandButtons(gui, window.transform);
         SparkleBox(window.transform);
+        LevelRow(gui, window.transform);
         GuiStatus.Build(window.transform);
         GuiHelp.Build(window.transform);
 
@@ -337,6 +351,105 @@ internal static class GuiWindow
             }
         );
     }
+
+    /// <summary>What the word and the number of the level row both describe (GuiHelp.Watch).</summary>
+    private const string LevelHelp =
+        "The level your costume is drawn at - the star levels of the creatures. It is written into your ZDO for every machine to read (and kept in the configuration, CreatureLevel).";
+
+    /// <summary>
+    /// The level row: the star levels, on the band the sparkle box stands on and
+    /// right-aligned with the picture above it - the word, then - and + around the number.
+    /// Each button runs "disguise level <n>" the way every button of this window runs its
+    /// sub-command (Command), so the answer lands on the status line below and the console
+    /// and the window stay one single call. The number is rewritten per frame like the state
+    /// line (RefreshState), so a level typed into the console or into ConfigurationManager
+    /// lands without closing the window; and a level at the ends of the span the game itself
+    /// keeps a creature inside stops its button there, rather than running a command that
+    /// could not move it.
+    /// </summary>
+    private static void LevelRow(GUIManager gui, Transform parent)
+    {
+        const float numberWidth = 44f;
+        const float wordWidth = 60f;
+        const int fontSize = 16;
+        const float gap = 4f;
+        float height = GuiMetrics.RowHeight;
+
+        // Everything is measured from the picture's own right edge, leftwards: this row
+        // belongs to the picture, and the sparkle box keeps the left half of the band.
+        float cursor = PreviewX + CreaturePreview.PictureWidth;
+        float plusX = cursor - (height * 0.5f);
+        cursor -= height + gap;
+        float numberX = cursor - (numberWidth * 0.5f);
+        cursor -= numberWidth + gap;
+        float minusX = cursor - (height * 0.5f);
+        cursor -= height + gap;
+        float wordX = cursor - (wordWidth * 0.5f);
+
+        s_levelUp = ButtonOf(
+            Command(
+                gui,
+                parent,
+                "+",
+                "One level more (disguise level <n>): 2 and 3 are the starred creatures - another skin where the prefab has one, a star, and the health of a real creature of that level. It stops at 9, where the game's own spawn command stops.",
+                plusX,
+                height,
+                SparkleY,
+                () => RunCommand($"level {DisguiseConfig.ConfigCreatureLevel.Value + 1}")
+            )
+        );
+
+        GameObject number = Label(
+            gui,
+            DescribeLevel(),
+            parent,
+            new Vector2(0.5f, 1f),
+            new Vector2(numberX, SparkleY),
+            gui.AveriaSerif,
+            fontSize,
+            gui.ValheimBeige,
+            numberWidth,
+            height
+        );
+        s_level = number.GetComponent<Text>();
+        GuiHelp.Watch(number, LevelHelp);
+
+        s_levelDown = ButtonOf(
+            Command(
+                gui,
+                parent,
+                "-",
+                "One level less (disguise level <n>): level 1 is the plain creature, with no skin of its own above the base look.",
+                minusX,
+                height,
+                SparkleY,
+                () => RunCommand($"level {DisguiseConfig.ConfigCreatureLevel.Value - 1}")
+            )
+        );
+
+        GameObject word = Label(
+            gui,
+            "Level",
+            parent,
+            new Vector2(0.5f, 1f),
+            new Vector2(wordX, SparkleY),
+            gui.AveriaSerif,
+            fontSize,
+            gui.ValheimBeige,
+            wordWidth,
+            height
+        );
+        GuiHelp.Watch(word, LevelHelp);
+    }
+
+    /// <summary>The Button a command's label belongs to: the label is a child of its body.</summary>
+    private static Button? ButtonOf(Text? label)
+    {
+        return label != null ? label.GetComponentInParent<Button>() : null;
+    }
+
+    /// <summary>The number on the level row: the level the costume is drawn at.</summary>
+    private static string DescribeLevel() => DisguiseConfig.ConfigCreatureLevel.Value.ToString();
 
     /// <summary>
     /// Puts the window where the config says, then keeps it on screen with the very rule the
@@ -388,6 +501,7 @@ internal static class GuiWindow
             "Turn the disguise on for everyone - your ZDO then carries the configured prefab instead of your viking - or stop it (disguise enable / disable).",
             centre,
             width,
+            ButtonY,
             TogglePower
         );
 
@@ -399,6 +513,7 @@ internal static class GuiWindow
             "Read the costume and the list again from the network (disguise refresh).",
             centre,
             width,
+            ButtonY,
             () => RunCommand("refresh")
         );
 
@@ -410,6 +525,7 @@ internal static class GuiWindow
             "Draw the costume on YOUR screen instead of your viking - purely local, no machine is told anything (SeeYourDisguise, disguise view).",
             centre,
             width,
+            ButtonY,
             () => RunCommand("view")
         );
 
@@ -421,6 +537,7 @@ internal static class GuiWindow
             "Raise the costume for everyone who draws you, up to 100 m - your own body stays on the ground (disguise fly).",
             centre,
             width,
+            ButtonY,
             () => RunCommand("fly")
         );
 
@@ -432,6 +549,7 @@ internal static class GuiWindow
             "Mark the prefab named on the line above, or take the mark off - favorites are what the Favorites box shows (disguise favorite).",
             centre,
             width,
+            ButtonY,
             ToggleFavorite
         );
     }
@@ -444,6 +562,7 @@ internal static class GuiWindow
         string help,
         float centreX,
         float width,
+        float centreY,
         UnityAction onClick
     )
     {
@@ -452,7 +571,7 @@ internal static class GuiWindow
             parent,
             new Vector2(0.5f, 1f),
             new Vector2(0.5f, 1f),
-            new Vector2(centreX, ButtonY),
+            new Vector2(centreX, centreY),
             width,
             GuiMetrics.RowHeight
         );
@@ -517,6 +636,8 @@ internal static class GuiWindow
         GuiText.Set(s_state, DescribeState);
         GuiText.Set(s_power, DescribePower);
         GuiText.Set(s_favorite, DescribeFavorite);
+        GuiText.Set(s_level, DescribeLevel);
+        SyncLevelButtons();
 
         Toggle? sparkle = s_sparkle;
         if (sparkle != null)
@@ -530,6 +651,30 @@ internal static class GuiWindow
         }
 
         GuiPose.Sync();
+    }
+
+    /// <summary>
+    /// The - and + of the level row stop being clickable at the ends of the span the game
+    /// itself keeps a creature inside: a button that could not move the level would only
+    /// answer "set to the same value", and the greyed one says it before the click.
+    /// </summary>
+    private static void SyncLevelButtons()
+    {
+        Button? down = s_levelDown;
+        Button? up = s_levelUp;
+        if (down == null && up == null)
+        {
+            return; // no window: every frame it is closed or destroyed
+        }
+        int level = DisguiseConfig.ConfigCreatureLevel.Value;
+        if (down != null)
+        {
+            down.interactable = level > DisguiseConfig.LevelMin;
+        }
+        if (up != null)
+        {
+            up.interactable = level < DisguiseConfig.LevelMax;
+        }
     }
 
     /// <summary>
