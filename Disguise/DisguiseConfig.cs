@@ -12,21 +12,25 @@ namespace Disguise;
 internal static class DisguiseConfig
 {
     /// <summary>
-    /// The floor under a costume's level - and NO ceiling at all, because the game itself
-    /// has none: Character.SetLevel accepts every level from 1 up (it ignores anything
-    /// below), Awake reads the ZDO's number without validating it, and SetupMaxHealth
-    /// multiplies the base by it as it stands. Only the vanilla spawn console command
-    /// clamps, on its own command line (Terminal.cs: 9 for a creature, 4 for an item).
-    /// The floor is what keeps a hand-edited 0 from drawing a creature whose health is
-    /// base x 0 - nothing.
+    /// The span a costume's level is kept inside: the very one the vanilla spawn command
+    /// gives a creature - Terminal.cs clamps its [level] argument with Mathf.Min(level, 9)
+    /// BEFORE calling SetLevel (4 for an item), so "spawn Troll 1 100" hands out a level 9.
+    /// The costume follows that same span wherever a level can be set: this entry (BepInEx
+    /// clamps it on load and on every write), the two commands (TryParseLevel) and the
+    /// window's + (SyncLevelButtons). The game itself never clamps - SetLevel asks only for
+    /// >= 1 and Awake reads the ZDO as it stands - so the ceiling is a choice here: staying
+    /// inside what vanilla hands out. A level outside the skins a prefab carries only keeps
+    /// raising the health the costume is drawn with.
     /// </summary>
     internal const int LevelMin = 1;
+
+    internal const int LevelMax = 9;
 
     internal static ConfigEntry<bool> ConfigEnabled = null!;
 
     internal static ConfigEntry<string> ConfigCreature = null!;
 
-    /// <summary>Level the costume appears as (LevelMin and up): see BindGeneral.</summary>
+    /// <summary>Level the costume appears as (LevelMin..LevelMax): see BindGeneral.</summary>
     internal static ConfigEntry<int> ConfigCreatureLevel = null!;
 
     internal static ConfigEntry<bool> ConfigProtectSave = null!;
@@ -165,10 +169,9 @@ internal static class DisguiseConfig
                     + "another skin where the prefab has one, a star over the costume, and the "
                     + "health of a real creature of that level (Character multiplies it by the "
                     + "level). Beyond the skins a prefab carries, only that health keeps "
-                    + "growing. No upper limit: the game itself has none - only the vanilla "
-                    + "spawn console command clamps a creature, to 9, on its own line. "
-                    + "Console: disguise level <n>, or disguise set <name> [level].",
-                new AcceptableValueRange<int>(LevelMin, int.MaxValue)
+                    + "growing. Kept inside 1 to 9, the span the vanilla spawn command gives "
+                    + "a creature. Console: disguise level <1-9>, or disguise set <name> [level].",
+                new AcceptableValueRange<int>(LevelMin, LevelMax)
             )
         );
 
