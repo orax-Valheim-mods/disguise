@@ -18,6 +18,8 @@ internal static class PrefabResolver
 
     private static int s_refreshHash;
 
+    private static int s_levelHash;
+
     private static bool s_creatureWarningLogged;
 
     private static FootStep? s_creatureFootStep;
@@ -54,6 +56,25 @@ internal static class PrefabResolver
                 s_refreshHash = StringExtensionMethods.GetStableHashCode(Disguise.RefreshKey);
             }
             return s_refreshHash;
+        }
+    }
+
+    /// <summary>
+    /// The GAME's own level key (ZDOVars.s_level, the very same hash): Character reads it
+    /// once, in its Awake, for every entity that is NOT a player - and the level is where
+    /// the star levels come from (LevelEffects draws the skin of level 2 and 3) and what
+    /// the creature's maximum hit points are multiplied by. Spelled out here rather than
+    /// read off ZDOVars, so the game's members stay out of the count the README documents.
+    /// </summary>
+    internal static int LevelHash
+    {
+        get
+        {
+            if (s_levelHash == 0)
+            {
+                s_levelHash = StringExtensionMethods.GetStableHashCode("level");
+            }
+            return s_levelHash;
         }
     }
 

@@ -45,8 +45,17 @@ internal static class HealthMask
     /// <summary>
     /// Maximum hit points of every costume already measured, by prefab hash (0: measured and
     /// without any - a dropped item, which keeps your own value and shows no damage anyway).
+    /// The base of a creature, before its level multiplies it (see Maximum).
     /// </summary>
     private static readonly Dictionary<int, float> s_maximum = new Dictionary<int, float>();
+
+    /// <summary>
+    /// The prefabs whose hit points a Character owns, remembered at the same measurement as
+    /// their maximum: those are the ones a level multiplies (Maximum), the way the game gives
+    /// every non-player Character base x level. A piece or a vehicle keeps its own maximum -
+    /// it has no level, whatever the costume's is set to.
+    /// </summary>
+    private static readonly HashSet<int> s_creatureCostumes = new HashSet<int>();
 
     // Active swap window: the game is single threaded and ZDO.Serialize never nests, but the
     // same rule as EquipmentMask applies - End() only ever closes what Begin opened.
@@ -125,38 +134,57 @@ internal static class HealthMask
 
     // ------------------------------------------------------------------ internals
 
-    /// <summary>The costume's own hit points, measured once per prefab.</summary>
+    /// <summary>The costume's own hit points, measured once per prefab - and drawn at the
+    /// scale of its level when it is a creature (see the set above).</summary>
     private static float Maximum(ZDO zdo)
     {
         int hash = zdo.GetPrefab();
+        float baseMaximum;
         if (s_maximum.TryGetValue(hash, out float cached))
         {
-            return cached;
+            baseMaximum = cached;
         }
-        ZNetScene? zns = ZNetScene.instance;
-        GameObject? prefab = zns != null ? zns.GetPrefab(hash) : null;
-        if (prefab == null)
+        else
         {
-            // Not resolvable YET - a ZNetScene still loading, or a prefab another mod
-            // registers a moment later. Nothing is cached, so the next costume read tries
-            // again: only a measurement really TAKEN is worth keeping for the session, and
-            // a 0 cached here would switch this costume's health swap off until the game
-            // restarts (BeginOutgoingHealth refuses a maximum it cannot trust).
-            return 0f;
+            ZNetScene? zns = ZNetScene.instance;
+            GameObject? prefab = zns != null ? zns.GetPrefab(hash) : null;
+            if (prefab == null)
+            {
+                // Not resolvable YET - a ZNetScene still loading, or a prefab another mod
+                // registers a moment later. Nothing is cached, so the next costume read tries
+                // again: only a measurement really TAKEN is worth keeping for the session, and
+                // a 0 cached here would switch this costume's health swap off until the game
+                // restarts (BeginOutgoingHealth refuses a maximum it cannot trust).
+                return 0f;
+            }
+            baseMaximum = ReadMaximum(prefab, out bool scalesWithLevel);
+            s_maximum[hash] = baseMaximum;
+            if (scalesWithLevel)
+            {
+                s_creatureCostumes.Add(hash);
+            }
         }
-        float maximum = ReadMaximum(prefab);
-        s_maximum[hash] = maximum;
-        return maximum;
+        if (!s_creatureCostumes.Contains(hash))
+        {
+            return baseMaximum;
+        }
+        // A creature of a level has the health of one: the game gives every non-player
+        // Character base x level (Character.SetupMaxHealth), so a level 3 costume drawn with
+        // a level 1 bar would read as a badly wounded creature at a glance. The level comes
+        // out of the very ZDO the others are shown - they were given the same one.
+        return baseMaximum * Mathf.Max(1, zdo.GetInt(PrefabResolver.LevelHash, 1));
     }
 
     /// <summary>
     /// The maximum hit points of a costume, read from the component that owns them: by name
     /// for the lookup and through reflection for the field, which keeps this out of the game
     /// assembly's member count (audit_visibility). Nothing to return means no swap, never a
-    /// guess.
+    /// guess. <paramref name="scalesWithLevel"/> says the owner was a Character - the only
+    /// kind the game multiplies by a level.
     /// </summary>
-    private static float ReadMaximum(GameObject prefab)
+    private static float ReadMaximum(GameObject prefab, out bool scalesWithLevel)
     {
+        scalesWithLevel = false;
         foreach (string name in s_healthOwners)
         {
             Component? owner = prefab.GetComponent(name);
@@ -172,6 +200,7 @@ internal static class HealthMask
                 && value > 0f
             )
             {
+                scalesWithLevel = name == "Humanoid";
                 return value;
             }
         }

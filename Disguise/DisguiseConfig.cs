@@ -11,9 +11,21 @@ namespace Disguise;
 /// </summary>
 internal static class DisguiseConfig
 {
+    /// <summary>
+    /// The level a costume can be given, as a whole number: the game's own spawn command
+    /// keeps a creature inside this span (Terminal.cs, "spawn"), and a level outside the
+    /// skins a prefab carries only keeps raising the health it is drawn with.
+    /// </summary>
+    internal const int LevelMin = 1;
+
+    internal const int LevelMax = 9;
+
     internal static ConfigEntry<bool> ConfigEnabled = null!;
 
     internal static ConfigEntry<string> ConfigCreature = null!;
+
+    /// <summary>Level the costume appears as (LevelMin..LevelMax): see BindGeneral.</summary>
+    internal static ConfigEntry<int> ConfigCreatureLevel = null!;
 
     internal static ConfigEntry<bool> ConfigProtectSave = null!;
 
@@ -141,6 +153,20 @@ internal static class DisguiseConfig
         );
 
         ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
+
+        ConfigCreatureLevel = config.Bind(
+            "1 - General",
+            "CreatureLevel",
+            1,
+            new ConfigDescription(
+                "The level you appear as: 1 is the plain creature, 2 and 3 the starred ones - "
+                    + "another skin where the prefab has one, a star over the costume, and the "
+                    + "health of a real creature of that level (Character multiplies it by the "
+                    + "level). Beyond the skins a prefab carries, only that health keeps "
+                    + "growing. Console: disguise level <1-9>, or disguise set <name> [level].",
+                new AcceptableValueRange<int>(LevelMin, LevelMax)
+            )
+        );
 
         ConfigProtectSave = config.Bind(
             "1 - General",

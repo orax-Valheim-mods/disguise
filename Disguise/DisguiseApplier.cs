@@ -54,9 +54,45 @@ internal static class DisguiseApplier
                 zdo.Set(PrefabResolver.MarkerHash, 0);
             }
 
+            // We are the live owner of this ZDO: what is written below is OURS to publish.
+            // A ZDO the world load re-applies - another player's costume, on a server - keeps
+            // the level its own machine chose; the server cannot know it, and the owner
+            // re-asserts it within ReassertSeconds anyway.
+            ZDO? local = GameAccess.GetLocalPlayerZDO();
+            bool mine = local != null && local.m_uid == zdo.m_uid;
+
+            // The costume's level: what makes every machine that draws you pick the skin of
+            // its star level (Character.Awake reads this key - and never for a player, so it
+            // can not touch the viking under the costume).
+            bool levelChanged = false;
+            if (mine)
+            {
+                if (desired != playerHash)
+                {
+                    int level = DisguiseConfig.ConfigCreatureLevel.Value;
+                    levelChanged = zdo.GetInt(PrefabResolver.LevelHash, 1) != level;
+                    zdo.Set(PrefabResolver.LevelHash, level);
+                }
+                else if (zdo.GetInt(PrefabResolver.LevelHash, 1) != 1)
+                {
+                    // Explicit 1, for the same reason as the marker above: an absent key
+                    // already reads as the default level, and would only weigh down the
+                    // payload of every player who ever took a costume off.
+                    zdo.Set(PrefabResolver.LevelHash, 1);
+                }
+            }
+
             int current = zdo.GetPrefab();
             if (current == desired)
             {
+                // The costume kept its prefab - but a level that just moved still has to
+                // reach the machines already drawing it: a creature reads its level once,
+                // when it is born (Character.Awake), and a vanilla client keeps that
+                // instance forever after.
+                if (mine && levelChanged)
+                {
+                    ObserverRefresh.StartObserverRefresh(zdo, force: false);
+                }
                 return;
             }
             zdo.SetPrefab(desired);
@@ -67,8 +103,7 @@ internal static class DisguiseApplier
             // The network prefab changed: ask the server for an observer refresh, but only when
             // we are the live owner of that ZDO (never while the server re-applies disguises at
             // world load, where there is no local player).
-            ZDO? local = GameAccess.GetLocalPlayerZDO();
-            if (local != null && local.m_uid == zdo.m_uid)
+            if (mine)
             {
                 ObserverRefresh.StartObserverRefresh(zdo, force: false);
             }
