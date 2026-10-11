@@ -115,7 +115,7 @@ In game, open the console with **F5**:
 | `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, the effect prefabs (`fx_`, `sfx_`, `vfx_`) and a prefab with **no mesh to draw** are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
 | `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it exactly that way, on the prefab selected in the window). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
 | `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does the same, at the level you are on, § 2 GUI). An optional **level** follows the name - `disguise set Troll 3` - and leaving it out brings the costume back to **level 1** |
-| `disguise level 2` | The **level** the costume is drawn at, 1 to 9 - no argument reports the current one. 2 and 3 are the **starred** creatures: another skin where the prefab has one, a star over the costume, and the health of a real creature of that level (§ 2). The `-` / `+` row of the window runs this command |
+| `disguise level 2` | The **level** the costume is drawn at, **1 and up** - no upper limit, the game itself having none (only the vanilla `spawn` console command clamps a creature, to 9, on its own line) - and no argument reports the current one. 2 and 3 are the **starred** creatures: another skin where the prefab has one, a star over the costume, and the health of a real creature of that level (§ 2). The `-` / `+` row of the window runs this command |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
@@ -172,7 +172,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
 | `CreaturePrefab` | `Greydwarf` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla, non-effect ones) |
-| `CreatureLevel` | `1` | The **level** you appear as, 1 to 9 - the span the game's own `spawn` command keeps a creature inside. 2 and 3 are the **starred** creatures: another skin where the prefab carries one, a star over the costume, and the health of a real creature of that level (the bar the others draw is the costume's base health multiplied by it). Above the skins a prefab carries, only that health keeps growing. Written into your ZDO for every machine to read and saved with the config; change it with `disguise level <1-9>`, `disguise set <name> [level]` or the `-` / `+` row of the window (§ 2) |
+| `CreatureLevel` | `1` | The **level** you appear as, **1 and up** - no upper limit, the game itself having none (`Character.SetLevel` accepts every level from 1 up and `Awake` reads the ZDO's number as it stands; only the vanilla `spawn` console command clamps a creature, to 9, on its own line). 2 and 3 are the **starred** creatures: another skin where the prefab carries one, a star over the costume, and the health of a real creature of that level (the bar the others draw is the costume's base health multiplied by it). Above the skins a prefab carries, only that health keeps growing. Written into your ZDO for every machine to read and saved with the config; change it with `disguise level <n>`, `disguise set <name> [level]` or the `-` / `+` row of the window (§ 2) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `false` | Write the mod's own **Info/Debug** messages to the BepInEx log - the whole output of `disguise list` included (§ 7). **Off by default**: a working install keeps its log quiet, and `disguise logs [on|off]` switches it (the command writes the value back, so the choice stays for the next start). Warnings and errors are always written (§ 7) |
@@ -414,9 +414,9 @@ ConfigurationManager is pushed back into the box every frame like every other la
 `CreatureLevel` setting), each click running `disguise level <n>` exactly like every other
 button of this window runs its sub-command, so the answer lands on the status line below.
 The number is rewritten per frame, so a level typed into the console or into
-ConfigurationManager lands without closing the window; and the two buttons stop being
-clickable at the ends of the span (1 and 9) rather than running a command that could not
-move the level. The **line under the
+ConfigurationManager lands without closing the window; and the minus stops being clickable
+at level 1 rather than running a command that could not move the level - there is no upper
+end to stop at, the game itself having none. The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -1286,8 +1286,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   word `Level`, then `-` and `+` around the number - each button runs `disguise level <n>`
   through the very same `DisguiseCommand.Run` path as every button of this window, the
   number is rewritten per frame by `RefreshState` like every other label, and
-  `SyncLevelButtons` stops the two at the ends of the span the game itself keeps a creature
-  inside, 1 to 9), the
+  `SyncLevelButtons` stops the minus at level 1 - there is no upper end, the game itself
+  having none), the
   status line below them, the **help line** closing the window under that one (`GuiHelp.Build`
   - the words of every control are handed to `GuiHelp.Watch` as it is built: Close, the chord,
   the state line, the five buttons, the sparkle box and the level row here, and the same call made by

@@ -12,19 +12,21 @@ namespace Disguise;
 internal static class DisguiseConfig
 {
     /// <summary>
-    /// The level a costume can be given, as a whole number: the game's own spawn command
-    /// keeps a creature inside this span (Terminal.cs, "spawn"), and a level outside the
-    /// skins a prefab carries only keeps raising the health it is drawn with.
+    /// The floor under a costume's level - and NO ceiling at all, because the game itself
+    /// has none: Character.SetLevel accepts every level from 1 up (it ignores anything
+    /// below), Awake reads the ZDO's number without validating it, and SetupMaxHealth
+    /// multiplies the base by it as it stands. Only the vanilla spawn console command
+    /// clamps, on its own command line (Terminal.cs: 9 for a creature, 4 for an item).
+    /// The floor is what keeps a hand-edited 0 from drawing a creature whose health is
+    /// base x 0 - nothing.
     /// </summary>
     internal const int LevelMin = 1;
-
-    internal const int LevelMax = 9;
 
     internal static ConfigEntry<bool> ConfigEnabled = null!;
 
     internal static ConfigEntry<string> ConfigCreature = null!;
 
-    /// <summary>Level the costume appears as (LevelMin..LevelMax): see BindGeneral.</summary>
+    /// <summary>Level the costume appears as (LevelMin and up): see BindGeneral.</summary>
     internal static ConfigEntry<int> ConfigCreatureLevel = null!;
 
     internal static ConfigEntry<bool> ConfigProtectSave = null!;
@@ -163,8 +165,10 @@ internal static class DisguiseConfig
                     + "another skin where the prefab has one, a star over the costume, and the "
                     + "health of a real creature of that level (Character multiplies it by the "
                     + "level). Beyond the skins a prefab carries, only that health keeps "
-                    + "growing. Console: disguise level <1-9>, or disguise set <name> [level].",
-                new AcceptableValueRange<int>(LevelMin, LevelMax)
+                    + "growing. No upper limit: the game itself has none - only the vanilla "
+                    + "spawn console command clamps a creature, to 9, on its own line. "
+                    + "Console: disguise level <n>, or disguise set <name> [level].",
+                new AcceptableValueRange<int>(LevelMin, int.MaxValue)
             )
         );
 

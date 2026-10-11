@@ -30,7 +30,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
+                "Disguise: status | set <prefab> [level] | level <n> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -185,7 +185,7 @@ internal static class DisguiseCommand
                 {
                     Say(
                         ctx,
-                        "Usage: disguise set <prefab_name> [level 1-9]   (disguise list for the names)"
+                        "Usage: disguise set <prefab_name> [level]   (disguise list for the names)"
                     );
                     break;
                 }
@@ -223,7 +223,10 @@ internal static class DisguiseCommand
                         ctx,
                         $"[Disguise] Current level: {DisguiseConfig.ConfigCreatureLevel.Value}."
                     );
-                    Say(ctx, "Usage: disguise level <1-9>   (2 and 3 are the starred creatures)");
+                    Say(
+                        ctx,
+                        "Usage: disguise level <n>   (2 and 3 are the starred creatures, no upper limit)"
+                    );
                     break;
                 }
                 if (!TryParseLevel(words[2], out int level))
@@ -276,10 +279,11 @@ internal static class DisguiseCommand
         Say(ctx, "  disguise favorite [name]  mark / unmark a favorite (the window's Favorite");
         Say(ctx, "                            button does this, on the selected prefab)");
         Say(ctx, "  disguise set <prefab>     change the prefab and enable the disguise");
-        Say(ctx, "                            ([level 1-9] with it, and 1 when it is left out;");
+        Say(ctx, "                            ([level] with it, and 1 when it is left out;");
         Say(ctx, "                            a row of the window does the same, at your level)");
-        Say(ctx, "  disguise level <1-9>      the level the costume is drawn at: 2 and 3 are the");
-        Say(ctx, "                            starred creatures (the window's -/+ row does this)");
+        Say(ctx, "  disguise level <n>        the level the costume is drawn at: 2 and 3 are the");
+        Say(ctx, "                            starred creatures (the window's -/+ row does this,");
+        Say(ctx, "                            and no upper limit - the game itself has none)");
         Say(ctx, "  disguise enable           enable the disguise");
         Say(ctx, "  disguise disable          disable it: you become a normal viking again");
         Say(ctx, "  disguise refresh          force other players to re-create your object now");
@@ -747,9 +751,10 @@ internal static class DisguiseCommand
     }
 
     /// <summary>
-    /// A level as the game takes one: a WHOLE number, kept inside the span the game's own
-    /// spawn command uses for a creature (DisguiseConfig.LevelMax) - a costume of any level
-    /// is drawn, but above the skins a prefab carries only its health keeps growing.
+    /// A level as the game takes one: a WHOLE number, from DisguiseConfig.LevelMin up and
+    /// with NO ceiling - Character.SetLevel accepts every level the game itself does, and a
+    /// costume of a level above the skins a prefab carries only keeps raising the health it
+    /// is drawn with.
     /// </summary>
     private static bool TryParseLevel(string text, out int level)
     {
@@ -757,13 +762,13 @@ internal static class DisguiseCommand
         {
             return false;
         }
-        level = Mathf.Clamp(level, DisguiseConfig.LevelMin, DisguiseConfig.LevelMax);
+        level = Mathf.Max(DisguiseConfig.LevelMin, level);
         return true;
     }
 
     /// <summary>What a word that is not a level is answered with, wherever it was typed.</summary>
     private static string NotALevel(string text) =>
-        $"[Disguise] \"{text}\" is not a level: a whole number from {DisguiseConfig.LevelMin} to {DisguiseConfig.LevelMax}.";
+        $"[Disguise] \"{text}\" is not a level: a whole number, {DisguiseConfig.LevelMin} or more.";
 
     /// <summary>The height at this very moment: only X and Z are asked for, Y is carried over.</summary>
     private static float CurrentHeight()

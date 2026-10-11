@@ -135,10 +135,10 @@ internal static class GuiWindow
 
     /// <summary>
     /// The level row's number and its two buttons, on the band the sparkle box stands on:
-    /// the number is rewritten per frame like the state line (RefreshState), and the buttons
-    /// stop being clickable at the ends of the span the game itself keeps a creature inside
-    /// (1 to 9) instead of running a command that could not move the level. Unity-null once
-    /// the window is gone, the same safety as everything above.
+    /// the number is rewritten per frame like the state line (RefreshState), and the minus
+    /// stops being clickable at the bottom of the span (1) instead of running a command
+    /// that could not move the level - there is no upper end to stop at, the game itself
+    /// having none. Unity-null once the window is gone, the same safety as everything above.
     /// </summary>
     private static Text? s_level;
 
@@ -363,9 +363,9 @@ internal static class GuiWindow
     /// sub-command (Command), so the answer lands on the status line below and the console
     /// and the window stay one single call. The number is rewritten per frame like the state
     /// line (RefreshState), so a level typed into the console or into ConfigurationManager
-    /// lands without closing the window; and a level at the ends of the span the game itself
-    /// keeps a creature inside stops its button there, rather than running a command that
-    /// could not move it.
+    /// lands without closing the window; and the minus stops being clickable at level 1,
+    /// rather than running a command that could not move the level. There is no upper end:
+    /// the game itself puts no ceiling on a level, and neither does this row.
     /// </summary>
     private static void LevelRow(GUIManager gui, Transform parent)
     {
@@ -391,7 +391,7 @@ internal static class GuiWindow
                 gui,
                 parent,
                 "+",
-                "One level more (disguise level <n>): 2 and 3 are the starred creatures - another skin where the prefab has one, a star, and the health of a real creature of that level. It stops at 9, where the game's own spawn command stops.",
+                "One level more (disguise level <n>): 2 and 3 are the starred creatures - another skin where the prefab has one, a star, and the health of a real creature of that level. No upper limit: the game itself has none (only the vanilla spawn command clamps a creature, to 9, on its own line).",
                 plusX,
                 height,
                 SparkleY,
@@ -654,9 +654,9 @@ internal static class GuiWindow
     }
 
     /// <summary>
-    /// The - and + of the level row stop being clickable at the ends of the span the game
-    /// itself keeps a creature inside: a button that could not move the level would only
-    /// answer "set to the same value", and the greyed one says it before the click.
+    /// The - and + of the level row stop being clickable where a click could not move the
+    /// level: the minus at the bottom (1), the plus only at the very top of the number type
+    /// (which no one will ever reach - the game itself puts no ceiling on a level).
     /// </summary>
     private static void SyncLevelButtons()
     {
@@ -673,7 +673,7 @@ internal static class GuiWindow
         }
         if (up != null)
         {
-            up.interactable = level < DisguiseConfig.LevelMax;
+            up.interactable = level < int.MaxValue;
         }
     }
 
