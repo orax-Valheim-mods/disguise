@@ -114,7 +114,8 @@ In game, open the console with **F5**:
 | `disguise status` | Current state (prefab, marker, save protection) |
 | `disguise list` | Every **vanilla** prefab you can become, with a count per category (`disguise list troll` to filter; the window shows the same names, § 2 GUI). Prefabs a mod adds, the effect prefabs (`fx_`, `sfx_`, `vfx_`) and a prefab with **no mesh to draw** are never listed (§ 6, § 7). The whole output goes to the BepInEx log too, while `Logs = true` (§ 7) |
 | `disguise favorite [prefab]` | **Mark a prefab as a favorite**, or take the mark off - one command does either and says which (no argument = the configured prefab; the window's Favorite button runs it exactly that way, on the prefab selected in the window). The marks are kept in `6 - GUI` / `Favorites`, and the Favorites box of the window then lists them alone (§ 2 GUI) |
-| `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does exactly this, § 2 GUI) |
+| `disguise set Troll` | Change the prefab and enable the disguise (a click on a row of the window does the same, at the level you are on, § 2 GUI). An optional **level** follows the name - `disguise set Troll 3` - and leaving it out brings the costume back to **level 1** |
+| `disguise level 2` | The **level** the costume is drawn at, 1 to 9 - no argument reports the current one. 2 and 3 are the **starred** creatures: another skin where the prefab has one, a star over the costume, and the health of a real creature of that level (§ 2). The `-` / `+` row of the window runs this command |
 | `disguise enable` | Enable the disguise |
 | `disguise disable` | Disable: you become a viking visible to everyone again |
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
@@ -171,6 +172,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 |---|---|---|
 | `Enabled` | `true` | Disguise on/off |
 | `CreaturePrefab` | `Greydwarf` | Exact name of the prefab you appear as: any **network** prefab of the game - a creature, an object, a piece, a ship (§ 3: a vanilla client rebuilds you from its own prefab table, so anything not registered there can never be shown; the two lists only show the vanilla, non-effect ones) |
+| `CreatureLevel` | `1` | The **level** you appear as, 1 to 9 - the span the game's own `spawn` command keeps a creature inside. 2 and 3 are the **starred** creatures: another skin where the prefab carries one, a star over the costume, and the health of a real creature of that level (the bar the others draw is the costume's base health multiplied by it). Above the skins a prefab carries, only that health keeps growing. Written into your ZDO for every machine to read and saved with the config; change it with `disguise level <1-9>`, `disguise set <name> [level]` or the `-` / `+` row of the window (§ 2) |
 | `ProtectSaveFile` | `true` | Writes `Player` (not the creature) to the world save - **needs the DLL on the server**, since the server writes the save (§ 1.b) |
 | `ReassertSeconds` | `2` | Re-application period on your player |
 | `Logs` | `false` | Write the mod's own **Info/Debug** messages to the BepInEx log - the whole output of `disguise list` included (§ 7). **Off by default**: a working install keeps its log quiet, and `disguise logs [on|off]` switches it (the command writes the value back, so the choice stays for the next start). Warnings and errors are always written (§ 7) |
@@ -275,7 +277,11 @@ skinned mesh is bound to), `Animator`, `LODGroup`, the **mesh filters**, the ren
 particles and the lights: a `MeshRenderer` whose `MeshFilter` went with the strip keeps no
 mesh at all and draws nothing, which is what used to leave every non-creature costume -
 pieces, items, ships, carts and most static ones too - invisible on your own screen, while a
-creature, drawn by a `SkinnedMeshRenderer`, never missed it at all.
+creature, drawn by a `SkinnedMeshRenderer`, never missed it at all. `LevelEffects` - the
+component that dresses a creature for its **level** - is kept as well, by NAME (an `is` test
+would be one more game type in the audit's count) and harmless without the `Character` above
+it that the strip removes: `LevelSkin` then lends it the level, so a starred costume shows
+its skin on your screen and in the window's picture too.
 The clone sits at your player transform, copied once per
 frame from `LateUpdate`, and is deliberately **not parented** to you: a child would be walked
 by every `GetComponentsInChildren` the game and the mod run on your player, extending your
@@ -402,7 +408,15 @@ else, the same control the row above is made of (box and label are one hit targe
 `GuiCategories.BuildBox`), starting at the picture's own left edge so the right half keeps one
 edge all the way down; a click on it takes the shimmer off an item costume at once, on your
 own screen and in the picture (both rebuild themselves, § 2), and a value written in
-ConfigurationManager is pushed back into the box every frame like every other label. The **line under the
+ConfigurationManager is pushed back into the box every frame like every other label. On the
+**same band**, right-aligned with the picture above it, sits the **level row** - the word
+`Level`, then `-` and `+` around the number: the level the costume is drawn at (§ 2, the
+`CreatureLevel` setting), each click running `disguise level <n>` exactly like every other
+button of this window runs its sub-command, so the answer lands on the status line below.
+The number is rewritten per frame, so a level typed into the console or into
+ConfigurationManager lands without closing the window; and the two buttons stop being
+clickable at the ends of the span (1 and 9) rather than running a command that could not
+move the level. The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -497,9 +511,10 @@ own text, since one `Text` keeps a single colour for a whole label) on every row
 hold: put there by `Label` when a row is built and written again by `SyncFavoriteStars`
 whenever the `Favorites` line changes (hidden rows too - a category can be switched on later
 with no build in between) - the row of the
-prefab configured right now highlighted in orange, and a click on any row =
-`disguise set <prefab_name>` (config written and applied at once, the line under the title
-updated). The rows read beige and the configured one orange - Jotunn paints the text of all
+prefab configured right now highlighted in orange, and a click on any row hands out that
+prefab **at the level you are on** (config written and applied at once, the line under the
+title updated - and the picture above had already been showing that very creature at that
+level, the hover having built it with the level of the moment). The rows read beige and the configured one orange - Jotunn paints the text of all
 of its buttons orange, so the list itself is tinted beige for the difference to be visible -
 and the wheel moves the list by `GuiScrollStep` pixels per notch (3000 by default = about 88
 rows per notch; uGUI's own default is `1`). The list is **clamped
@@ -620,7 +635,13 @@ save file (`ZDO.Save`). The chosen prefab determines **what each client instanti
    (`ZDOMan.RPC_ZDOData` → `ZDO.Deserialize`) and **relays it to every other client**,
    modded or not.
 2. A vanilla client thus receives `prefab = Troll` and **instantiates a Troll** in your
-   place. It does not know it is a player: no mod required on its side.
+   place. It does not know it is a player: no mod required on its side. That creature then
+   reads its **level** out of the same ZDO - the game's own `level` key, `1` when it is
+   absent - and dresses itself for it: the skin of a starred creature at levels 2 and 3
+   where the prefab carries one, a star over the costume, and its health multiplied by
+   the level. `CreatureLevel` (§ 2) is therefore written into your ZDO next to the
+   marker, on your own ZDO only - and it can never reach the viking underneath, since the
+   game reads that key for every entity that is **not** a player (`Character.Awake`).
 3. Modded machines (your PC, plus the server when the DLL is installed there) intercept
    `ZNetScene.CreateObject` and, thanks
    to the marker stored in the ZDO (`cd_disguise`), **still instantiate the real `Player`
@@ -650,7 +671,9 @@ save file (`ZDO.Save`). The chosen prefab determines **what each client instanti
      permanently and **make you invisible** to vanilla clients (their instance is
      destroyed and never re-created). Same rule for the `cd_disguise` marker.
    The result: other players see the new look **~1.5 s** after `disguise set/enable/
-   disable`, without moving and without anyone reconnecting.
+   disable`, and after a **level** change as well - a creature reads its level once, when
+   it is born (`Character.Awake`), so a machine already drawing it needs a fresh object
+   before a new skin can show - without moving and without anyone reconnecting.
    > This step runs **entirely on the server** (`ZDOMan.SendZDOs`): it needs the DLL
    > installed there (§ 1.b). Without it, everything else still works.
 
@@ -1043,7 +1066,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   (`PauseMenuEntry`), the terrain tiles it built to read the ground (`GroundProbe`), and every
   Harmony patch (`UnpatchSelf`), before the logger goes with the
   instance. Everything it does not share stays `private`.
-- `DisguiseConfig.cs` - the thirty-five settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the thirty-six settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
@@ -1051,8 +1074,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   pause menu's Settings button (to take the shape of) and closing the pause menu (§ 2),
   both PUBLIC in the game and reached through reflection all the same, the audit counting
   a public member exactly as it counts a private one.
-- `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the vanilla
-  `Player` prefab hash, the configured creature hash) and `PrefabName`.
+- `PrefabResolver.cs` - every hash the mod uses (`cd_disguise` / `cd_refresh`, the game's
+  own `level` key, the vanilla `Player` prefab hash, the configured creature hash) and
+  `PrefabName`.
 - `PrefabKind.cs` - the six categories of the list (`Static`, `Creature`, `Item`,
   `Building`, `Nature`, `Other`): one checkbox each in the window, one category per
   prefab. `Static` is the first test `KindOf` makes and the only one about movement instead
@@ -1092,8 +1116,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   goes out of every place it was repeated. A favorite is a mark and never a category: the
   kind PrefabCatalog gave the prefab stands, and `GuiCategories.ShowRow` is where the two
   filters meet.
-- `DisguiseApplier.cs` - `HasMarker` / `ApplyTo` / `InstantiateAs`: writes the marker and
-  swaps the network prefab.
+- `DisguiseApplier.cs` - `HasMarker` / `ApplyTo` / `InstantiateAs`: writes the marker, the
+  **level** of the costume (the game's own `level` key, on YOUR zdo only - another player's
+  level is theirs to publish) and swaps the network prefab.
 - `EquipmentMask.cs` - the equipment display options (`3 - Display`): swaps the equipment
   hashes out of the outgoing packet, out of the save file, and back into the frame the
   modded machines render (§ 2).
@@ -1101,7 +1126,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   the costume's own maximum into the `health` key for the duration of `ZDO.Serialize` and
   puts the real one back right after, relaying machine only, so a vanilla client draws a
   whole costume instead of one wearing your hit points as damage. Silently, no DataRevision
-  bump, and never through `ZDO.Save`.
+  bump, and never through `ZDO.Save`. A **creature's** maximum is the one a creature of its
+  level has - base x level, the way the game gives every non-player Character its health -
+  while a piece or a vehicle, which owns its hit points through `WearNTear`, keeps its own
+  whatever the level says.
 - `AllyView.cs` - the other half of `3 - Display`: publishes the health-bar relation
   (`cd_rel`) and writes it into `ZDOVars.s_tamed` for the duration of the packet, so a
   vanilla client draws your creature as an ally or as an enemy (§ 2).
@@ -1254,9 +1282,15 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   right half has between the buttons and the status line - its listener writes
   `HideItemSparkle` and the cache `RefreshState` compares against, so a value typed in
   ConfigurationManager is pushed back into the box while a click never is), the
+  **level row** on that same band, right-aligned with the picture above it (`LevelRow`: the
+  word `Level`, then `-` and `+` around the number - each button runs `disguise level <n>`
+  through the very same `DisguiseCommand.Run` path as every button of this window, the
+  number is rewritten per frame by `RefreshState` like every other label, and
+  `SyncLevelButtons` stops the two at the ends of the span the game itself keeps a creature
+  inside, 1 to 9), the
   status line below them, the **help line** closing the window under that one (`GuiHelp.Build`
   - the words of every control are handed to `GuiHelp.Watch` as it is built: Close, the chord,
-  the state line, the five buttons and the sparkle box here, and the same call made by
+  the state line, the five buttons, the sparkle box and the level row here, and the same call made by
   `GuiStatus`, `GuiPose`, `GuiCreatureList` and `GuiCategories` for their own), and the
   coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
@@ -1393,9 +1427,11 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   pointer only once it is drawn) and the rule that decides what is in it: the last row the pointer was on, the
   configured creature before any row was pointed at in this opening, the change held back
   0.15 s so that a pointer sweeping the list builds one copy instead of one per row crossed -
-  and one more reason to build the copy again, the sparkle option (`HideItemSparkle`) having
-  been read by the factory at build time: a value that moves while the picture stands shows
-  the creature once more, and only when it can matter (an item, `GhostFactory.HideSparkle`).
+  and two more reasons to build the copy again: the sparkle option (`HideItemSparkle`) and
+  the level (`CreatureLevel`), both read by the factory at build time - a value that moves
+  while the picture stands shows the creature once more, and only when it can matter (an
+  item for the sparkle, `GhostFactory.HideSparkle`; a level above 1 for the level,
+  `LevelSkin`).
   The pointer reaching a row is `GuiRowHover`, one component per row, which now also writes
   that row's help on the bottom line.
 - `CreaturePreview.cs` - the stage the preview is filmed from: the free layer, the camera of
@@ -1404,6 +1440,17 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   along both axes (so the object itself fills the picture, whatever its shape or size), the
   turntable, and `Forget` - texture released, layer given back to the cameras and the lights -
   called with the window closing.
+- `LevelSkin.cs` - the skin of a star level, on the two copies this mod builds itself: the
+  clone your own screen draws (`SelfView` / `GhostFactory.Create`) and the picture in the
+  window (`CreaturePreview`), which are inert copies the game's own skin cannot dress -
+  `LevelEffects` puts it on in `Start`, through the `Character` above it, and the factory
+  strips every `Character` before a copy wakes. So this calls the very method the game calls
+  (`SetupLevelVisualization`: the level's scale, its alternate skin object, its tinted
+  material) and lends the copy the one thing the method asks of its `Character` - the
+  prefab's own, of which the method reads nothing but the name of its gameObject (the key of
+  the material cache, shared with the real creatures of the world). Everything goes through
+  reflection BY NAME, the way `HealthMask` reads `m_health`: a rename in a game update costs
+  the base look, never an exception on your screen.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
@@ -1549,6 +1596,7 @@ so the count of twenty-four stays correct.
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
 | A prefab like `Abomination_attack1` or `wraith_melee` is missing from the list | Normal, and no accident: those are the creature's own **attack helpers** and zones - registered `Item` prefabs with **no mesh anywhere**, which is why the log says `Preview: <name> has no mesh to show.` when one is pointed at. The catalogue drops them with every other prefab nothing could be drawn of (a spawner, a blob's AoE): they would be an empty picture in the window and an invisible viking in the world (§ 6). `disguise set <name>` still takes one typed by hand |
 | The shimmer beside an item costume is still there | `HideItemSparkle` only reaches what **this machine** draws: your own costume (`SeeYourDisguise`, § 2) and the picture of the window - so tick `Hide item sparkle` under the command buttons (or write `HideItemSparkle = true` in the `.cfg`) and both drop it at once, the clone being rebuilt rather than repaired. A machine with no DLL of ours builds your **real item prefab** from the network, where the particle system is baked into the prefab and no setting of ours exists to turn it off; a machine running the DLL draws a real `Player` for you and never your costume (§ 3), so there is nothing of yours there to shimmer |
+| A level 2 or 3 costume shows the plain creature | Three places can show it, each with the game's own rule behind it. **Another machine**: a creature reads its level once, when it is born (`Character.Awake`) and keeps that instance forever, so a machine already drawing you needs a fresh object before a new skin can show - `ForceObserverRefresh` (§ 4.1) does it on its own, `disguise refresh` is the manual fallback, and the dedicated server must run the DLL for either. **Your own screen / the picture**: those are copies this mod builds, dressed by `LevelSkin` at their build - the level is read once per build, so a level that just moved rebuilds them within the same frame (the picture after its 0.15 s hover delay). **Everywhere at once**: a level above the skins a prefab carries keeps only the health growing, and the game draws the base look - `spawn <creature> 1 4` in vanilla behaves exactly the same. A star only ever appears at levels **2 and 3** (`EnemyHud` draws it for those two alone) |
 | The pause menu has no `Disguise` line | `ShowMenuEntry` is off (`6 - GUI`, on by default). Set it back to `true` and the line comes back at the next opening of the pause menu - at once, if that menu is on screen while ConfigurationManager changes it. The line is there in the main menu too, where the window only says `the prefab list is available in game` until a world is loaded |
 | Opening the window takes a noticeable moment | Two things cost, and the log says both: `GUI: <n> name(s) in <ms> ms, <built> of <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The catalogue is the walk that tags every vanilla prefab with its kind - up to ten component tests, and exactly ONCE: the walk skips them when all it was asked for is names, and the window does that one pass for its own rows. The rows are Jotunn buttons of four objects each, and only the categories the boxes have ON get one at the opening; a category switched on later is built then, once (in the order of the list), and a row is never destroyed, so switching back and forth stays a `SetActive`. The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log) |
 | The cursor stays free after the window is closed (or in a later world, the camera never follows the mouse again) | `GameCamera.m_mouseCapture` is still handed to Jotunn: `DisguiseGui.Tick` notices the mismatch on the next frame and releases it (a window destroyed by a scene change cannot release it by itself). If it survives that, deploy a current build and restart (§ 6) |
