@@ -1268,7 +1268,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   open) - and `Refilter` on every change, which first builds the rows the boxes just started
   OWING (the opening only builds what they owe already: the six categories, or the marks
   when `Favorites` was already ticked) and then re-runs the filter over them. The row is
-  drawn **Favorites first, the six kinds after it in alphabetical order** (`Kinds` - the
+  drawn **Favorites first, the six kinds after it in alphabetical order** (`s_kinds` - the
   enum keeps the order `disguise list` prints in, and no box reads a kind by its number any
   more); the first box reads `ShowFavorites`, and `ShowRow` holds the one rule of a row: the
   marks alone while it is on, the box of the kind otherwise. A category and a mark part

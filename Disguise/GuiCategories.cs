@@ -13,7 +13,7 @@ namespace Disguise;
 /// the categories the list shows (the console's "disguise list" always prints every kind),
 /// and one - Favorites - which is not a kind at all but a mark beside them (a prefab keeps
 /// the one kind PrefabCatalog gave it). Favorites is drawn FIRST and the six kinds follow it
-/// in alphabetical order of their label (Kinds); while it is on, the six are ignored and the
+/// in alphabetical order of their label (s_kinds); while it is on, the six are ignored and the
 /// list shows the marked prefabs only: one click to leaf through a favorites list, one more
 /// to be back on the categories.
 ///
@@ -63,7 +63,7 @@ internal static class GuiCategories
     /// list" prints the categories in; no box reads a kind by its number any more, so a kind
     /// added later has to find its place in this array.
     /// </summary>
-    private static readonly PrefabKind[] Kinds =
+    private static readonly PrefabKind[] s_kinds =
     {
         PrefabKind.Building,
         PrefabKind.Creature,
@@ -74,10 +74,10 @@ internal static class GuiCategories
     };
 
     /// <summary>The row is placed from the top-left corner of the window, like the list.</summary>
-    private static readonly Vector2 Anchor = new Vector2(0f, 1f);
+    private static readonly Vector2 s_anchor = new Vector2(0f, 1f);
 
     /// <summary>Jotunn never sets a pivot: it stays in the middle, so a position IS a centre.</summary>
-    private static readonly Vector2 Centre = new Vector2(0.5f, 0.5f);
+    private static readonly Vector2 s_centre = new Vector2(0.5f, 0.5f);
 
     private static readonly List<Toggle?> s_toggles = new();
 
@@ -164,9 +164,9 @@ internal static class GuiCategories
             // CreateToggle parents with worldPositionStays, which leaves the box wherever
             // the window happens to be: anchors and position are written afterwards, the
             // way GuiCreatureList corrects its own field.
-            boxRect.anchorMin = Anchor;
-            boxRect.anchorMax = Anchor;
-            boxRect.pivot = Centre;
+            boxRect.anchorMin = s_anchor;
+            boxRect.anchorMax = s_anchor;
+            boxRect.pivot = s_centre;
             boxRect.anchoredPosition = new Vector2(cursor + (BoxSize * 0.5f), y);
         }
         cursor += BoxSize + InnerGap;
@@ -175,7 +175,7 @@ internal static class GuiCategories
             gui,
             title,
             parent,
-            Anchor,
+            s_anchor,
             new Vector2(cursor, y),
             gui.AveriaSerif,
             LabelFontSize,
@@ -318,13 +318,13 @@ internal static class GuiCategories
     /// <summary>The value a box shows: Favorites first, then the six kinds (BoxCount of them).</summary>
     private static bool ShownAt(int index)
     {
-        return index == 0 ? FavoritesOn() : Shown(Kinds[index - 1]);
+        return index == 0 ? FavoritesOn() : Shown(s_kinds[index - 1]);
     }
 
     /// <summary>The label of a box: "Favorites" first, then the plural of the kind.</summary>
     private static string TitleAt(int index)
     {
-        return index == 0 ? "Favorites" : Title(Kinds[index - 1]);
+        return index == 0 ? "Favorites" : Title(s_kinds[index - 1]);
     }
 
     private static void OnToggled(int index, bool on)
@@ -337,7 +337,7 @@ internal static class GuiCategories
     /// <summary>The Show* entry of a box: Favorites has its own, the six kinds the six entries.</summary>
     private static ConfigEntry<bool> Entry(int index)
     {
-        return index == 0 ? DisguiseConfig.ConfigShowFavorites : KindEntry(Kinds[index - 1]);
+        return index == 0 ? DisguiseConfig.ConfigShowFavorites : KindEntry(s_kinds[index - 1]);
     }
 
     /// <summary>The Show* entry of a kind: the six boxes are the six entries, no copy anywhere.</summary>

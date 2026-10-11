@@ -42,13 +42,13 @@ internal static class CreaturePreview
     internal const float PictureHeight = 300f;
 
     /// <summary>Where the stage stands: 20 km under the world, out of every camera playing the game.</summary>
-    private static readonly Vector3 StageOrigin = new Vector3(0f, -20000f, 0f);
+    private static readonly Vector3 s_stageOrigin = new Vector3(0f, -20000f, 0f);
 
-    private static readonly Vector3 KeyAngles = new Vector3(28f, 22f, 0f);
+    private static readonly Vector3 s_keyAngles = new Vector3(28f, 22f, 0f);
 
-    private static readonly Vector3 FillAngles = new Vector3(20f, -135f, 0f);
+    private static readonly Vector3 s_fillAngles = new Vector3(20f, -135f, 0f);
 
-    private static readonly Color PreviewAmbient = new Color(0.42f, 0.42f, 0.47f);
+    private static readonly Color s_previewAmbient = new Color(0.42f, 0.42f, 0.47f);
 
     private const float KeyIntensity = 1.1f;
 
@@ -103,7 +103,7 @@ internal static class CreaturePreview
     private const int NoFreeLayer = -1;
 
     /// <summary>The layers Unity keeps spare under 8: unnamed, and nothing in the game draws on them.</summary>
-    private static readonly int[] SpareLayers = { 7, 6, 3 };
+    private static readonly int[] s_spareLayers = { 7, 6, 3 };
 
     private static int s_layer = NotSearched;
 
@@ -580,7 +580,7 @@ internal static class CreaturePreview
         Forget();
 
         s_root = new GameObject("Disguise preview stage");
-        s_root.transform.position = StageOrigin;
+        s_root.transform.position = s_stageOrigin;
         HideStage();
 
         GameObject cameraObject = new GameObject("Disguise preview camera");
@@ -610,8 +610,8 @@ internal static class CreaturePreview
 
         // Key light on the camera (the side you look at is always lit), fill on the stage
         // (a fixed direction, so the shading shifts as the camera goes round).
-        AddLight(cameraObject.transform, KeyAngles, KeyIntensity);
-        AddLight(s_root.transform, FillAngles, FillIntensity);
+        AddLight(cameraObject.transform, s_keyAngles, KeyIntensity);
+        AddLight(s_root.transform, s_fillAngles, FillIntensity);
         return true;
     }
 
@@ -640,9 +640,9 @@ internal static class CreaturePreview
                 return layer;
             }
         }
-        for (int i = 0; i < SpareLayers.Length; i++)
+        for (int i = 0; i < s_spareLayers.Length; i++)
         {
-            int layer = SpareLayers[i];
+            int layer = s_spareLayers[i];
             if (string.IsNullOrEmpty(LayerMask.LayerToName(layer)))
             {
                 return layer;
@@ -766,10 +766,10 @@ internal static class CreaturePreview
         try
         {
             RenderSettings.fog = false;
-            RenderSettings.ambientLight = PreviewAmbient;
-            RenderSettings.ambientSkyColor = PreviewAmbient;
-            RenderSettings.ambientEquatorColor = PreviewAmbient;
-            RenderSettings.ambientGroundColor = PreviewAmbient * 0.7f;
+            RenderSettings.ambientLight = s_previewAmbient;
+            RenderSettings.ambientSkyColor = s_previewAmbient;
+            RenderSettings.ambientEquatorColor = s_previewAmbient;
+            RenderSettings.ambientGroundColor = s_previewAmbient * 0.7f;
             camera.Render();
         }
         finally
