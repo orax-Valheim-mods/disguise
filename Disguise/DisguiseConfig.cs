@@ -104,8 +104,25 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<string> ConfigFavorites = null!;
 
-    /// <summary>Binds every setting to the config file. Called once, from Disguise.Awake.</summary>
+    /// <summary>
+    /// Binds every setting to the config file. Called once, from Disguise.Awake. The work
+    /// itself sits in one private method per section - the six sections of the .cfg, in the
+    /// order the file shows them - so no method grows past the screen it is read on, and a
+    /// section can be read or changed on its own. Each of those methods binds its settings
+    /// AND registers the handlers of those settings: what belongs together stays together.
+    /// </summary>
     internal static void Bind(ConfigFile config)
+    {
+        BindGeneral(config);
+        BindMultiplayer(config);
+        BindDisplay(config);
+        BindOwnView(config);
+        BindFlight(config);
+        BindGui(config);
+    }
+
+    /// <summary>Section `1 - General`: the mod itself, and what the log writes.</summary>
+    private static void BindGeneral(ConfigFile config)
     {
         ConfigEnabled = config.Bind(
             "1 - General",
@@ -122,6 +139,8 @@ internal static class DisguiseConfig
             "Exact name of the creature prefab (e.g. Troll, Draugr, Wolf, Greydwarf, Blob, Skeleton, Neck, Boar, Eikthyr...). "
                 + "Console command: disguise list to see the available names."
         );
+
+        ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
 
         ConfigProtectSave = config.Bind(
             "1 - General",
@@ -150,7 +169,11 @@ internal static class DisguiseConfig
                 + "what tells a broken install from a working one. "
                 + "Console command: disguise logs [on|off]."
         );
+    }
 
+    /// <summary>Section `2 - Multiplayer`: what the other machines are told, and when.</summary>
+    private static void BindMultiplayer(ConfigFile config)
+    {
         ConfigForceRefresh = config.Bind(
             "2 - Multiplayer",
             "ForceObserverRefresh",
@@ -168,7 +191,11 @@ internal static class DisguiseConfig
                 + "observer refresh. The change becomes visible to other players after roughly this delay. "
                 + "Increase it (e.g. 2.5) on a laggy connection if clients do not refresh."
         );
+    }
 
+    /// <summary>Section `3 - Display`: what the OTHER machines see while you are disguised.</summary>
+    private static void BindDisplay(ConfigFile config)
+    {
         // -- 3 - Display: the equipment hashes live in your ZDO, and VisEquipment attaches
         // those items to whatever prefab carries it - the creature, on a vanilla client.
         // Hiding them removes the misplaced gear, your own view keeps it (see EquipmentMask).
@@ -229,7 +256,11 @@ internal static class DisguiseConfig
         ConfigHideCape.SettingChanged += HideSettingChanged;
         ConfigHideHeldItems.SettingChanged += HideSettingChanged;
         ConfigShowAsAlly.SettingChanged += (_, _) => AllyView.OnSettingChanged();
+    }
 
+    /// <summary>Section `4 - Own view`: purely local rendering, on this screen only.</summary>
+    private static void BindOwnView(ConfigFile config)
+    {
         // -- 4 - Own view: purely local rendering, polled every frame by SelfView.Tick() and
         // (while the window is open) by GuiPreview.Tick, so no SettingChanged handler is
         // needed here: a clone already standing rebuilds itself when the setting moves.
@@ -254,7 +285,11 @@ internal static class DisguiseConfig
                 + "builds the real item prefab from the network and has no setting to read. Window: "
                 + "the 'Hide item sparkle' box under the command buttons."
         );
+    }
 
+    /// <summary>Section `5 - Flight`: the keys, the wheel and the speed of the climb.</summary>
+    private static void BindFlight(ConfigFile config)
+    {
         // -- 5 - Flight: purely visual, the player never leaves the ground (FlightControl).
         // The keys are BepInEx KeyboardShortcut values: the .cfg stores them as
         // "main key + modifiers" (e.g. Home + LeftAlt), and ConfigurationManager (Alt+F10 by
@@ -333,7 +368,11 @@ internal static class DisguiseConfig
                 + "FlyScrollWheel is on). A smooth wheel or a trackpad moves proportionally; "
                 + "a negative value reverses climb and descent."
         );
+    }
 
+    /// <summary>Section `6 - GUI`: the window - its chord, its place, its list.</summary>
+    private static void BindGui(ConfigFile config)
+    {
         ConfigGuiKey = config.Bind(
             "6 - GUI",
             "GuiKey",
@@ -465,8 +504,6 @@ internal static class DisguiseConfig
                 + "the ones \"disguise list\" prints; a name no catalogue holds simply never "
                 + "matches a row, and nothing here is ever dropped from the catalogue itself."
         );
-
-        ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
 
         ConfigShowMenuEntry.SettingChanged += (_, _) => PauseMenuEntry.OnSettingChanged();
     }
