@@ -390,33 +390,34 @@ left to read by then, which is why the last frame's is remembered. A place typed
 `.cfg` by hand is honoured too, and kept on screen when it is read: a change of resolution
 cannot push the window out of sight. The window shows
 the line under the title, then the checkbox row under that line, the prefab list, the two pose rows under it, the 3D preview, the
-command buttons, the sparkle box, the status line and, closing the window, the help line under it (the branch added them one step at a time): a row of five buttons
+command buttons, the level row and the sparkle box, the status line and, closing the window, the help line under it (the branch added them one step at a time): a row of five buttons
 under the picture, each one running the sub-command its label stands for
-exactly as the console would (`Enable` / `Disable`, `Refresh`, `Own view`, `Flight`,
-`Add favorite` / `Remove favorite` =
-`disguise enable` / `disable`, `refresh`, `view`, `fly`, `favorite <prefab>`), and reporting its answer on the
-status line, the line above the help line that closes the window. The first button is a toggle: it reads "Disable" while the
-disguise is on and "Enable" while it is off, and both that label and the line under the title
-are rewritten after every click. The last one is a toggle the same way - "Add favorite" over a
-prefab with no mark, "Remove favorite" over one that has - and it acts on the prefab
+exactly as the console would (`Add favorite` / `Remove favorite`, `Enable` / `Disable`,
+`Refresh`, `Own view`, `Flight` =
+`favorite <prefab>`, `disguise enable` / `disable`, `refresh`, `view`, `fly`), and reporting its answer on the
+status line, the line above the help line that closes the window. The first button is a
+toggle for the mark - "Add favorite" over a prefab with no mark, "Remove favorite" over one
+that has - and it acts on the prefab
 **selected** in the window, the one the state line names: the console's own
 `disguise favorite` with no name, so the button and the command are one single call and the
-answer it writes on the status line always names the prefab it changed. Under those five
-buttons sits the **sparkle box** - `Hide item sparkle`, the one checkbox that is not in the row
-above, because it gates no list: it writes `HideItemSparkle` (`4 - Own view`) and nothing
-else, the same control the row above is made of (box and label are one hit target,
-`GuiCategories.BuildBox`), starting at the picture's own left edge so the right half keeps one
-edge all the way down; a click on it takes the shimmer off an item costume at once, on your
-own screen and in the picture (both rebuild themselves, § 2), and a value written in
-ConfigurationManager is pushed back into the box every frame like every other label. On the
-**same band**, right-aligned with the picture above it, sits the **level row** - the word
-`Level`, then `-` and `+` around the number: the level the costume is drawn at (§ 2, the
-`CreatureLevel` setting), each click running `disguise level <n>` exactly like every other
-button of this window runs its sub-command, so the answer lands on the status line below.
-The number is rewritten per frame, so a level typed into the console or into
-ConfigurationManager lands without closing the window; and the two buttons stop being
-clickable at the ends of the span (1 and 9) rather than running a command that could not
-move the level. The **line under the
+answer it writes on the status line always names the prefab it changed. The second is a
+toggle for the disguise itself: it reads "Disable" while the disguise is on and "Enable"
+while it is off, and both that label and the line under the title are rewritten after every
+click. Under those five
+buttons sits a **band** with two controls on it. At the picture's own left edge sits the
+**level row** - the word `Level`, then `-` and `+` around the number: the level the costume
+is drawn at (§ 2, the `CreatureLevel` setting), each click running `disguise level <n>`
+exactly like every other button of this window runs its sub-command, so the answer lands on
+the status line below. The number is rewritten per frame, so a level typed into the console
+or into ConfigurationManager lands without closing the window; and the two buttons stop
+being clickable at the ends of the span (1 and 9) rather than running a command that could
+not move the level. To its right sits the **sparkle box** - `Hide item sparkle`, the one
+checkbox that is not in the row above, because it gates no list: it writes `HideItemSparkle`
+(`4 - Own view`) and nothing else, the same control the row above is made of (box and label
+are one hit target, `GuiCategories.BuildBox`); a click on it takes the shimmer off an item
+costume at once, on your own screen and in the picture (both rebuild themselves, § 2), and a
+value written in ConfigurationManager is pushed back into the box every frame like every
+other label. The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -1273,21 +1274,22 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   two lines that close it, the status line being anchored to the bottom edge (nothing above
   moves when the panel grows, and `StatusY` is the number that keeps its own box where it was
   across the 40 px it grew by for the help line)), the
-  row of five command buttons under the picture (each one runs its sub-command through
+  row of five command buttons under the picture (Favorite first, then Enable/Disable,
+  Refresh, Own view, Flight; each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
-  two toggles among them - the first from the config, the Favorite one from the configured
-  prefab and its mark; their text is best-fit, five buttons now sharing the width of the picture), the
-  **sparkle box** under those buttons (`SparkleBox`: the very control `GuiCategories.BuildBox`
-  puts in the row above, starting at the picture's own left edge and centred in the 94 px the
-  right half has between the buttons and the status line - its listener writes
+  two toggles among them - the Favorite one from the configured
+  prefab and its mark, the other from the config; their text is best-fit, five buttons now sharing the width of the picture), the
+  **band** under those buttons: the **level row** first, at the picture's own left edge
+  (`LevelRow`: the word `Level`, then `-` and `+` around the number - each button runs
+  `disguise level <n>` through the very same `DisguiseCommand.Run` path as every button of
+  this window, the number is rewritten per frame by `RefreshState` like every other label,
+  `SyncLevelButtons` stops the two at the ends of the span the game itself keeps a creature
+  inside, 1 to 9, and the whole row's width is the shared `LevelRowWidth`), then the
+  **sparkle box** to its right (`SparkleBox`: the very control `GuiCategories.BuildBox`
+  puts in the row above, starting after `LevelRowWidth` + a gap of the band and centred in
+  the 94 px the right half has between the buttons and the status line - its listener writes
   `HideItemSparkle` and the cache `RefreshState` compares against, so a value typed in
   ConfigurationManager is pushed back into the box while a click never is), the
-  **level row** on that same band, right-aligned with the picture above it (`LevelRow`: the
-  word `Level`, then `-` and `+` around the number - each button runs `disguise level <n>`
-  through the very same `DisguiseCommand.Run` path as every button of this window, the
-  number is rewritten per frame by `RefreshState` like every other label, and
-  `SyncLevelButtons` stops the two at the ends of the span the game itself keeps a creature
-  inside, 1 to 9), the
   status line below them, the **help line** closing the window under that one (`GuiHelp.Build`
   - the words of every control are handed to `GuiHelp.Watch` as it is built: Close, the chord,
   the state line, the five buttons, the sparkle box and the level row here, and the same call made by

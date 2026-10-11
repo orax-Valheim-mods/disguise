@@ -22,7 +22,8 @@ namespace Disguise;
 /// them, this class only says where they sit - under that line), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
-/// films into it), under it the five command buttons and, under those, the sparkle box
+/// films into it), under it the five command buttons and, under those, the band the level
+/// row holds at the picture's own left edge with the sparkle box to its right
 /// (HideItemSparkle - the one checkbox that is not in the row above, because it gates
 /// nothing: it is the costume itself that is drawn differently), then the status line
 /// (GuiStatus), which is the hint while no button has been pressed and the answer of the
@@ -118,7 +119,32 @@ internal static class GuiWindow
     private const float SparkleY = -504f;
 
     /// <summary>
-    /// The label of the first command button, kept here because it is a toggle: RefreshState
+    /// The band's split, in pixels of the picture above it: the level row stands at the
+    /// picture's own left edge and takes LevelRowWidth of the band (LevelRow), then
+    /// LevelBandGap of air, and the sparkle box takes what is left of it (SparkleBox) -
+    /// one shared number, because the row is built in the picture's coordinates and the
+    /// box in the window's, and neither may ask where the other one is.
+    /// </summary>
+    private const float LevelWordWidth = 60f;
+
+    private const float LevelNumberWidth = 44f;
+
+    private const float LevelItemGap = 4f;
+
+    private const float LevelBandGap = 8f;
+
+    private const float LevelRowWidth =
+        LevelWordWidth
+        + LevelItemGap
+        + GuiMetrics.RowHeight
+        + LevelItemGap
+        + LevelNumberWidth
+        + LevelItemGap
+        + GuiMetrics.RowHeight;
+
+    /// <summary>
+    /// The label of the Enable/Disable command button - the second of the row, after the
+    /// Favorite one - kept here because it is a toggle: RefreshState
     /// rewrites it after every change, the same way it rewrites the state line. Unity-null
     /// once the window is gone, which is the whole safety of both.
     /// </summary>
@@ -134,9 +160,10 @@ internal static class GuiWindow
     private static Text? s_favorite;
 
     /// <summary>
-    /// The level row's number and its two buttons, on the band the sparkle box stands on:
-    /// the number is rewritten per frame like the state line (RefreshState), and the buttons
-    /// stop being clickable at the ends of the span the game itself keeps a creature inside
+    /// The level row's number and its two buttons, at the picture's own left edge of the
+    /// band shared with the sparkle box: the number is rewritten per frame like the state
+    /// line (RefreshState), and the buttons stop being clickable at the ends of the span
+    /// the game itself keeps a creature inside
     /// (1 to 9) instead of running a command that could not move the level. Unity-null once
     /// the window is gone, the same safety as everything above.
     /// </summary>
@@ -326,8 +353,9 @@ internal static class GuiWindow
     /// The control itself comes from GuiCategories.BuildBox - the very one the checkbox row
     /// is made of - and the listener here writes the entry and the cache, and nothing else:
     /// there is no list to re-filter, and the clones standing rebuild themselves when the
-    /// value moves (SelfView, GuiPreview). Placed at the picture's own left edge, where the
-    /// row of buttons above starts, so the right half keeps one edge all the way down.
+    /// value moves (SelfView, GuiPreview). Standing to the RIGHT of the level row, which
+    /// holds the picture's own left edge (LevelRow): the two controls share the band the
+    /// buttons above end on, and both stay inside the picture's own two edges.
     /// </summary>
     private static void SparkleBox(Transform parent)
     {
@@ -335,8 +363,9 @@ internal static class GuiWindow
 
         // The preview anchors on the MIDDLE of the window and starts PreviewX right of it
         // (GuiPreview), while the box anchors on its top-left corner (BuildBox): the two
-        // corners are the same x once this much is added to it.
-        float cursor = (Width * 0.5f) + PreviewX;
+        // corners are the same x once this much is added to it - and the level row, built
+        // in the preview's own coordinates, has already taken LevelRowWidth of the band.
+        float cursor = (Width * 0.5f) + PreviewX + LevelRowWidth + LevelBandGap;
         s_sparkle = GuiCategories.BuildBox(
             parent,
             ref cursor,
@@ -357,34 +386,32 @@ internal static class GuiWindow
         "The level your costume is drawn at - the star levels of the creatures. It is written into your ZDO for every machine to read (and kept in the configuration, CreatureLevel).";
 
     /// <summary>
-    /// The level row: the star levels, on the band the sparkle box stands on and
-    /// right-aligned with the picture above it - the word, then - and + around the number.
-    /// Each button runs "disguise level <1-9>" the way every button of this window runs its
-    /// sub-command (Command), so the answer lands on the status line below and the console
-    /// and the window stay one single call. The number is rewritten per frame like the state
-    /// line (RefreshState), so a level typed into the console or into ConfigurationManager
-    /// lands without closing the window; and a level at the ends of the span the game itself
-    /// keeps a creature inside stops its button there, rather than running a command that
-    /// could not move it.
+    /// The level row: the star levels, at the picture's own left edge of the band the
+    /// sparkle box shares - the word, then - and + around the number, the box to their
+    /// right. Each button runs "disguise level <1-9>" the way every button of this window
+    /// runs its sub-command (Command), so the answer lands on the status line below and
+    /// the console and the window stay one single call. The number is rewritten per frame
+    /// like the state line (RefreshState), so a level typed into the console or into
+    /// ConfigurationManager lands without closing the window; and a level at the ends of
+    /// the span the game itself keeps a creature inside stops its button there, rather
+    /// than running a command that could not move it.
     /// </summary>
     private static void LevelRow(GUIManager gui, Transform parent)
     {
-        const float numberWidth = 44f;
-        const float wordWidth = 60f;
         const int fontSize = 16;
-        const float gap = 4f;
         float height = GuiMetrics.RowHeight;
 
-        // Everything is measured from the picture's own right edge, leftwards: this row
-        // belongs to the picture, and the sparkle box keeps the left half of the band.
-        float cursor = PreviewX + CreaturePreview.PictureWidth;
-        float plusX = cursor - (height * 0.5f);
-        cursor -= height + gap;
-        float numberX = cursor - (numberWidth * 0.5f);
-        cursor -= numberWidth + gap;
-        float minusX = cursor - (height * 0.5f);
-        cursor -= height + gap;
-        float wordX = cursor - (wordWidth * 0.5f);
+        // Everything is measured from the picture's own left edge, rightwards: this row
+        // holds that edge of the band, and SparkleBox starts where LevelRowWidth says the
+        // row ends - one shared number, because the two builds use different coordinates.
+        float cursor = PreviewX;
+        float wordX = cursor + (LevelWordWidth * 0.5f);
+        cursor += LevelWordWidth + LevelItemGap;
+        float minusX = cursor + (height * 0.5f);
+        cursor += height + LevelItemGap;
+        float numberX = cursor + (LevelNumberWidth * 0.5f);
+        cursor += LevelNumberWidth + LevelItemGap;
+        float plusX = cursor + (height * 0.5f);
 
         s_levelUp = ButtonOf(
             Command(
@@ -408,7 +435,7 @@ internal static class GuiWindow
             gui.AveriaSerif,
             fontSize,
             gui.ValheimBeige,
-            numberWidth,
+            LevelNumberWidth,
             height
         );
         s_level = number.GetComponent<Text>();
@@ -436,7 +463,7 @@ internal static class GuiWindow
             gui.AveriaSerif,
             fontSize,
             gui.ValheimBeige,
-            wordWidth,
+            LevelWordWidth,
             height
         );
         GuiHelp.Watch(word, LevelHelp);
@@ -484,9 +511,10 @@ internal static class GuiWindow
     /// <summary>
     /// The row under the picture: CommandCount buttons of equal width, each one running its
     /// sub-command through DisguiseCommand.Run, which has no console here and answers on the
-    /// status line below. The first is a toggle, so what it says and what it runs both follow
-    /// the config; the last follows the configured prefab and its mark (DescribeFavorite),
-    /// which is why RefreshState rewrites it every frame like the state line above.
+    /// status line below. The first follows the configured prefab and its mark
+    /// (DescribeFavorite); the second is a toggle, so what it says and what it runs both
+    /// follow the config - and RefreshState rewrites both every frame like the state line
+    /// above.
     /// </summary>
     private static void CommandButtons(GUIManager gui, Transform parent)
     {
@@ -494,6 +522,18 @@ internal static class GuiWindow
             (CreaturePreview.PictureWidth - ((CommandCount - 1) * ButtonGap)) / CommandCount;
         float centre = PreviewX + (width * 0.5f);
 
+        s_favorite = Command(
+            gui,
+            parent,
+            DescribeFavorite(),
+            "Mark the prefab named on the line above, or take the mark off - favorites are what the Favorites box shows (disguise favorite).",
+            centre,
+            width,
+            ButtonY,
+            ToggleFavorite
+        );
+
+        centre += width + ButtonGap;
         s_power = Command(
             gui,
             parent,
@@ -539,18 +579,6 @@ internal static class GuiWindow
             width,
             ButtonY,
             () => RunCommand("fly")
-        );
-
-        centre += width + ButtonGap;
-        s_favorite = Command(
-            gui,
-            parent,
-            DescribeFavorite(),
-            "Mark the prefab named on the line above, or take the mark off - favorites are what the Favorites box shows (disguise favorite).",
-            centre,
-            width,
-            ButtonY,
-            ToggleFavorite
         );
     }
 
