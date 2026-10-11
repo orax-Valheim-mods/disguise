@@ -161,14 +161,18 @@ internal static class PrefabResolver
         {
             return s_creatureFootStep;
         }
-        s_creatureFootStepHash = hash;
-        s_creatureFootStep = null;
         ZNetScene? zns = ZNetScene.instance;
         GameObject? prefab = zns != null ? zns.GetPrefab(hash) : null;
-        if (prefab != null)
+        if (prefab == null)
         {
-            s_creatureFootStep = prefab.GetComponentInChildren<FootStep>(true);
+            // Not resolvable YET (a scene still loading, or a prefab another mod adds a
+            // moment later): nothing is cached, so the next footstep tries again. A prefab
+            // that resolves and carries no FootStep IS cached as null - most creatures have
+            // none, and the lookup may not run on every footstep of the world.
+            return null;
         }
+        s_creatureFootStepHash = hash;
+        s_creatureFootStep = prefab.GetComponentInChildren<FootStep>(true);
         return s_creatureFootStep;
     }
 
