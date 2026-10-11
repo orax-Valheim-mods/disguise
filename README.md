@@ -1259,6 +1259,22 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `GuiStatus`, `GuiPose`, `GuiCreatureList` and `GuiCategories` for their own), and the
   coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
+- `GuiText.cs` - one thing the whole window does over and over: put a word on a label, and
+  write it only when the word really changed (uGUI lays a text out again on EVERY
+  assignment, an identical one included, so a label refreshed every frame would re-measure,
+  re-wrap and rebuild its mesh for nothing). One overload for each of the two text
+  components the game has - uGUI `Text` and TextMeshPro share no base carrying `text` - and
+  one of them takes the text as a builder, called only when the label is there to show it:
+  that is how `GuiWindow.RefreshState` keeps `DescribeState`, `DescribePower` and
+  `DescribeFavorite` from running for a window a scene change already destroyed. A null
+  label is a label that scene change took, and costs nothing.
+- `GuiMetrics.cs` - the two measures the window shares with the lines around it: the 800 px
+  every line spanning the window is cut to (the 860 of the window minus the margin it keeps
+  on both sides - the help line, the status line and the state line all line up on it), and
+  the 40 px of one row (a command button, a help line, a line of the list). Both names
+  replace two private constants each plus one raw literal, so the measure a player sees
+  line up cannot drift apart in four files again; the status line keeps its own 44 (it sits
+  under the window's frame) and the title row its `TitleRowY`, in `GuiWindow`.
 - `GuiCategories.cs` - the row of seven checkboxes: Jotunn's `CreateToggle` box (the
   Valheim checkbox, orange marker) with a label measured to its own text
   (`Text.preferredWidth`, so the air before the next box is the same whatever the word), the
