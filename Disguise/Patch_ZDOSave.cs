@@ -52,15 +52,17 @@ internal static class Patch_ZDOSave
         return true; // let the original body run anyway
     }
 
-    private static void Postfix(ZDO __instance, int __state)
+    // The finalizer runs even if ZDO.Save threw on the way (disk full, write error): the
+    // prefab written into the LIVE zdo for the duration of the save has to come back either
+    // way, and a Postfix is not the place for that - Harmony skips postfixes when the
+    // original method throws. A zdo left wearing Player is a player the relaying server then
+    // sends as vanilla to the others, until the owner reasserts the creature back.
+    private static Exception? Finalizer(Exception? __exception, ZDO __instance, int __state)
     {
-        if (__state == 0 || __instance == null)
-        {
-            return;
-        }
-        if (GameAccess.s_zdoPrefabField != null)
+        if (__state != 0 && __instance != null && GameAccess.s_zdoPrefabField != null)
         {
             GameAccess.s_zdoPrefabField.SetValue(__instance, __state);
         }
+        return __exception;
     }
 }
