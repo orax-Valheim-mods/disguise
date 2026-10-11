@@ -133,13 +133,18 @@ internal static class HealthMask
         {
             return cached;
         }
-        float maximum = 0f;
         ZNetScene? zns = ZNetScene.instance;
         GameObject? prefab = zns != null ? zns.GetPrefab(hash) : null;
-        if (prefab != null)
+        if (prefab == null)
         {
-            maximum = ReadMaximum(prefab);
+            // Not resolvable YET - a ZNetScene still loading, or a prefab another mod
+            // registers a moment later. Nothing is cached, so the next costume read tries
+            // again: only a measurement really TAKEN is worth keeping for the session, and
+            // a 0 cached here would switch this costume's health swap off until the game
+            // restarts (BeginOutgoingHealth refuses a maximum it cannot trust).
+            return 0f;
         }
+        float maximum = ReadMaximum(prefab);
         s_maximum[hash] = maximum;
         return maximum;
     }
