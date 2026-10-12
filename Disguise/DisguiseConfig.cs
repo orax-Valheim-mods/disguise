@@ -60,6 +60,8 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<bool> ConfigHideItemSparkle = null!;
 
+    internal static ConfigEntry<bool> ConfigHideCreatureGear = null!;
+
     internal static ConfigEntry<KeyboardShortcut> ConfigFlyEnableKey = null!;
 
     internal static ConfigEntry<KeyboardShortcut> ConfigFlyDisableKey = null!;
@@ -317,6 +319,20 @@ internal static class DisguiseConfig
                 + "another machine receives. A machine without this DLL keeps the vanilla sparkle: it "
                 + "builds the real item prefab from the network and has no setting to read. Window: "
                 + "the 'Hide item sparkle' box under the command buttons."
+        );
+
+        ConfigHideCreatureGear = config.Bind(
+            "4 - Own view",
+            "HideCreatureGear",
+            false,
+            "Hide the armor and the weapon a humanoid costume is born with: the gear a real creature "
+                + "of that prefab spawns with (Humanoid's default and random items, the weapon its AI "
+                + "takes into a hand). Off - the gear is DRAWN - which is how a Fuling in the world "
+                + "looks, spear and all. Local visuals only, like HideItemSparkle: it changes what "
+                + "THIS machine draws - your own costume and the window's picture - and never what "
+                + "another machine receives. A machine without this DLL keeps drawing the vanilla "
+                + "creature it receives, gear included. Window: the 'Hide armor & weapon' box under "
+                + "the command buttons. Console command: disguise gear [on|off]."
         );
     }
 

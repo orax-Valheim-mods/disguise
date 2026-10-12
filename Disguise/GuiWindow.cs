@@ -23,9 +23,10 @@ namespace Disguise;
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
 /// films into it), under it the five command buttons and, under those, the band the level
-/// row holds at the picture's own left edge with the sparkle box to its right
-/// (HideItemSparkle - the one checkbox that is not in the row above, because it gates
-/// nothing: it is the costume itself that is drawn differently), then the status line
+/// row holds at the picture's own left edge with the two option boxes to its right - the
+/// sparkle box (HideItemSparkle) over the gear box (HideCreatureGear), the two checkboxes
+/// that are not in the row above because they gate nothing: it is the costume itself that
+/// is drawn differently - then the status line
 /// (GuiStatus), which is the hint while no button has been pressed and the answer of the
 /// last one after that - and, closing the window under it, the help line (GuiHelp), which
 /// holds what the element the pointer is on is for and the idle line while it is on
@@ -111,12 +112,21 @@ internal static class GuiWindow
     /// <summary>
     /// Centre of the sparkle box (HideItemSparkle): the right half of the window has 94 px
     /// between the bottom of the command row (-478) and the band the status line takes
-    /// (-572), and the box takes the upper part of them - 14 px under the buttons, 56 above
-    /// that line - starting at the picture's own left edge, which is where the button row
-    /// above starts as well. The same control as the checkbox row (GuiCategories builds it),
-    /// standing alone here with its own entry to write and no list to re-filter.
+    /// (-572), and the two boxes now split them in two rows - this one 14 px under the
+    /// buttons, the gear box (GearY) 20 px above that line, both starting at the picture's
+    /// own left edge's right, after the level row. The same control as the checkbox row
+    /// (GuiCategories builds it), standing alone here with its own entry to write and no
+    /// list to re-filter.
     /// </summary>
     private const float SparkleY = -504f;
+
+    /// <summary>
+    /// Centre of the gear box (HideCreatureGear), on the second row of the band: 36 px under
+    /// the sparkle box, which leaves 12 px between the two rows and 20 above the status
+    /// line's band. Same x as the sparkle box - the two options stand in one column on the
+    /// right of the level row.
+    /// </summary>
+    private const float GearY = -540f;
 
     /// <summary>
     /// The band's split, in pixels of the picture above it: the level row stands at the
@@ -192,6 +202,16 @@ internal static class GuiWindow
 
     private static bool s_sparkleApplied;
 
+    /// <summary>
+    /// The gear box on the second row of the band, and what it showed last: the same pair as
+    /// the sparkle box above, for the same reason - the entry can also be written by
+    /// ConfigurationManager while the window is open, and RefreshState pushes that back into
+    /// the box. Unity-null once the window is gone, which is the whole safety of it.
+    /// </summary>
+    private static Toggle? s_gear;
+
+    private static bool s_gearApplied;
+
     internal static GameObject Build(Transform parent)
     {
         GUIManager gui = GUIManager.Instance;
@@ -199,6 +219,7 @@ internal static class GuiWindow
         s_power = null;
         s_favorite = null;
         s_sparkle = null;
+        s_gear = null;
 
         // Draggable: Jotunn puts its DragWindowCntrl on the panel, and the whole background
         // forwards the gesture, so there is no dedicated title bar to grab.
@@ -335,11 +356,12 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        // The five command buttons under the picture, the sparkle box under them, the
+        // The five command buttons under the picture, the two option boxes under them, the
         // line they answer on (which still holds the hint about clicking a row while no
         // button has been pressed), and the help line closing the window under that one.
         CommandButtons(gui, window.transform);
         SparkleBox(window.transform);
+        GearBox(window.transform);
         LevelRow(gui, window.transform);
         GuiStatus.Build(window.transform);
         GuiHelp.Build(window.transform);
@@ -377,6 +399,34 @@ internal static class GuiWindow
             {
                 s_sparkleApplied = on;
                 DisguiseConfig.ConfigHideItemSparkle.Value = on;
+            }
+        );
+    }
+
+    /// <summary>
+    /// The box on the second row of the band: HideCreatureGear, the option that takes the
+    /// armor and the weapon a humanoid costume is born with off that costume (GearSkin reads
+    /// it at every build of a copy). Same control, same column and same rules as the sparkle
+    /// box above it: this machine's own drawing only, and a copy already standing rebuilds
+    /// itself when the value moves (SelfView, GuiPreview). The console spells the same
+    /// switch "disguise gear [on|off]", said the way a player says it: ON is the gear drawn.
+    /// </summary>
+    private static void GearBox(Transform parent)
+    {
+        s_gearApplied = DisguiseConfig.ConfigHideCreatureGear.Value;
+
+        float cursor = (Width * 0.5f) + PreviewX + LevelRowWidth + LevelBandGap;
+        s_gear = GuiCategories.BuildBox(
+            parent,
+            ref cursor,
+            GearY,
+            "Hide armor & weapon",
+            "Takes the gear a humanoid costume is born with - the armor and the weapon the game gives a real creature of that prefab at spawn - off THIS machine, yours and the picture above; what another machine draws is never touched.",
+            s_gearApplied,
+            on =>
+            {
+                s_gearApplied = on;
+                DisguiseConfig.ConfigHideCreatureGear.Value = on;
             }
         );
     }
@@ -654,10 +704,10 @@ internal static class GuiWindow
     /// out again for the same words); the Favorite label follows the configured prefab, which
     /// costs a look at the config and one at the marks (both a string compare and a set
     /// lookup); the pose fields cost six more string comparisons, and skip the one being typed
-    /// in (GuiPose); the sparkle box costs one bool - a click on it writes that cache itself,
-    /// so only a value from outside (ConfigurationManager) is ever pushed back. Does nothing
-    /// without a window, which is every frame it is closed and every frame after a scene
-    /// change destroyed it.
+    /// in (GuiPose); the two option boxes cost one bool each - a click on one writes that
+    /// cache itself, so only a value from outside (ConfigurationManager) is ever pushed back.
+    /// Does nothing without a window, which is every frame it is closed and every frame after
+    /// a scene change destroyed it.
     /// </summary>
     internal static void RefreshState()
     {
@@ -675,6 +725,17 @@ internal static class GuiWindow
             {
                 s_sparkleApplied = hide;
                 sparkle.SetIsOnWithoutNotify(hide);
+            }
+        }
+
+        Toggle? gear = s_gear;
+        if (gear != null)
+        {
+            bool hideGear = DisguiseConfig.ConfigHideCreatureGear.Value;
+            if (hideGear != s_gearApplied)
+            {
+                s_gearApplied = hideGear;
+                gear.SetIsOnWithoutNotify(hideGear);
             }
         }
 

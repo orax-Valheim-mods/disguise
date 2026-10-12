@@ -27,6 +27,13 @@ namespace Disguise;
 /// its callbacks drive game logic). The clone cannot move, cannot be seen by any game system
 /// and never reaches the network.
 ///
+/// One thing a copy that is SHOWN keeps on top of that list: its VisEquipment, dressed by
+/// GearSkin in the gear the creature is born with. That component needs a ZNetView above it
+/// to run, so the copy also carries a GhostNetView - the game's type with both of its
+/// messages hidden, i.e. a ZNetView that never mints the ZDO it would otherwise create -
+/// and VisEquipment, finding no ZDO, draws the copy's own slots instead (its else branch).
+/// The throwaway copy of CreatureTriggers keeps neither: it exists to read an Animator.
+///
 /// One thing a clone is then TAKEN off, when the config asks for it: the shimmer of an item
 /// (HideItemSparkle - HideSparkles, the particle systems of an Item costume draw nothing).
 /// </summary>
@@ -56,7 +63,7 @@ internal static class GhostFactory
                 ?? prefab.GetComponentInChildren<ZSyncAnimation>(true)
         );
 
-        GameObject? clone = BuildInert(prefabHash);
+        GameObject? clone = BuildInert(prefabHash, keepEquipment: true);
         if (clone == null)
         {
             return null;
@@ -87,13 +94,19 @@ internal static class GhostFactory
     /// it can only wake renderers, lights, particles, LODGroup and the Animator - never a
     /// ZNetView (which would mint a real ZDO), a Character or an AI.
     ///
+    /// <paramref name="keepEquipment"/> is what a copy that is SHOWN passes (SelfView, the
+    /// window's picture): its VisEquipment survives the strip and a GhostNetView is added
+    /// next to it - the pair GearSkin dresses in the gear the creature is born with, and
+    /// the only thing on the copy that has anything to run. The throwaway copy of
+    /// CreatureTriggers passes false: nothing ever draws it, so it carries neither.
+    ///
     /// The caller owns the result. SelfView activates and renders it; CreatureTriggers
     /// activates it only to read its Animator - Animator.parameters returns an empty array
     /// while the animator is not active in the hierarchy, and a ZNetScene prefab never is
     /// (m_prefabs holds asset references, in no scene at all) - and destroys it in the same
     /// call, once per creature.
     /// </summary>
-    internal static GameObject? BuildInert(int prefabHash)
+    internal static GameObject? BuildInert(int prefabHash, bool keepEquipment)
     {
         GameObject? prefab = Prefab(prefabHash);
         if (prefab == null)
@@ -125,15 +138,30 @@ internal static class GhostFactory
 
             clone.name = prefab.name + " (Disguise copy)";
 
-            Strip(clone);
+            Strip(clone, keepEquipment);
             if (HideSparkle(prefab))
             {
                 HideSparkles(clone);
             }
-            if (!IsInert(clone))
+            if (!IsInert(clone, keepEquipment))
             {
                 UnityEngine.Object.Destroy(clone);
                 return null;
+            }
+            if (keepEquipment)
+            {
+                // The pair that draws the gear the creature is born with: the VisEquipment
+                // the strip kept, and the ZNetView-without-a-ZDO it needs to hang from -
+                // without one its m_nview is null and Start throws. The slots are written
+                // while the copy is still inactive, so its own Start draws them the moment
+                // it is activated; and nothing of this writes a single slot when
+                // HideCreatureGear asks for a bare costume, which is then built exactly
+                // like before the gear existed.
+                _ = clone.AddComponent<GhostNetView>();
+                if (!GearSkin.HideGear(prefab))
+                {
+                    GearSkin.Dress(clone, prefab);
+                }
             }
             return clone;
         }
@@ -238,7 +266,7 @@ internal static class GhostFactory
     /// never removed from Character.s_characters and the exceptions outlive the clone:
     /// a health bar frozen on screen and the frame time to go with it.
     /// </summary>
-    private static void Strip(GameObject clone)
+    private static void Strip(GameObject clone, bool keepEquipment)
     {
         for (int pass = 0; pass < MaxStripPasses; pass++)
         {
@@ -249,7 +277,11 @@ internal static class GhostFactory
                 Component component = components[i];
                 // Transforms (the skeleton, the bone hierarchy) must stay: the skinned meshes
                 // reference them. Everything else keeps only if it is on the visual list.
-                if (component == null || component is Transform || IsVisual(component))
+                if (
+                    component == null
+                    || component is Transform
+                    || IsVisual(component, keepEquipment)
+                )
                 {
                     continue;
                 }
@@ -273,11 +305,11 @@ internal static class GhostFactory
     /// up as a live object on an inert copy, so the clone is discarded instead of activated -
     /// failing loudly once, with the type named, rather than throwing on every frame after.
     /// </summary>
-    private static bool IsInert(GameObject clone)
+    private static bool IsInert(GameObject clone, bool keepEquipment)
     {
         foreach (Component component in clone.GetComponentsInChildren<Component>(true))
         {
-            if (component == null || component is Transform || IsVisual(component))
+            if (component == null || component is Transform || IsVisual(component, keepEquipment))
             {
                 continue;
             }
@@ -295,8 +327,13 @@ internal static class GhostFactory
     /// draws nothing, which used to leave every non-creature costume invisible on the screen
     /// wearing it (pieces, items, ships, carts, and most static ones too), while a creature,
     /// drawn by a SkinnedMeshRenderer, never misses it at all.
+    ///
+    /// <paramref name="keepEquipment"/> adds the one component that draws without being a
+    /// renderer AND has something to run: the copy's own VisEquipment, which GearSkin
+    /// dresses and whose GhostNetView carries no ZDO (the copy's slots, never the network).
+    /// Kept only for a copy that is shown, and by NAME like everything the audit counts.
     /// </summary>
-    private static bool IsVisual(Component component)
+    private static bool IsVisual(Component component, bool keepEquipment)
     {
         return component is Animator
             || component is LODGroup
@@ -310,6 +347,7 @@ internal static class GhostFactory
             // copy of a starred creature keeps the skin its level calls for (LevelSkin hands
             // it the level). By NAME, like everything the audit counts: an "is" test would be
             // one more game type in the number the README documents.
-            || component.GetType().Name == "LevelEffects";
+            || component.GetType().Name == "LevelEffects"
+            || (keepEquipment && component.GetType().Name == "VisEquipment");
     }
 }

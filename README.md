@@ -121,6 +121,7 @@ In game, open the console with **F5**:
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
 | `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
 | `disguise logs [on|off]` | Write the mod's own **Info** messages to the BepInEx log (toggles without an argument; warnings and errors are always written, § 2) |
+| `disguise gear [on|off]` | Draw a **humanoid** costume with the armor and the weapon it is born with (`on`, the default) or **bare** (`off`) - `HideCreatureGear` the other way around (toggles without an argument, purely local, § 2) |
 | `disguise fly [on|off]` | **Raise the creature above you** for the other machines (toggles without an argument, § 2). Purely visual: your player never leaves the ground |
 | `disguise offset <X> <Y> <Z>` | **Move the costume** that far from you - world units, `1` is one metre (no argument reports where it stands, `0 0 0` puts it back, § 3). Purely visual: your player never moves |
 | `disguise rotation <X> <Y> <Z>` | **Turn the costume** in place, in degrees **on top of** the way it already faces (no argument reports it, `0 0 0` is the normal facing, § 3). Purely visual: your player never turns |
@@ -180,6 +181,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 | `SeeYourDisguise` | `true` | Show the creature on **your own screen** (`4 - Own view`, local only) |
 | `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (`4 - Own view`, local only: your own costume and the window's picture, never what another machine draws; § 2) |
+| `HideCreatureGear` | `false` | Draw a **humanoid** costume **bare** - no armor, no weapon. Off (the gear is drawn) is the default, because that is what a real creature of that prefab wears at spawn: `Humanoid.Start` gives it its default items and one pick of each random pool (`GiveDefaultItems`), `MonsterAI.Start` then takes the best weapon of that inventory into a hand. The costume is dressed the same way (`GearSkin`), which is how a Fuling appears with its spear and its armor (`4 - Own view`, local only, like the setting above; § 2) |
 
 **Display section** (`3 - Display`) - what the **other machines** see while you are
 disguised. `VisEquipment` reads the equipment hashes from your ZDO and
@@ -239,7 +241,7 @@ against the creature's own controller (`CreatureTriggers`), so your own screen s
 and staggers with the creature like everyone else. Console command: `disguise view [on|off]`,
 which switches it on the spot.
 
-The other setting of this section is **`HideItemSparkle`** (`false` by default, the
+The next setting of this section is **`HideItemSparkle`** (`false` by default, the
 `Hide item sparkle` box under the command buttons of the window). Every Item prefab of the
 game carries a `ParticleSystem` **on its root** - the shimmer the vanilla game draws beside a
 dropped item so it can be found - and a costume built from an item shimmers exactly like one
@@ -258,11 +260,36 @@ A clone already standing rebuilds itself the moment the value moves - one bool w
 frame, the expensive test made only when it can matter - and the box, the `.cfg` and
 ConfigurationManager are the three ways to write it.
 
+The last setting of this section is **`HideCreatureGear`** (`false` by default, the
+`Hide armor & weapon` box on the second row under the command buttons of the window). Every
+humanoid creature of the game is born **armed**: `Humanoid.Start` gives it the default items
+of its prefab and one seeded pick of each random pool (`m_randomShield`, `m_randomWeapon`,
+`m_randomArmor`, one `m_randomSets` set, the `m_randomItems` list - `GiveDefaultItems`),
+and `MonsterAI.Start` then takes the best weapon of that inventory into a hand
+(`EquipBestWeapon`). The costume has neither of those scripts - the strip removes them, and
+they would need a ZDO - so `GearSkin` walks the very same lists, in the very same order,
+with the very same seeded roll (the prefab's own name instead of the ZDO uid a clone can
+never have), and writes the very same slots on the clone's own `VisEquipment`: the slots
+`Humanoid.EquipItem` would have filled, replicated from its own type switch, which are the
+fields `VisEquipment.UpdateEquipmentVisuals` reads back **when there is no ZDO** - exactly
+the state of a clone, whose `GhostNetView` carries none. The game's own component then
+attaches each item to the clone's bones, drawing the gear itself in `Start` and once per
+frame after: nothing of the attaching is replicated, it is the vanilla code. A Fuling
+costume therefore appears with its spear and its armor, like a Fuling in the world, and
+ticking the box takes them off again. Same reach as the setting above - **purely local**,
+your own costume and the picture of the window only - and the same three ways to write it:
+the box, the `.cfg`, `disguise gear [on|off]`.
+
 The clone is **purely local**: no ZDO, no collision, no AI, no network component.
 `GhostFactory` builds it from a prefab deactivated for the duration of the instantiation,
 which defers every `Awake` and lets the mod strip `ZNetView`, `Character`, `BaseAI`,
 `ZSync*` and the colliders **before** the clone is activated (a live `ZNetView.Awake` would
-create a phantom networked ZDO). The very same build is what makes the animation bridge able
+create a phantom networked ZDO). One component is kept on a clone that is **shown**, because
+it draws: its own `VisEquipment`, next to a `GhostNetView` the mod adds - the game's type
+with both of its messages hidden, a `ZNetView` that mints no ZDO at all - which is what lets
+that component run and draw the gear of a humanoid costume (`GearSkin`, § 2). The throwaway
+copy of the animation bridge passes the other way and keeps neither: nothing ever draws it.
+The very same build is what makes the animation bridge able
 to read a creature's trigger list at all (§ 3): the copy is activated, read, and destroyed in
 the same call. The strip runs in **several passes**: Unity refuses to
 remove a component another one still requires ("Can't remove Humanoid because CharacterDrop
@@ -390,7 +417,7 @@ left to read by then, which is why the last frame's is remembered. A place typed
 `.cfg` by hand is honoured too, and kept on screen when it is read: a change of resolution
 cannot push the window out of sight. The window shows
 the line under the title, then the checkbox row under that line, the prefab list, the two pose rows under it, the 3D preview, the
-command buttons, the level row and the sparkle box, the status line and, closing the window, the help line under it (the branch added them one step at a time): a row of five buttons
+command buttons, the level row and the two option boxes, the status line and, closing the window, the help line under it (the branch added them one step at a time): a row of five buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Add favorite` / `Remove favorite`, `Enable` / `Disable`,
 `Refresh`, `Own view`, `Flight` =
@@ -404,20 +431,24 @@ answer it writes on the status line always names the prefab it changed. The seco
 toggle for the disguise itself: it reads "Disable" while the disguise is on and "Enable"
 while it is off, and both that label and the line under the title are rewritten after every
 click. Under those five
-buttons sits a **band** with two controls on it. At the picture's own left edge sits the
+buttons sits a **band** with three controls on it. At the picture's own left edge sits the
 **level row** - the word `Level`, then `-` and `+` around the number: the level the costume
 is drawn at (§ 2, the `CreatureLevel` setting), each click running `disguise level <n>`
 exactly like every other button of this window runs its sub-command, so the answer lands on
 the status line below. The number is rewritten per frame, so a level typed into the console
 or into ConfigurationManager lands without closing the window; and the two buttons stop
 being clickable at the ends of the span (1 and 9) rather than running a command that could
-not move the level. To its right sits the **sparkle box** - `Hide item sparkle`, the one
-checkbox that is not in the row above, because it gates no list: it writes `HideItemSparkle`
+not move the level. To its right sits the **sparkle box** - `Hide item sparkle`, one of the
+two checkboxes that are not in the row above, because it gates no list: it writes `HideItemSparkle`
 (`4 - Own view`) and nothing else, the same control the row above is made of (box and label
 are one hit target, `GuiCategories.BuildBox`); a click on it takes the shimmer off an item
 costume at once, on your own screen and in the picture (both rebuild themselves, § 2), and a
 value written in ConfigurationManager is pushed back into the box every frame like every
-other label. The **line under the
+other label. Under that box, on the second row of the band, sits the **gear box** -
+`Hide armor & weapon`, the same control in the same column: it writes `HideCreatureGear`
+(`4 - Own view`) and takes the armor and the weapon a humanoid costume is born with off
+that costume (§ 2, `GearSkin`), again rebuilding the costume and the picture at once, and
+again pushed back from ConfigurationManager like every other label. The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -448,7 +479,7 @@ command goes on printing after it stay in the console. Closing the window under 
 the **help line**: it holds what the element the pointer is on is FOR - one sentence for the
 five buttons and the sub-command each of them runs, for the seven boxes and the filter they
 ask of the list, for the filter field and Clear, for the two pose rows and their six fields,
-for the picture, the sparkle box, the state line, the chord, Close and the answer line
+for the picture, the two option boxes, the state line, the chord, Close and the answer line
 itself - and an idle line while the pointer rests on nothing that describes itself
 (`Drag the panel to move the window - this line describes whatever the pointer rests on.`).
 It is written by the element the pointer ENTERS and put back by the one it LEAVES, and the
@@ -1067,7 +1098,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   (`PauseMenuEntry`), the terrain tiles it built to read the ground (`GroundProbe`), and every
   Harmony patch (`UnpatchSelf`), before the logger goes with the
   instance. Everything it does not share stays `private`.
-- `DisguiseConfig.cs` - the thirty-six settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the thirty-seven settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
@@ -1287,12 +1318,14 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   inside, 1 to 9, and the whole row's width is the shared `LevelRowWidth`), then the
   **sparkle box** to its right (`SparkleBox`: the very control `GuiCategories.BuildBox`
   puts in the row above, starting after `LevelRowWidth` + a gap of the band and centred in
-  the 94 px the right half has between the buttons and the status line - its listener writes
+  the upper half of the 94 px the right half has between the buttons and the status line - its listener writes
   `HideItemSparkle` and the cache `RefreshState` compares against, so a value typed in
-  ConfigurationManager is pushed back into the box while a click never is), the
+  ConfigurationManager is pushed back into the box while a click never is), then the
+  **gear box** on the second row of the band under it (`GearBox`: the same control in the
+  same column, its listener writing `HideCreatureGear`, its cache watched the same way), the
   status line below them, the **help line** closing the window under that one (`GuiHelp.Build`
   - the words of every control are handed to `GuiHelp.Watch` as it is built: Close, the chord,
-  the state line, the five buttons, the sparkle box and the level row here, and the same call made by
+  the state line, the five buttons, the two option boxes and the level row here, and the same call made by
   `GuiStatus`, `GuiPose`, `GuiCreatureList` and `GuiCategories` for their own), and the
   coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
@@ -1331,7 +1364,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   place it was in (`RefilterInPlace`). One box of that row is a method the window borrows:
   `BuildBox` builds a single checkbox (box, label measured to its text, the label carrying the
   Button that flips the box) and hands the cursor on, so the row is seven calls of it and the
-  sparkle box of `GuiWindow` is the eighth with its own listener - the caller giving each one
+  sparkle box and the gear box of `GuiWindow` are the eighth and ninth with their own listener - the caller giving each one
   the help to show on the bottom line, which `BuildBox` puts on BOTH halves of the checkbox:
   the box and its label are two objects, and the event system stops at the first one that
   handles the pointer, so the label - the one that carries the Button - is where the pointer
@@ -1429,10 +1462,12 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   pointer only once it is drawn) and the rule that decides what is in it: the last row the pointer was on, the
   configured creature before any row was pointed at in this opening, the change held back
   0.15 s so that a pointer sweeping the list builds one copy instead of one per row crossed -
-  and two more reasons to build the copy again: the sparkle option (`HideItemSparkle`) and
-  the level (`CreatureLevel`), both read by the factory at build time - a value that moves
+  and three more reasons to build the copy again: the sparkle option (`HideItemSparkle`),
+  the gear option (`HideCreatureGear`) and
+  the level (`CreatureLevel`), all read by the factory at build time - a value that moves
   while the picture stands shows the creature once more, and only when it can matter (an
-  item for the sparkle, `GhostFactory.HideSparkle`; a level above 1 for the level,
+  item for the sparkle, `GhostFactory.HideSparkle`; a humanoid for the gear,
+  `GearSkin.HideGear`; a level above 1 for the level,
   `LevelSkin`).
   The pointer reaching a row is `GuiRowHover`, one component per row, which now also writes
   that row's help on the bottom line.
@@ -1453,6 +1488,29 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   the material cache, shared with the real creatures of the world). Everything goes through
   reflection BY NAME, the way `HealthMask` reads `m_health`: a rename in a game update costs
   the base look, never an exception on your screen.
+- `GearSkin.cs` - the armor and the weapon a humanoid costume is born with (`HideCreatureGear`,
+  § 2), on the two copies that are shown: the clone your own screen draws and the picture of
+  the window. The game hands a real creature its gear in two steps at spawn - `Humanoid.Start`
+  gives the default items and one seeded pick of each random pool (`GiveDefaultItems`),
+  `MonsterAI.Start` then puts the best weapon of that inventory in a hand - and this walks the
+  very same lists in the very same order (the prefab's own name seeding the roll, where the
+  real game uses the ZDO uid a copy never gets), writes the very same slots on the copy's own
+  `VisEquipment` (the slots `Humanoid.EquipItem` would fill, its type switch replicated), and
+  leaves the attaching to the game: `VisEquipment` runs on the copy - with no ZDO, it reads
+  its own fields, the branch it takes whenever a `ZNetView` carries none - and draws each item
+  on the copy's own bones in `Start` and once per frame after. The components are found by
+  NAME, the types and fields through `GameAccess`, the item type through the game's own enum
+  parsed by name: no game member is referenced, and a rename is a missing slot, never an
+  exception. `HideGear` answers whether a costume has to be drawn bare (the option, then the
+  humanoid's six lists), which is what `GhostFactory` asks at every build and `SelfView` /
+  `GuiPreview` ask when the value moves.
+- `GhostNetView.cs` - the `ZNetView` a copy that is shown carries so its `VisEquipment` can
+  run: the game's component with **both** of its Unity messages hidden (Awake would mint the
+  real ZDO the whole strip exists to avoid, OnDestroy would walk references it never held),
+  i.e. a `ZNetView` whose only answer is `GetZDO() -> null`. Unity calls a message on the most
+  derived class only, so the game's code is never reached; the two hidden messages are the
+  component's only ones. Its constructor is the one game member this adds to the DLL (§ 6),
+  the base's own and public.
 - `Patch_CreateObject.cs`, `Patch_ZDOLoad.cs`, `Patch_PlayerOnSpawned.cs`,
   `Patch_ZDOSave.cs`, `Patch_ZDODeserialize.cs`, `Patch_SendZDOs.cs`,
   `Patch_CreateDestroyObjects.cs`, `Patch_FindSectorObjects.cs`,
@@ -1504,7 +1562,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 83   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 84   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -1535,12 +1593,22 @@ member it touches is **public** in the game (`ZoneSystem.instance`, `ZoneSystem.
 `m_scale`, `GetWorldHeight`) and it still reaches them through reflection, because the
 audit counts a public member just as it counts a private one - while the zone id is the
 body of `ZoneSystem.GetZone` / `GetZonePos` reimplemented in `GroundProbe` rather than
-called, so the fourth read adds no member either and the count stands at 83.
+called, so the fourth read adds no member either and the count stood at 83.
 The pause menu entry is that same rule once more: `Menu.m_settingsButton` (public - read to
 clone the shape of the entry from it) and `Menu.Hide` (public - called to close the pause
 menu with the game's own hand) are both reached through `GameAccess`, and the two patches
 name their targets with `nameof` (`Menu.Show`, the second one a **private** method, named
-rather than referenced) so that neither adds a member either - the count still stands at 83.
+rather than referenced) so that neither adds a member either - the count still stood at 83.
+The gear of a humanoid costume (`GearSkin`, § 2) is the first thing since to move it: every
+type it works on is looked up **by name** on the assembly the game loads
+(`Assembly.GetType` for `Humanoid`, `Humanoid+ItemSet`, `Humanoid+RandomItem`, `ItemDrop`,
+`ItemDrop+ItemData` and its nested types), every member read through a `FieldInfo` of
+`GameAccess`, the item type
+pulled out of the game's own `ItemType` enum with `Enum.Parse` by name, and the item hashes
+through `StringExtensionMethods.GetStableHashCode`, already referenced elsewhere - so all of
+that adds nothing. What adds **+1** is `GhostNetView` **subclassing** `ZNetView`: an
+instance constructor chaining to its base compiles to a call to `ZNetView::.ctor()`, a
+**public** member (public, so ISSUES stays at 0) - the count stands at 84.
 Everything else of the two fixes (`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.GetPrefab`,
 `ZNet.IsServer()`, `prefab.GetComponent("...")`, `prefab.GetComponent<Character>()`) was
 already referenced somewhere else, and neither fix added a Harmony patch: both run inside
@@ -1598,6 +1666,7 @@ so the count of twenty-four stays correct.
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
 | A prefab like `Abomination_attack1` or `wraith_melee` is missing from the list | Normal, and no accident: those are the creature's own **attack helpers** and zones - registered `Item` prefabs with **no mesh anywhere**, which is why the log says `Preview: <name> has no mesh to show.` when one is pointed at. The catalogue drops them with every other prefab nothing could be drawn of (a spawner, a blob's AoE): they would be an empty picture in the window and an invisible viking in the world (§ 6). `disguise set <name>` still takes one typed by hand |
 | The shimmer beside an item costume is still there | `HideItemSparkle` only reaches what **this machine** draws: your own costume (`SeeYourDisguise`, § 2) and the picture of the window - so tick `Hide item sparkle` under the command buttons (or write `HideItemSparkle = true` in the `.cfg`) and both drop it at once, the clone being rebuilt rather than repaired. A machine with no DLL of ours builds your **real item prefab** from the network, where the particle system is baked into the prefab and no setting of ours exists to turn it off; a machine running the DLL draws a real `Player` for you and never your costume (§ 3), so there is nothing of yours there to shimmer |
+| A humanoid costume appears **without its armor and its weapon** | `HideCreatureGear` takes them off on purpose (`4 - Own view`, local only): untick `Hide armor & weapon` under the command buttons (or write `HideCreatureGear = false` in the `.cfg`, or run `disguise gear on`) and the costume is drawn with the gear a real creature of that prefab spawns with - your own screen and the window's picture rebuilding themselves at once. The reverse case is the same switch the other way: a machine running no DLL of ours draws the creature it receives from the game itself, gear included, whatever this setting says |
 | A level 2 or 3 costume shows the plain creature | Three places can show it, each with the game's own rule behind it. **Another machine**: a creature reads its level once, when it is born (`Character.Awake`) and keeps that instance forever, so a machine already drawing you needs a fresh object before a new skin can show - `ForceObserverRefresh` (§ 4.1) does it on its own, `disguise refresh` is the manual fallback, and the dedicated server must run the DLL for either. **Your own screen / the picture**: those are copies this mod builds, dressed by `LevelSkin` at their build - the level is read once per build, so a level that just moved rebuilds them within the same frame (the picture after its 0.15 s hover delay). **Everywhere at once**: a level above the skins a prefab carries keeps only the health growing, and the game draws the base look - `spawn <creature> 1 4` in vanilla behaves exactly the same. A star only ever appears at levels **2 and 3** (`EnemyHud` draws it for those two alone) |
 | The pause menu has no `Disguise` line | `ShowMenuEntry` is off (`6 - GUI`, on by default). Set it back to `true` and the line comes back at the next opening of the pause menu - at once, if that menu is on screen while ConfigurationManager changes it. The line is there in the main menu too, where the window only says `the prefab list is available in game` until a world is loaded |
 | Opening the window takes a noticeable moment | Two things cost, and the log says both: `GUI: <n> name(s) in <ms> ms, <built> of <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The catalogue is the walk that tags every vanilla prefab with its kind - up to ten component tests, and exactly ONCE: the walk skips them when all it was asked for is names, and the window does that one pass for its own rows. The rows are Jotunn buttons of four objects each, and only the categories the boxes have ON get one at the opening; a category switched on later is built then, once (in the order of the list), and a row is never destroyed, so switching back and forth stays a `SetActive`. The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log) |

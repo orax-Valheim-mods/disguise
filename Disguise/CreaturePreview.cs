@@ -191,7 +191,7 @@ internal static class CreaturePreview
             return null;
         }
 
-        GameObject? clone = GhostFactory.BuildInert(zns.GetPrefabHash(prefab));
+        GameObject? clone = GhostFactory.BuildInert(zns.GetPrefabHash(prefab), keepEquipment: true);
         if (clone == null)
         {
             return null;

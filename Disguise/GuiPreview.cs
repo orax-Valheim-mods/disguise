@@ -19,7 +19,9 @@ namespace Disguise;
 /// that is crossing the list - and the copy is only rebuilt when the name really changed.
 ///
 /// One more reason to build a copy again: the sparkle option (HideItemSparkle), which the
-/// factory reads at build time - the picture then shows the costume as the screen draws it.
+/// factory reads at build time - the picture then shows the costume as the screen draws it -
+/// and the gear option (HideCreatureGear), read there too: a humanoid costume with its armor
+/// and its weapon, or without.
 /// </summary>
 internal static class GuiPreview
 {
@@ -47,6 +49,17 @@ internal static class GuiPreview
     private static bool s_shownSparkle;
 
     private static bool s_shownOption;
+
+    /// <summary>
+    /// The same pair for the gear option (HideCreatureGear): what the stage was built WITH
+    /// (the answer of GearSkin.HideGear for its creature) and the option itself at that
+    /// moment. Here the difference can show whatever the creature is - a humanoid draws the
+    /// armor and the weapon it is born with, anything else has no gear at all - so the test
+    /// runs on the move of the option, never per frame, exactly like the pair above.
+    /// </summary>
+    private static bool s_shownGear;
+
+    private static bool s_shownGearOption;
 
     /// <summary>
     /// The level the stage was dressed for (LevelSkin, at its build): a level that moves
@@ -175,6 +188,22 @@ internal static class GuiPreview
             }
         }
 
+        // The same thing for the gear option (HideCreatureGear), through the same delay and
+        // the same guard: a humanoid costume then appears on the picture wearing the armor
+        // and the weapon it is born with - or without them - like the screen draws it.
+        bool gearOption = DisguiseConfig.ConfigHideCreatureGear.Value;
+        if (gearOption != s_shownGearOption)
+        {
+            s_shownGearOption = gearOption;
+            if (
+                string.Equals(s_pending, s_shown, System.StringComparison.Ordinal)
+                && s_shownGear != GearSkin.HideGear(s_pending)
+            )
+            {
+                s_shown = string.Empty;
+            }
+        }
+
         // The level moved under a picture that is already standing: the stage was dressed
         // for the old one, so the creature is shown AGAIN - through the same delay and the
         // same guard as any other change of creature (s_shown emptied rather than the show
@@ -196,6 +225,7 @@ internal static class GuiPreview
         {
             s_shown = s_pending;
             s_shownSparkle = GhostFactory.HideSparkle(s_shown);
+            s_shownGear = GearSkin.HideGear(s_shown);
             CreaturePreview.Show(s_pending);
         }
 
@@ -225,6 +255,8 @@ internal static class GuiPreview
         s_dueAt = 0f;
         s_shownSparkle = false;
         s_shownOption = false;
+        s_shownGear = false;
+        s_shownGearOption = false;
         s_shownLevel = 0;
     }
 }

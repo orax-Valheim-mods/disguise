@@ -56,6 +56,177 @@ internal static class GameAccess
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
     );
 
+    // -- The gear a humanoid creature is born with (GearSkin) ----------------------------
+    // The game hands it out at spawn: Humanoid.Start gives the prefab's default items and
+    // one pick of each random pool (GiveDefaultItems), MonsterAI.Start then takes the best
+    // weapon of that inventory into a hand (EquipBestWeapon). Every type below is looked up
+    // BY NAME on the assembly the game loads - the nested ones too (Humanoid+ItemSet,
+    // ItemDrop+ItemData+ItemType) - and every member through a FieldInfo, so none of this
+    // reaches the audit's member count and a rename is a null, never an exception.
+    internal static readonly Type? s_humanoidGearType = typeof(VisEquipment).Assembly.GetType(
+        "Humanoid"
+    );
+
+    internal static readonly Type? s_itemSetType = typeof(VisEquipment).Assembly.GetType(
+        "Humanoid+ItemSet"
+    );
+
+    internal static readonly Type? s_randomItemType = typeof(VisEquipment).Assembly.GetType(
+        "Humanoid+RandomItem"
+    );
+
+    internal static readonly Type? s_itemDropType = typeof(VisEquipment).Assembly.GetType(
+        "ItemDrop"
+    );
+
+    internal static readonly Type? s_itemDataType = typeof(VisEquipment).Assembly.GetType(
+        "ItemDrop+ItemData"
+    );
+
+    internal static readonly Type? s_sharedDataType = typeof(VisEquipment).Assembly.GetType(
+        "ItemDrop+ItemData+SharedData"
+    );
+
+    internal static readonly Type? s_itemTypeEnum = typeof(VisEquipment).Assembly.GetType(
+        "ItemDrop+ItemData+ItemType"
+    );
+
+    // The six lists GiveDefaultItems walks, on the prefab's humanoid.
+    internal static readonly FieldInfo? s_defaultItemsField = Field(
+        s_humanoidGearType,
+        "m_defaultItems"
+    );
+
+    internal static readonly FieldInfo? s_randomWeaponField = Field(
+        s_humanoidGearType,
+        "m_randomWeapon"
+    );
+
+    internal static readonly FieldInfo? s_randomArmorField = Field(
+        s_humanoidGearType,
+        "m_randomArmor"
+    );
+
+    internal static readonly FieldInfo? s_randomShieldField = Field(
+        s_humanoidGearType,
+        "m_randomShield"
+    );
+
+    internal static readonly FieldInfo? s_randomSetsField = Field(
+        s_humanoidGearType,
+        "m_randomSets"
+    );
+
+    internal static readonly FieldInfo? s_randomItemsField = Field(
+        s_humanoidGearType,
+        "m_randomItems"
+    );
+
+    internal static readonly FieldInfo? s_itemSetItemsField = Field(s_itemSetType, "m_items");
+
+    internal static readonly FieldInfo? s_randomItemPrefabField = Field(
+        s_randomItemType,
+        "m_prefab"
+    );
+
+    internal static readonly FieldInfo? s_randomItemChanceField = Field(
+        s_randomItemType,
+        "m_chance"
+    );
+
+    // What one item prefab carries: the ItemData of its ItemDrop, then its shared data,
+    // then the type that decides the slot it is drawn in - Humanoid.EquipItem's own switch,
+    // replicated by GearSkin.
+    internal static readonly FieldInfo? s_itemDropItemDataField = Field(
+        s_itemDropType,
+        "m_itemData"
+    );
+
+    internal static readonly FieldInfo? s_itemDataSharedField = Field(s_itemDataType, "m_shared");
+
+    internal static readonly FieldInfo? s_itemDataVariantField = Field(s_itemDataType, "m_variant");
+
+    internal static readonly FieldInfo? s_itemDataQualityField = Field(s_itemDataType, "m_quality");
+
+    internal static readonly FieldInfo? s_sharedItemTypeField = Field(
+        s_sharedDataType,
+        "m_itemType"
+    );
+
+    // VisEquipment's slots: private in the game, and the exact fields its own
+    // UpdateEquipmentVisuals falls back to when there is no ZDO - the state of an inert
+    // copy, whose GhostNetView carries none (VisEquipment.cs, the else branch). GearSkin
+    // writes them while the copy is still inactive; the component's own Start draws them,
+    // and its CustomUpdate keeps the answer refreshed every frame for nothing.
+    internal static readonly FieldInfo? s_visLeftItemField = Field(
+        typeof(VisEquipment),
+        "m_leftItem"
+    );
+
+    internal static readonly FieldInfo? s_visRightItemField = Field(
+        typeof(VisEquipment),
+        "m_rightItem"
+    );
+
+    internal static readonly FieldInfo? s_visChestItemField = Field(
+        typeof(VisEquipment),
+        "m_chestItem"
+    );
+
+    internal static readonly FieldInfo? s_visLegItemField = Field(
+        typeof(VisEquipment),
+        "m_legItem"
+    );
+
+    internal static readonly FieldInfo? s_visHelmetItemField = Field(
+        typeof(VisEquipment),
+        "m_helmetItem"
+    );
+
+    internal static readonly FieldInfo? s_visShoulderItemField = Field(
+        typeof(VisEquipment),
+        "m_shoulderItem"
+    );
+
+    internal static readonly FieldInfo? s_visUtilityItemField = Field(
+        typeof(VisEquipment),
+        "m_utilityItem"
+    );
+
+    internal static readonly FieldInfo? s_visTrinketItemField = Field(
+        typeof(VisEquipment),
+        "m_trinketItem"
+    );
+
+    internal static readonly FieldInfo? s_visLeftItemVariantField = Field(
+        typeof(VisEquipment),
+        "m_leftItemVariant"
+    );
+
+    internal static readonly FieldInfo? s_visLeftItemQualityField = Field(
+        typeof(VisEquipment),
+        "m_leftItemQuality"
+    );
+
+    internal static readonly FieldInfo? s_visRightItemQualityField = Field(
+        typeof(VisEquipment),
+        "m_rightItemQuality"
+    );
+
+    internal static readonly FieldInfo? s_visShoulderItemVariantField = Field(
+        typeof(VisEquipment),
+        "m_shoulderItemVariant"
+    );
+
+    internal static readonly FieldInfo? s_visShoulderItemQualityField = Field(
+        typeof(VisEquipment),
+        "m_shoulderItemQuality"
+    );
+
+    /// <summary>One field of one game type, resolved once (null when the name is gone).</summary>
+    private static FieldInfo? Field(Type? type, string name) =>
+        type?.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
     // ZDOExtraData.s_saveInts: private in the game. ZDO.Save does NOT read the live values,
     // it reads the snapshot cloned by ZDOExtraData.PrepareSave() at the start of the save.
     internal static readonly FieldInfo? s_saveIntsField = typeof(ZDOExtraData).GetField(

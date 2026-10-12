@@ -45,6 +45,18 @@ internal static class SelfView
 
     private static bool s_ghostSparkleOption;
 
+    /// <summary>
+    /// The same pair for the gear of a humanoid costume (HideCreatureGear): the answer of
+    /// GearSkin.HideGear for the clone's prefab, and the option itself at its build. Here a
+    /// move of the OPTION can show whatever the costume is - a humanoid draws the armor and
+    /// the weapon it is born with, anything else has no gear at all - so the expensive test
+    /// (the humanoid's six lists) runs once per change, and never while the option stands
+    /// still: one bool per frame, the same as the sparkle pair above.
+    /// </summary>
+    private static bool s_ghostHideGear;
+
+    private static bool s_ghostGearOption;
+
     /// <summary>Working buffers for the scan (reused, never allocated per frame).</summary>
     private static readonly List<Renderer> s_renderers = new();
 
@@ -122,6 +134,20 @@ internal static class SelfView
                 }
             }
 
+            // The same thing for the gear option (HideCreatureGear): the clone standing was
+            // built the other way, so it is built again - which only costs anything when the
+            // difference can show, i.e. for a humanoid costume, whose armor and weapon are
+            // what this option takes off or puts back.
+            bool gearOption = DisguiseConfig.ConfigHideCreatureGear.Value;
+            if (s_ghost != null && gearOption != s_ghostGearOption)
+            {
+                s_ghostGearOption = gearOption;
+                if (s_ghostHideGear != GearSkin.HideGear(wanted))
+                {
+                    Remove(); // rebuilt by the block below, within this same frame
+                }
+            }
+
             if (s_ghost == null)
             {
                 if (s_failedPrefabHash == wanted && Time.unscaledTime < s_nextBuildAttempt)
@@ -148,6 +174,8 @@ internal static class SelfView
                 s_ghostPrefabHash = wanted;
                 s_ghostHideSparkle = GhostFactory.HideSparkle(wanted);
                 s_ghostSparkleOption = DisguiseConfig.ConfigHideItemSparkle.Value;
+                s_ghostHideGear = GearSkin.HideGear(wanted);
+                s_ghostGearOption = DisguiseConfig.ConfigHideCreatureGear.Value;
                 s_ghostLevel = level;
                 s_failedPrefabHash = 0;
                 s_nextRendererScan = 0f;
@@ -301,6 +329,8 @@ internal static class SelfView
         s_ghostPrefabHash = 0;
         s_ghostHideSparkle = false;
         s_ghostSparkleOption = false;
+        s_ghostHideGear = false;
+        s_ghostGearOption = false;
         s_ghostLevel = 0;
         s_nextRendererScan = 0f;
         GhostAnimation.Reset();

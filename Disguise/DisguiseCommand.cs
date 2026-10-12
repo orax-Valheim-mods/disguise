@@ -30,7 +30,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
+                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | gear | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -61,6 +61,7 @@ internal static class DisguiseCommand
             "refresh",
             "view",
             "logs",
+            "gear",
             "fly",
             "offset",
             "rotation",
@@ -148,6 +149,10 @@ internal static class DisguiseCommand
 
             case "logs":
                 SetLogs(ctx, words.Length > 2 ? words[2] : null);
+                break;
+
+            case "gear":
+                SetGear(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "fly":
@@ -288,6 +293,8 @@ internal static class DisguiseCommand
             ctx,
             "  disguise logs [on|off]    write the mod's own Info messages to the BepInEx log"
         );
+        Say(ctx, "  disguise gear [on|off]    draw a humanoid costume with the armor and the");
+        Say(ctx, "                            weapon it is born with (on by default, local only)");
         Say(
             ctx,
             "  disguise fly [on|off]     fly: the creature is raised for the others (visual only)"
@@ -437,6 +444,40 @@ internal static class DisguiseCommand
                 ? "[Disguise] Logs ON: the mod writes its Info messages to the BepInEx log again."
                 : "[Disguise] Logs OFF: no more Info messages from the mod "
                     + "(warnings and errors are still written)."
+        );
+    }
+
+    /// <summary>
+    /// "disguise gear [on|off]": the armor and the weapon a humanoid costume is BORN with -
+    /// the gear the game gives a real creature of that prefab at spawn (its default and
+    /// random items, then the weapon its AI takes into a hand) - drawn on the costume, or
+    /// not (HideCreatureGear, 4 - Own view). ON, which is the default, is the gear drawn,
+    /// like a Fuling in the world: spear and all. Local rendering, exactly like the sparkle
+    /// box it stands next to in the window: it changes what THIS machine draws and never
+    /// what another machine receives.
+    /// </summary>
+    private static void SetGear(Terminal? ctx, string? argument)
+    {
+        // The config hides the gear, the command says whether it is SHOWN: the two spellings
+        // are the same switch, read the way a player says it.
+        bool shown;
+        if (argument == null)
+        {
+            shown = DisguiseConfig.ConfigHideCreatureGear.Value;
+        }
+        else if (!TryParseOnOff(argument, out shown))
+        {
+            Say(ctx, "Usage: disguise gear [on|off]");
+            return;
+        }
+        DisguiseConfig.ConfigHideCreatureGear.Value = !shown;
+
+        Say(
+            ctx,
+            shown
+                ? "[Disguise] Gear ON: a humanoid costume is drawn with the armor and the "
+                    + "weapon it is born with (this machine only)."
+                : "[Disguise] Gear OFF: a humanoid costume is drawn bare - no armor, no weapon."
         );
     }
 
@@ -805,6 +846,10 @@ internal static class DisguiseCommand
         Say(
             ctx,
             $"  Item sparkle on your screen: {(DisguiseConfig.ConfigHideItemSparkle.Value ? "hidden" : "shown")} (HideItemSparkle, 4 - Own view)"
+        );
+        Say(
+            ctx,
+            $"  Gear of a humanoid costume: {(DisguiseConfig.ConfigHideCreatureGear.Value ? "hidden" : "shown")} (disguise gear, 4 - Own view)"
         );
         Say(
             ctx,
