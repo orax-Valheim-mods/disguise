@@ -406,10 +406,11 @@ internal static class GuiWindow
     /// <summary>
     /// The box on the second row of the band: HideCreatureGear, the option that takes the
     /// armor and the weapon a humanoid costume is born with off that costume (GearSkin reads
-    /// it at every build of a copy). Same control, same column and same rules as the sparkle
-    /// box above it: this machine's own drawing only, and a copy already standing rebuilds
-    /// itself when the value moves (SelfView, GuiPreview). The console spells the same
-    /// switch "disguise gear [on|off]", said the way a player says it: ON is the gear drawn.
+    /// it at every build of a copy, CostumeGear at every packet leaving this machine). Same
+    /// control, same column and same rules as the sparkle box above it: a copy already
+    /// standing rebuilds itself when the value moves (SelfView, GuiPreview). The console
+    /// spells the same switch "disguise gear [on|off]", said the way a player says it: ON is
+    /// the gear drawn.
     /// </summary>
     private static void GearBox(Transform parent)
     {
@@ -421,7 +422,7 @@ internal static class GuiWindow
             ref cursor,
             GearY,
             "Hide armor & weapon",
-            "Takes the gear a humanoid costume is born with - the armor and the weapon the game gives a real creature of that prefab at spawn - off THIS machine, yours and the picture above; what another machine draws is never touched.",
+            "Takes the gear a humanoid costume is born with - the armor and the weapon the game gives a real creature of that prefab at spawn - off every costume drawn of you: yours here, the picture above, and the one the machines running no mod receive (your ZDO carries that gear itself while you wear it). The machines running this mod keep drawing you with YOUR equipment, whatever this says.",
             s_gearApplied,
             on =>
             {

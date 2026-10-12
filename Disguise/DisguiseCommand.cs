@@ -294,7 +294,7 @@ internal static class DisguiseCommand
             "  disguise logs [on|off]    write the mod's own Info messages to the BepInEx log"
         );
         Say(ctx, "  disguise gear [on|off]    draw a humanoid costume with the armor and the");
-        Say(ctx, "                            weapon it is born with (on by default, local only)");
+        Say(ctx, "                            weapon it is born with (on by default)");
         Say(
             ctx,
             "  disguise fly [on|off]     fly: the creature is raised for the others (visual only)"
@@ -452,9 +452,11 @@ internal static class DisguiseCommand
     /// the gear the game gives a real creature of that prefab at spawn (its default and
     /// random items, then the weapon its AI takes into a hand) - drawn on the costume, or
     /// not (HideCreatureGear, 4 - Own view). ON, which is the default, is the gear drawn,
-    /// like a Fuling in the world: spear and all. Local rendering, exactly like the sparkle
-    /// box it stands next to in the window: it changes what THIS machine draws and never
-    /// what another machine receives.
+    /// like a Fuling in the world: spear and all. It reaches every screen drawing that
+    /// costume: yours here (a rebuild, next call), and the machines running no DLL's, which
+    /// read the gear out of your ZDO - published by the reassert, rolled like the game rolls
+    /// it (CostumeGear). The machines running this DLL keep drawing you with your own
+    /// equipment either way.
     /// </summary>
     private static void SetGear(Terminal? ctx, string? argument)
     {

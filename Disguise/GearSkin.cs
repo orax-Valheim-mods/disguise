@@ -18,14 +18,19 @@ namespace Disguise;
 /// MonsterAI.Start -> EquipBestWeapon takes the best weapon of that inventory into a hand.
 /// The copy has neither of those scripts - the strip removes them, and they would need a
 /// ZDO - so this class walks the very same lists in the very same order, with the very same
-/// seeded pick (the prefab's own name instead of the ZDO uid a copy can never have), and
-/// writes the very same slots on the copy's VisEquipment: the slots Humanoid.EquipItem
+/// seeded pick (the ZDO's own s_seed, the value every machine rolls the costume with; a
+/// copy with no ZDO falls back to the prefab's own name), and writes the very same slots on
+/// the copy's VisEquipment: the slots Humanoid.EquipItem
 /// would have filled, its own type switch replicated here, which are the fields
 /// VisEquipment.UpdateEquipmentVisuals reads back when the ZDO is absent - exactly the
 /// state of an inert copy, whose GhostNetView carries none (the else branch). VisEquipment
 /// then draws the gear itself in Start and once per frame after, attaching each item to the
 /// copy's own bones the way it does for a real creature: nothing of the attaching is
 /// replicated here, it is the game's.
+///
+/// The same roll is what the machines running no DLL receive: CostumeGear publishes it in
+/// the equipment keys of the ZDO, seeded the same way, so one single pick is what every
+/// screen drawing that costume agrees on.
 ///
 /// Nothing of the game is referenced: the components are found by NAME (HealthMask's rule),
 /// the types and fields through GameAccess, the item type through the game's own enum
@@ -72,57 +77,25 @@ internal static class GearSkin
     /// humanoid - ends here with a handful of zero writes: no slot, nothing drawn, the same
     /// picture as before this class existed.
     /// </summary>
-    internal static void Dress(GameObject clone, GameObject prefab)
+    internal static void Dress(GameObject clone, GameObject prefab, int seed)
     {
         try
         {
-            if (!s_haveTypes)
-            {
-                return;
-            }
-            Component? humanoid = Named(prefab, "Humanoid");
             Component? visEquipment = Named(clone, "VisEquipment");
-            if (humanoid == null || visEquipment == null)
+            Gear? gear = Compute(prefab, seed);
+            if (visEquipment == null || gear == null)
             {
                 return;
-            }
-
-            Gear gear = new();
-            // The game's own roll, seeded by the ZDO uid the creature is spawned with - a
-            // value a copy has none of. The prefab's own name keeps the pick deterministic:
-            // every copy of the same creature wears the same random gear, which is what a
-            // creature whose look never changes looks like. The global state is put back
-            // around it, exactly like GiveDefaultItems does.
-            UnityEngine.Random.State state = UnityEngine.Random.state;
-            UnityEngine.Random.InitState(StringExtensionMethods.GetStableHashCode(prefab.name));
-            try
-            {
-                GiveAll(gear, Read<GameObject[]>(GameAccess.s_defaultItemsField, humanoid));
-                GiveOne(gear, Read<GameObject[]>(GameAccess.s_randomShieldField, humanoid));
-                GiveOne(gear, Read<GameObject[]>(GameAccess.s_randomWeaponField, humanoid));
-                GiveOne(gear, Read<GameObject[]>(GameAccess.s_randomArmorField, humanoid));
-                GiveSet(gear, Read<object[]>(GameAccess.s_randomSetsField, humanoid));
-                GiveListed(gear, humanoid);
-            }
-            finally
-            {
-                UnityEngine.Random.state = state;
             }
 
             Write(visEquipment, gear);
 
             // One line under Logs, so a bare costume can be read apart from a costume the
-            // lists left bare: the six list lengths of the prefab, then every slot written.
+            // lists left bare: the seed the pick was rolled with, then every slot written.
             if (DisguiseConfig.ConfigLogs.Value)
             {
                 Disguise.LogInfo(
-                    $"Gear: {prefab.name} lists "
-                        + $"[{Length(Read<GameObject[]>(GameAccess.s_defaultItemsField, humanoid))} "
-                        + $"{Length(Read<GameObject[]>(GameAccess.s_randomShieldField, humanoid))} "
-                        + $"{Length(Read<GameObject[]>(GameAccess.s_randomWeaponField, humanoid))} "
-                        + $"{Length(Read<GameObject[]>(GameAccess.s_randomArmorField, humanoid))} "
-                        + $"{Length(Read<object[]>(GameAccess.s_randomSetsField, humanoid))} "
-                        + $"{Length(Read<object[]>(GameAccess.s_randomItemsField, humanoid))}] -> "
+                    $"Gear: {prefab.name} (seed {seed}) -> "
                         + $"right {gear.Right} (q{gear.RightQuality}), left {gear.Left}, "
                         + $"chest {gear.Chest}, legs {gear.Leg}, helmet {gear.Helmet}, "
                         + $"shoulder {gear.Shoulder}, utility {gear.Utility}, "
@@ -138,8 +111,71 @@ internal static class GearSkin
         }
     }
 
-    /// <summary>The length of a list for the log line above (null reads as nothing there).</summary>
-    private static int Length(System.Collections.ICollection? list) => list?.Count ?? 0;
+    /// <summary>
+    /// The gear a real creature of that prefab is born with - GiveDefaultItems' own lists,
+    /// in GiveDefaultItems' own order - rolled with the seed the GAME itself uses: the
+    /// s_seed of the ZDO, which Humanoid.Awake writes into every player ZDO from its uid.
+    /// That is the very seed a machine running no DLL of ours rolls the costume with (its
+    /// own Humanoid.Start runs GiveDefaultItems too, seeded the same way - and drawing
+    /// nothing of it, because the VisEquipment setters only write a ZDO for its owner), so
+    /// the pick published in the keys (CostumeGear) and the pick that machine's own game
+    /// code computes are one and the same. A seed of 0 - the window's picture, a creature
+    /// with no ZDO - falls back to the prefab's own name: one pick per creature, the same
+    /// at every rebuild.
+    ///
+    /// Null when the prefab carries no humanoid at all: nothing to wear and nothing to
+    /// publish, which is what CostumeGear asks for.
+    /// </summary>
+    internal static Gear? Compute(GameObject? prefab, int seed)
+    {
+        if (prefab == null || !s_haveTypes)
+        {
+            return null;
+        }
+        Component? humanoid = Named(prefab, "Humanoid");
+        if (humanoid == null)
+        {
+            return null;
+        }
+
+        Gear gear = new();
+        // The game's own roll, seeded the way the game seeds it (see the summary above).
+        // The global state is put back around it, exactly like GiveDefaultItems does.
+        UnityEngine.Random.State state = UnityEngine.Random.state;
+        UnityEngine.Random.InitState(
+            seed != 0 ? seed : StringExtensionMethods.GetStableHashCode(prefab.name)
+        );
+        try
+        {
+            GiveAll(gear, Read<GameObject[]>(GameAccess.s_defaultItemsField, humanoid));
+            GiveOne(gear, Read<GameObject[]>(GameAccess.s_randomShieldField, humanoid));
+            GiveOne(gear, Read<GameObject[]>(GameAccess.s_randomWeaponField, humanoid));
+            GiveOne(gear, Read<GameObject[]>(GameAccess.s_randomArmorField, humanoid));
+            GiveSet(gear, Read<object[]>(GameAccess.s_randomSetsField, humanoid));
+            GiveListed(gear, humanoid);
+        }
+        finally
+        {
+            UnityEngine.Random.state = state;
+        }
+        return gear;
+    }
+
+    /// <summary>
+    /// The seed the game rolls THIS ZDO's creature with: Humanoid.Awake reads s_seed out of
+    /// the ZDO and writes its own uid hash into it while the key is empty - the same value
+    /// on every machine, the reason a costume's gear cannot disagree with itself. 0 when
+    /// there is no ZDO to read (a picture, a probe).
+    /// </summary>
+    internal static int Seed(ZDO? zdo)
+    {
+        if (zdo == null || !zdo.IsValid())
+        {
+            return 0;
+        }
+        int seed = zdo.GetInt(ZDOVars.s_seed);
+        return seed != 0 ? seed : zdo.m_uid.GetHashCode();
+    }
 
     // ------------------------------------------------------------------ GiveDefaultItems
 
@@ -319,6 +355,7 @@ internal static class GearSkin
         else if (type == s_trinket)
         {
             gear.Trinket = itemPrefab.name;
+            gear.TrinketHash = hash;
         }
         // Anything else - ammo above all - has no slot VisEquipment draws.
     }
@@ -345,7 +382,7 @@ internal static class GearSkin
     }
 
     /// <summary>What one copy ends up wearing: a hash per slot, 0 where nothing is drawn.</summary>
-    private sealed class Gear
+    internal sealed class Gear
     {
         internal int Right;
 
@@ -374,6 +411,8 @@ internal static class GearSkin
         internal int Utility;
 
         internal string? Trinket;
+
+        internal int TrinketHash;
     }
 
     // ------------------------------------------------------------------ the game's enum

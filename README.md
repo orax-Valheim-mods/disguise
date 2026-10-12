@@ -121,7 +121,7 @@ In game, open the console with **F5**:
 | `disguise refresh` | Force every loaded player to re-create your object **now** (manual fallback - needs the DLL on the server, § 1.b) |
 | `disguise view [on|off]` | Show the creature on **your own screen** instead of your viking (toggles without an argument, purely local) |
 | `disguise logs [on|off]` | Write the mod's own **Info** messages to the BepInEx log (toggles without an argument; warnings and errors are always written, § 2) |
-| `disguise gear [on|off]` | Draw a **humanoid** costume with the armor and the weapon it is born with (`on`, the default) or **bare** (`off`) - `HideCreatureGear` the other way around (toggles without an argument, purely local, § 2) |
+| `disguise gear [on|off]` | Draw a **humanoid** costume with the armor and the weapon it is born with (`on`, the default) or **bare** (`off`) - `HideCreatureGear` the other way around (toggles without an argument, § 2) |
 | `disguise fly [on|off]` | **Raise the creature above you** for the other machines (toggles without an argument, § 2). Purely visual: your player never leaves the ground |
 | `disguise offset <X> <Y> <Z>` | **Move the costume** that far from you - world units, `1` is one metre (no argument reports where it stands, `0 0 0` puts it back, § 3). Purely visual: your player never moves |
 | `disguise rotation <X> <Y> <Z>` | **Turn the costume** in place, in degrees **on top of** the way it already faces (no argument reports it, `0 0 0` is the normal facing, § 3). Purely visual: your player never turns |
@@ -181,7 +181,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
 | `SeeYourDisguise` | `true` | Show the creature on **your own screen** (`4 - Own view`, local only) |
 | `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (`4 - Own view`, local only: your own costume and the window's picture, never what another machine draws; § 2) |
-| `HideCreatureGear` | `false` | Draw a **humanoid** costume **bare** - no armor, no weapon. Off (the gear is drawn) is the default, because that is what a real creature of that prefab wears at spawn: `Humanoid.Start` gives it its default items and one pick of each random pool (`GiveDefaultItems`), `MonsterAI.Start` then takes the best weapon of that inventory into a hand. The costume is dressed the same way (`GearSkin`), which is how a Fuling appears with its spear and its armor (`4 - Own view`, local only, like the setting above; § 2) |
+| `HideCreatureGear` | `false` | Draw a **humanoid** costume **bare** - no armor, no weapon. Off (the gear is drawn) is the default, because that is what a real creature of that prefab wears at spawn: `Humanoid.Start` gives it its default items and one pick of each random pool (`GiveDefaultItems`), `MonsterAI.Start` then takes the best weapon of that inventory into a hand. The costume is dressed the same way (`GearSkin`), which is how a Fuling appears with its spear and its armor - on **every** screen drawing that costume, including the machines running no DLL, whose gear your ZDO publishes itself while you are disguised (`CostumeGear`, § 3; `4 - Own view`; § 2) |
 
 **Display section** (`3 - Display`) - what the **other machines** see while you are
 disguised. `VisEquipment` reads the equipment hashes from your ZDO and
@@ -215,6 +215,15 @@ hides exactly what **you** asked for: its own `3 - Display` section is only the 
 a player whose client has no DLL at all (a disguise kept in the save, server alone), never
 an override. Without this, the server's defaults (`Hide* = true`) would hide your gear on
 every other client no matter what your config says.
+
+**A humanoid costume wears its own gear** (`CostumeGear`, § 3): while one is on you, these
+five options no longer decide what another machine draws of *it* - those same keys carry
+the gear **the costume** is born with instead (rolled like the game rolls it, so every
+machine agrees on one pick), while yours are put aside in `cd_eq_*` and read back by the
+machines that draw you as a player (`Patch_VisEquipment`) and by the save
+(`EquipmentMask.UnhideForSave`). Your own gear therefore never reaches a costume, whatever
+the five say; the options keep their full meaning on any other costume (a cart, a piece, a
+ship), and on your own gear on every screen running this DLL.
 
 **The health bar follows the same rule** (`ShowAsAlly`, `AllyView`): `EnemyHud` asks
 `BaseAI.IsEnemy(the player looking, your ZDO)` whether to draw the red bar of an enemy or
@@ -251,7 +260,8 @@ Ticking the box switches the **drawing** of every particle system of an Item cos
 itself - and not the system either, which would start again at activation), so the costume
 stands there without a shimmer while everything else it has is left alone: only an `Item` is
 concerned, a creature, a piece or a ship keeps every effect it carries. Like everything of
-`4 - Own view` it is **purely local**, and the reach of that is worth being precise about:
+`4 - Own view` **except the gear setting at the end of this section** it is **purely
+local**, and the reach of that is worth being precise about:
 your own costume and the picture of the window are drawn by this machine, so they follow the
 setting; a machine running no DLL of ours builds your **real item prefab** from the network
 and has the sparkle baked into it, with no setting of ours inside to turn it off; and a
@@ -268,17 +278,24 @@ of its prefab and one seeded pick of each random pool (`m_randomShield`, `m_rand
 and `MonsterAI.Start` then takes the best weapon of that inventory into a hand
 (`EquipBestWeapon`). The costume has neither of those scripts - the strip removes them, and
 they would need a ZDO - so `GearSkin` walks the very same lists, in the very same order,
-with the very same seeded roll (the prefab's own name instead of the ZDO uid a clone can
-never have), and writes the very same slots on the clone's own `VisEquipment`: the slots
+with the very same seeded roll (the ZDO's own `s_seed`, the value `Humanoid.Awake` writes
+into every player ZDO from its uid and the very seed the game rolls that costume with on
+every machine; a copy with no ZDO to read - the window's picture - falls back to the
+prefab's own name), and writes the very same slots on the clone's own `VisEquipment`: the
+slots
 `Humanoid.EquipItem` would have filled, replicated from its own type switch, which are the
 fields `VisEquipment.UpdateEquipmentVisuals` reads back **when there is no ZDO** - exactly
 the state of a clone, whose `GhostNetView` carries none. The game's own component then
 attaches each item to the clone's bones, drawing the gear itself in `Start` and once per
 frame after: nothing of the attaching is replicated, it is the vanilla code. A Fuling
 costume therefore appears with its spear and its armor, like a Fuling in the world, and
-ticking the box takes them off again. Same reach as the setting above - **purely local**,
-your own costume and the picture of the window only - and the same three ways to write it:
-the box, the `.cfg`, `disguise gear [on|off]`.
+ticking the box takes them off again. The gear reaches **every screen drawing that
+costume**: your own costume and the picture of the window here, and the costume the
+machines running no DLL receive - while you are disguised your ZDO carries that gear
+itself (`CostumeGear`, § 3), rolled the same way there, so a vanilla client draws the very
+pick your own screen shows; the machines running this DLL keep drawing **you**, with your
+own equipment, whatever the setting says. Same three ways to write it: the box, the `.cfg`,
+`disguise gear [on|off]`.
 
 The clone is **purely local**: no ZDO, no collision, no AI, no network component.
 `GhostFactory` builds it from a prefab deactivated for the duration of the instantiation,
@@ -447,8 +464,9 @@ value written in ConfigurationManager is pushed back into the box every frame li
 other label. Under that box, on the second row of the band, sits the **gear box** -
 `Hide armor & weapon`, the same control in the same column: it writes `HideCreatureGear`
 (`4 - Own view`) and takes the armor and the weapon a humanoid costume is born with off
-that costume (§ 2, `GearSkin`), again rebuilding the costume and the picture at once, and
-again pushed back from ConfigurationManager like every other label. The **line under the
+that costume - here and on every other machine drawing it (`CostumeGear`, § 3; § 2,
+`GearSkin`), again rebuilding the costume and the picture at once, and again pushed back
+from ConfigurationManager like every other label. The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -818,6 +836,32 @@ Visual synchronisation on vanilla clients:
   maximum is measured once per prefab from `WearNTear.m_health` / `Humanoid.m_health`, read
   by NAME and through reflection so it stays out of the audit's count; a prefab carrying
   neither (a dropped item, which shows no damage anyway) simply keeps your value.
+- **Costume gear** (`CostumeGear`): the armor and the weapon a humanoid costume is born with
+  travel in the very same keys - the only ones a machine running no DLL reads a costume
+  from, and the reason such a machine draws your costume **bare** without this: those keys
+  carry YOUR gear, which the mask keeps at 0 for it (§ 2), and its own game code cannot
+  dress the costume either - `Humanoid.Start` does roll the very same pick there
+  (`GiveDefaultItems`, seeded by the ZDO's `s_seed`) but the `VisEquipment` setters only
+  write a ZDO **for its owner**, so the roll never reaches the keys its own
+  `UpdateEquipmentVisuals` reads back every frame. For the duration of `ZDO.Serialize`,
+  each of the eight rows a creature is drawn with (head, chest, legs, shoulder, both hands,
+  utility, trinket - everything `UpdateEquipmentVisuals` reads before its `if (m_isPlayer)`)
+  takes the costume's own hash, rolled by `GearSkin` with that same `s_seed`, so your
+  screen, the packet and that machine's own roll are one single pick; and before the first
+  write of a row, what the row held (yours, or an empty slot, which a 0 in `cd_eq_*` alone
+  could never be told from "nothing recorded") moves into `cd_eq_*` and is **flagged** in
+  `cd_eq_pub` - which is what `Patch_VisEquipment` and `EquipmentMask.UnhideForSave` go by,
+  so modded machines keep drawing YOUR gear on the real `Player` they build for you and the
+  world file keeps your equipment, never the costume's. The window is nested inside the
+  mask's (opens second, closes first, each handing back what it found - they share
+  `cd_eq_pub`), runs on **every** machine serializing that ZDO: the owner publishing, the
+  relaying server finding the same values already there and changing nothing. Its roll is
+  cached per prefab and seed, and `HideCreatureGear` decides what is published - the owner's
+  own flag `cd_costumeGear`, published next to `cd_hide` by the reassert, this machine's
+  option as the fallback for an owner running no DLL - so toggling it bumps the
+  DataRevision and reaches every machine with the next packet, while the swap itself stays
+  silent. The five `[3 - Display]` options are not consulted for a humanoid costume: they
+  hid **your** gear from a costume that now wears its own (§ 2).
 - **Flight** (`cd_fly`, `FlightControl`): your own client writes the requested height into
   your ZDO - in **centimetres**, because `ZDO.Set` has no float overload in the original
   assembly - and that write is throttled to one per 100 ms so a held key cannot bump the
@@ -1493,8 +1537,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   the window. The game hands a real creature its gear in two steps at spawn - `Humanoid.Start`
   gives the default items and one seeded pick of each random pool (`GiveDefaultItems`),
   `MonsterAI.Start` then puts the best weapon of that inventory in a hand - and this walks the
-  very same lists in the very same order (the prefab's own name seeding the roll, where the
-  real game uses the ZDO uid a copy never gets), writes the very same slots on the copy's own
+  very same lists in the very same order (the ZDO's own `s_seed` seeding the roll - the very
+  seed the game uses - a copy with no ZDO to read falling back to the prefab's own name),
+  writes the very same slots on the copy's own
   `VisEquipment` (the slots `Humanoid.EquipItem` would fill, its type switch replicated), and
   leaves the attaching to the game: `VisEquipment` runs on the copy - with no ZDO, it reads
   its own fields, the branch it takes whenever a `ZNetView` carries none - and draws each item
@@ -1503,7 +1548,18 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   parsed by name: no game member is referenced, and a rename is a missing slot, never an
   exception. `HideGear` answers whether a costume has to be drawn bare (the option, then the
   humanoid's six lists), which is what `GhostFactory` asks at every build and `SelfView` /
-  `GuiPreview` ask when the value moves.
+  `GuiPreview` ask when the value moves; `Compute` / `Seed` are the pair `CostumeGear` asks
+  for the packet (§ 3).
+- `CostumeGear.cs` - the same gear on the wire: what the machines running no DLL draw your
+  costume from (§ 3). Publishes the owner's choice into `cd_costumeGear` (next to `cd_hide`,
+  same reassert, same bump rule), and for the duration of `ZDO.Serialize` re-dresses the
+  eight rows a creature is drawn with with the roll `GearSkin.Compute` returns for that
+  (prefab, `s_seed`) pair - cached - while the value each row held moves into `cd_eq_*` with
+  its flag in `cd_eq_pub`, which is what `Patch_VisEquipment` and
+  `EquipmentMask.UnhideForSave` read back (an empty slot is recorded as a flagged 0, the one
+  thing a bare `cd_eq_*` could never say). Its window nests **inside** the mask's and closes
+  before it (`Patch_ZDOSerialize`), because the two share `cd_eq_pub`: each class saves and
+  restores it once, in that order.
 - `GhostNetView.cs` - the `ZNetView` a copy that is shown carries so its `VisEquipment` can
   run: the game's component with **both** of its Unity messages hidden (Awake would mint the
   real ZDO the whole strip exists to avoid, OnDestroy would walk references it never held),
@@ -1562,7 +1618,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "A:\_MODDING\Valheim\MODS\Disguise\audit_visibility.ps1"
 ```
 
-Expected output: `Game members referenced: 84   ISSUES: 0` (exit code 0).
+Expected output: `Game members referenced: 87   ISSUES: 0` (exit code 0).
 On exit code 2, replace every listed member with reflection
 (`FieldInfo` / `MethodInfo` / `AccessTools`).
 Note: `ZDOMan.ZDOPeer` (nested type of the game) is **not public**, so the mod never
@@ -1614,6 +1670,14 @@ Everything else of the two fixes (`ZDO.GetPrefab`, `ZDO.GetFloat`, `ZNetScene.Ge
 already referenced somewhere else, and neither fix added a Harmony patch: both run inside
 ones that already existed (`Patch_ZDOSerialize`, `Patch_ZDOGetPosition`, `Patch_SendZDOs`),
 so the count of twenty-four stays correct.
+The gear on the wire (`CostumeGear`, § 3) is the next thing to move it, by **+3**, and all
+three are **public** members (`ZDOVars` fields), so ISSUES stays at 0: `ZDOVars.s_seed`,
+the seed `GearSkin.Seed` rolls a costume with; and `ZDOVars.s_utilityItem` /
+`ZDOVars.s_trinketItem`, the two keys `UpdateEquipmentVisuals` reads for *every* entity -
+player or creature - which the mask's rows did not cover until now (they do since, as two
+more rows under `HideHeldItems`: that also closes the old leak of a utility item and a
+trinket of yours glued onto a costume drawn by a machine running no DLL). The count stands
+at 87.
 
 ---
 
@@ -1666,7 +1730,7 @@ so the count of twenty-four stays correct.
 | An `fx_` / `sfx_` / `vfx_` prefab is missing from the list | Normal, and vanilla as they are: those prefixes name the **effect** prefabs - the sound and the particles something spawns, not an appearance - and both lists drop them on purpose (§ 6). `disguise set <name>` still takes one typed by hand |
 | A prefab like `Abomination_attack1` or `wraith_melee` is missing from the list | Normal, and no accident: those are the creature's own **attack helpers** and zones - registered `Item` prefabs with **no mesh anywhere**, which is why the log says `Preview: <name> has no mesh to show.` when one is pointed at. The catalogue drops them with every other prefab nothing could be drawn of (a spawner, a blob's AoE): they would be an empty picture in the window and an invisible viking in the world (§ 6). `disguise set <name>` still takes one typed by hand |
 | The shimmer beside an item costume is still there | `HideItemSparkle` only reaches what **this machine** draws: your own costume (`SeeYourDisguise`, § 2) and the picture of the window - so tick `Hide item sparkle` under the command buttons (or write `HideItemSparkle = true` in the `.cfg`) and both drop it at once, the clone being rebuilt rather than repaired. A machine with no DLL of ours builds your **real item prefab** from the network, where the particle system is baked into the prefab and no setting of ours exists to turn it off; a machine running the DLL draws a real `Player` for you and never your costume (§ 3), so there is nothing of yours there to shimmer |
-| A humanoid costume appears **without its armor and its weapon** | `HideCreatureGear` takes them off on purpose (`4 - Own view`, local only): untick `Hide armor & weapon` under the command buttons (or write `HideCreatureGear = false` in the `.cfg`, or run `disguise gear on`) and the costume is drawn with the gear a real creature of that prefab spawns with - your own screen and the window's picture rebuilding themselves at once. The reverse case is the same switch the other way: a machine running no DLL of ours draws the creature it receives from the game itself, gear included, whatever this setting says |
+| A humanoid costume appears **without its armor and its weapon** | On your own screen: `HideCreatureGear` takes them off on purpose (`4 - Own view`): untick `Hide armor & weapon` under the command buttons (or write `HideCreatureGear = false` in the `.cfg`, or run `disguise gear on`) and the costume is drawn with the gear a real creature of that prefab spawns with - your own screen and the window's picture rebuilding themselves at once. On **another machine** (a vanilla client included): its costume is built from your ZDO, so the gear has to travel in it - it does (`CostumeGear`, § 3), published by **your own** client, which therefore needs the current build; only a disguise kept in the **save** (restored by the server alone) needs the DLL on the dedicated server instead (§ 1.b). The machines running this DLL draw **you**, not the costume, and keep showing your own equipment whatever this setting says |
 | A level 2 or 3 costume shows the plain creature | Three places can show it, each with the game's own rule behind it. **Another machine**: a creature reads its level once, when it is born (`Character.Awake`) and keeps that instance forever, so a machine already drawing you needs a fresh object before a new skin can show - `ForceObserverRefresh` (§ 4.1) does it on its own, `disguise refresh` is the manual fallback, and the dedicated server must run the DLL for either. **Your own screen / the picture**: those are copies this mod builds, dressed by `LevelSkin` at their build - the level is read once per build, so a level that just moved rebuilds them within the same frame (the picture after its 0.15 s hover delay). **Everywhere at once**: a level above the skins a prefab carries keeps only the health growing, and the game draws the base look - `spawn <creature> 1 4` in vanilla behaves exactly the same. A star only ever appears at levels **2 and 3** (`EnemyHud` draws it for those two alone) |
 | The pause menu has no `Disguise` line | `ShowMenuEntry` is off (`6 - GUI`, on by default). Set it back to `true` and the line comes back at the next opening of the pause menu - at once, if that menu is on screen while ConfigurationManager changes it. The line is there in the main menu too, where the window only says `the prefab list is available in game` until a world is loaded |
 | Opening the window takes a noticeable moment | Two things cost, and the log says both: `GUI: <n> name(s) in <ms> ms, <built> of <n> row(s) in <ms> ms.` (`Logs = true`, § 2). The catalogue is the walk that tags every vanilla prefab with its kind - up to ten component tests, and exactly ONCE: the walk skips them when all it was asked for is names, and the window does that one pass for its own rows. The rows are Jotunn buttons of four objects each, and only the categories the boxes have ON get one at the opening; a category switched on later is built then, once (in the order of the list), and a row is never destroyed, so switching back and forth stays a `SetActive`. The very first list of a session also reads the game's vanilla manifest once (3.5 MB, then `Vanilla prefab set: <n> name(s).` in the log) |

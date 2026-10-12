@@ -334,7 +334,7 @@ internal static class CreatureTriggers
     /// </summary>
     private static HashSet<string> Probe(int hash)
     {
-        GameObject? copy = GhostFactory.BuildInert(hash, keepEquipment: false);
+        GameObject? copy = GhostFactory.BuildInert(hash, keepEquipment: false, gearSeed: 0);
         if (copy == null)
         {
             return new(StringComparer.Ordinal);

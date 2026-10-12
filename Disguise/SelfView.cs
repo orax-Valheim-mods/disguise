@@ -162,7 +162,11 @@ internal static class SelfView
                         + PoseControl.ViewOffset
                         + FlightControl.ViewOffset,
                     RestOffset.ViewRotation(wanted, basePosition, player.transform.rotation)
-                        * PoseControl.ViewRotation
+                        * PoseControl.ViewRotation,
+                    // The ZDO's own seed: what YOUR costume is rolled with everywhere - the
+                    // same armor and the same weapon the machines running no DLL receive
+                    // (CostumeGear) and draw on it.
+                    GearSkin.Seed(GameAccess.GetLocalPlayerZDO())
                 );
                 if (ghost == null)
                 {

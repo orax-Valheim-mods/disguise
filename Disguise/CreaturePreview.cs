@@ -191,7 +191,16 @@ internal static class CreaturePreview
             return null;
         }
 
-        GameObject? clone = GhostFactory.BuildInert(zns.GetPrefabHash(prefab), keepEquipment: true);
+        // The player's own seed: the picture of YOUR costume is then the very pick that
+        // costume wears everywhere else - your screen (SelfView) and the machines running no
+        // DLL (CostumeGear) both roll with it. Any other creature in the list is a picture
+        // too, rolled with the same seed: one picture, the same at every rebuild (no ZDO to
+        // read - the menu, a probe - falls back to the prefab's own name inside GearSkin).
+        GameObject? clone = GhostFactory.BuildInert(
+            zns.GetPrefabHash(prefab),
+            keepEquipment: true,
+            gearSeed: GearSkin.Seed(GameAccess.GetLocalPlayerZDO())
+        );
         if (clone == null)
         {
             return null;

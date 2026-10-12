@@ -28,6 +28,14 @@ namespace Disguise;
 /// matter what your client says. The local config is only the fallback for an owner running
 /// no DLL at all (a disguise kept in the save, restored by the server alone).
 ///
+/// A second writer shares exactly these keys: CostumeGear, which re-dresses the rows a
+/// humanoid costume is DRAWN with for that same outgoing packet - the costume's own gear
+/// where your slots would otherwise be hidden or empty. The two windows are nested (this one
+/// opens first and closes last, each putting back what it found), and cd_eq_pub says which
+/// rows hold a real value put aside - an EMPTY slot included, which a 0 in cd_eq_* alone
+/// could never be told from "nothing was ever put aside". Both readers below go by that key:
+/// the restore above, and the save.
+///
 /// Every swap goes through ZDOExtraData.Set, which does NOT bump the DataRevision, and the
 /// save path writes straight into its snapshot: the ZDO state - and therefore the game
 /// logic, the other packets and your own view - is never modified.
@@ -56,8 +64,13 @@ internal static class EquipmentMask
 
     private const int BitHeld = 1 << OptHeld;
 
-    /// <summary>Game keys read by VisEquipment - one row per hidden item.</summary>
-    private static readonly int[] s_vanillaKeys =
+    /// <summary>
+    /// Game keys read by VisEquipment - one row per hidden item. Utility and trinket are
+    /// rows like the rest: UpdateEquipmentVisuals reads them for every entity, player or
+    /// creature, so they would reach a costume too. CostumeGear re-dresses a subset of these
+    /// rows (everything but the two back slots a creature is never drawn with).
+    /// </summary>
+    internal static readonly int[] s_vanillaKeys =
     {
         ZDOVars.s_helmetItem,
         ZDOVars.s_chestItem,
@@ -67,10 +80,12 @@ internal static class EquipmentMask
         ZDOVars.s_rightItem,
         ZDOVars.s_leftBackItem,
         ZDOVars.s_rightBackItem,
+        ZDOVars.s_utilityItem,
+        ZDOVars.s_trinketItem,
     };
 
     /// <summary>Our own keys carrying the real hash while the vanilla key is hidden.</summary>
-    private static readonly int[] s_overrideKeys =
+    internal static readonly int[] s_overrideKeys =
     {
         Key("cd_eq_helmet"),
         Key("cd_eq_chest"),
@@ -80,6 +95,8 @@ internal static class EquipmentMask
         Key("cd_eq_right"),
         Key("cd_eq_leftback"),
         Key("cd_eq_rightback"),
+        Key("cd_eq_utility"),
+        Key("cd_eq_trinket"),
     };
 
     /// <summary>Option that gates each row (index of the Opt* constants above).</summary>
@@ -93,7 +110,41 @@ internal static class EquipmentMask
         OptHeld,
         OptHeld,
         OptHeld,
+        OptHeld,
+        OptHeld,
     };
+
+    // The rows, by index into the three arrays above, in their order. CostumeGear dresses a
+    // subset of them, so a row has to name the same slot in both classes: these constants
+    // are the shared vocabulary (the arrays stay in this order).
+    internal const int RowHelmet = 0;
+
+    internal const int RowChest = 1;
+
+    internal const int RowLegs = 2;
+
+    internal const int RowCape = 3;
+
+    internal const int RowLeft = 4;
+
+    internal const int RowRight = 5;
+
+    internal const int RowLeftBack = 6;
+
+    internal const int RowRightBack = 7;
+
+    internal const int RowUtility = 8;
+
+    internal const int RowTrinket = 9;
+
+    /// <summary>
+    /// Which rows hold a real value put aside - one bit per row of the arrays above, set by
+    /// both windows: this one when it hides a value, CostumeGear when it re-dresses a row.
+    /// An empty slot is put aside as 0 and FLAGGED too, because a 0 in cd_eq_* on its own
+    /// could equally mean "nothing was ever put aside" - and both readers below would then
+    /// leave the costume's gear on your back instead of your own gear (or nothing).
+    /// </summary>
+    internal static readonly int PublishKey = Key("cd_eq_pub");
 
     // Active swap window. The game is single threaded and the two swap windows (outgoing
     // packet, rendered frame) never nest, but every patch still keeps its own __state and
@@ -218,6 +269,8 @@ internal static class EquipmentMask
 
         s_activeZdo = zdo;
         bool swapped = false;
+        int pub = zdo.GetInt(PublishKey, 0);
+        int previous = pub;
         try
         {
             for (int i = 0; i < s_vanillaKeys.Length; i++)
@@ -239,6 +292,14 @@ internal static class EquipmentMask
                 }
                 Swap(zdo, s_vanillaKeys[i], 0);
                 Swap(zdo, s_overrideKeys[i], real);
+                pub |= 1 << i;
+                swapped = true;
+            }
+            if (pub != previous)
+            {
+                // One write for the whole window: those rows each hold a real value now,
+                // which is what both readers below go by (PublishKey).
+                Swap(zdo, PublishKey, pub);
                 swapped = true;
             }
         }
@@ -274,14 +335,22 @@ internal static class EquipmentMask
 
         s_activeZdo = zdo;
         bool swapped = false;
+        int pub = zdo.GetInt(PublishKey, 0);
         try
         {
             for (int i = 0; i < s_vanillaKeys.Length; i++)
             {
-                int hidden = zdo.GetInt(s_overrideKeys[i], 0);
-                if (hidden == 0 || hidden == zdo.GetInt(s_vanillaKeys[i], 0))
+                // Only rows that put a real value aside are restored - and that value may be
+                // 0, an empty slot recorded by CostumeGear while its costume wears gear the
+                // player has nothing of (see PublishKey).
+                if ((pub & (1 << i)) == 0)
                 {
-                    continue; // not hidden, or already the visible value
+                    continue;
+                }
+                int hidden = zdo.GetInt(s_overrideKeys[i], 0);
+                if (hidden == zdo.GetInt(s_vanillaKeys[i], 0))
+                {
+                    continue; // already the visible value
                 }
                 Swap(zdo, s_vanillaKeys[i], hidden);
                 swapped = true;
@@ -326,11 +395,12 @@ internal static class EquipmentMask
     }
 
     /// <summary>
-    /// ZDO.Save: writes the real hashes into the snapshot the save reads. The live values
-    /// are stored masked (that is the whole point of the mask), so without this the world
-    /// file would record your player with no equipment at all - same reasoning as
-    /// ProtectSaveFile for the prefab. Nothing to restore: the snapshot is discarded at the
-    /// end of the save.
+    /// ZDO.Save: writes the real hashes into the snapshot the save reads. On the machine
+    /// saving the world, the live values are the masked ones and - while a humanoid costume
+    /// is worn - the costume's own gear (both windows are the packet's alone): without this
+    /// the world file would record your player with the equipment of the creature it is
+    /// dressed as, or with none at all. Same reasoning as ProtectSaveFile for the prefab.
+    /// Nothing to restore: the snapshot is discarded at the end of the save.
     /// </summary>
     internal static void UnhideForSave(ZDO? zdo)
     {
@@ -338,14 +408,14 @@ internal static class EquipmentMask
         {
             return;
         }
+        int pub = zdo.GetInt(PublishKey, 0);
         for (int i = 0; i < s_vanillaKeys.Length; i++)
         {
-            int hidden = zdo.GetInt(s_overrideKeys[i], 0);
-            if (hidden == 0)
+            if ((pub & (1 << i)) == 0)
             {
-                continue; // nothing hidden in that slot
+                continue; // nothing put aside in that slot: the snapshot already holds it
             }
-            GameAccess.SetSaveInt(zdo, s_vanillaKeys[i], hidden);
+            GameAccess.SetSaveInt(zdo, s_vanillaKeys[i], zdo.GetInt(s_overrideKeys[i], 0));
         }
     }
 

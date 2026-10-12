@@ -47,8 +47,18 @@ internal static class GhostFactory
     /// The clone is deliberately NOT parented to your player: a child would be walked by
     /// every GetComponentsInChildren the game (and SelfView) runs on your player, on top of
     /// extending your hierarchy by a full creature. SelfView copies the transform instead.
+    ///
+    /// <paramref name="gearSeed"/> is the seed the armor and the weapon are rolled with
+    /// (GearSkin.Seed of the ZDO this costume belongs to - the seed the game rolls that
+    /// same costume with everywhere), so what this screen draws is what every other screen
+    /// draws, modded or not.
     /// </summary>
-    internal static GameObject? Create(int prefabHash, Vector3 position, Quaternion rotation)
+    internal static GameObject? Create(
+        int prefabHash,
+        Vector3 position,
+        Quaternion rotation,
+        int gearSeed
+    )
     {
         GameObject? prefab = Prefab(prefabHash);
         if (prefab == null)
@@ -63,7 +73,7 @@ internal static class GhostFactory
                 ?? prefab.GetComponentInChildren<ZSyncAnimation>(true)
         );
 
-        GameObject? clone = BuildInert(prefabHash, keepEquipment: true);
+        GameObject? clone = BuildInert(prefabHash, keepEquipment: true, gearSeed);
         if (clone == null)
         {
             return null;
@@ -99,6 +109,8 @@ internal static class GhostFactory
     /// next to it - the pair GearSkin dresses in the gear the creature is born with, and
     /// the only thing on the copy that has anything to run. The throwaway copy of
     /// CreatureTriggers passes false: nothing ever draws it, so it carries neither.
+    /// <paramref name="gearSeed"/> is only what those two are dressed with: the ZDO's own
+    /// seed for your costume, 0 for a picture (GearSkin then rolls by the prefab's name).
     ///
     /// The caller owns the result. SelfView activates and renders it; CreatureTriggers
     /// activates it only to read its Animator - Animator.parameters returns an empty array
@@ -106,7 +118,7 @@ internal static class GhostFactory
     /// (m_prefabs holds asset references, in no scene at all) - and destroys it in the same
     /// call, once per creature.
     /// </summary>
-    internal static GameObject? BuildInert(int prefabHash, bool keepEquipment)
+    internal static GameObject? BuildInert(int prefabHash, bool keepEquipment, int gearSeed)
     {
         GameObject? prefab = Prefab(prefabHash);
         if (prefab == null)
@@ -160,7 +172,7 @@ internal static class GhostFactory
                 _ = clone.AddComponent<GhostNetView>();
                 if (!GearSkin.HideGear(prefab))
                 {
-                    GearSkin.Dress(clone, prefab);
+                    GearSkin.Dress(clone, prefab, gearSeed);
                 }
             }
             return clone;

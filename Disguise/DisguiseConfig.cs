@@ -293,12 +293,17 @@ internal static class DisguiseConfig
         ConfigShowAsAlly.SettingChanged += (_, _) => AllyView.OnSettingChanged();
     }
 
-    /// <summary>Section `4 - Own view`: purely local rendering, on this screen only.</summary>
+    /// <summary>
+    /// Section `4 - Own view`: what this screen draws - the gear setting excepted, which
+    /// also has something to publish (CostumeGear).
+    /// </summary>
     private static void BindOwnView(ConfigFile config)
     {
-        // -- 4 - Own view: purely local rendering, polled every frame by SelfView.Tick() and
-        // (while the window is open) by GuiPreview.Tick, so no SettingChanged handler is
-        // needed here: a clone already standing rebuilds itself when the setting moves.
+        // -- 4 - Own view: rendering on this screen, polled every frame by SelfView.Tick()
+        // and (while the window is open) by GuiPreview.Tick, so the first two settings need
+        // no SettingChanged handler: a clone already standing rebuilds itself when the
+        // setting moves. The gear is the exception - its clones are polled the same way, but
+        // it also has something to publish (wired after its bind below).
         ConfigSeeYourDisguise = config.Bind(
             "4 - Own view",
             "SeeYourDisguise",
@@ -328,12 +333,20 @@ internal static class DisguiseConfig
             "Hide the armor and the weapon a humanoid costume is born with: the gear a real creature "
                 + "of that prefab spawns with (Humanoid's default and random items, the weapon its AI "
                 + "takes into a hand). Off - the gear is DRAWN - which is how a Fuling in the world "
-                + "looks, spear and all. Local visuals only, like HideItemSparkle: it changes what "
-                + "THIS machine draws - your own costume and the window's picture - and never what "
-                + "another machine receives. A machine without this DLL keeps drawing the vanilla "
-                + "creature it receives, gear included. Window: the 'Hide armor & weapon' box under "
-                + "the command buttons. Console command: disguise gear [on|off]."
+                + "looks, spear and all. Reaches every screen that draws you: your own costume and "
+                + "the window's picture here, and the costume the machines running no DLL of this "
+                + "mod receive - your ZDO publishes that gear itself while you are disguised, rolled "
+                + "the way the game rolls it so every machine agrees on the same pick. The machines "
+                + "running this DLL are never affected: they keep drawing YOU, with your own "
+                + "equipment. Window: the 'Hide armor & weapon' box under the command buttons. "
+                + "Console command: disguise gear [on|off]."
         );
+
+        // The clones rebuild themselves when this moves (the per-frame poll above), but the
+        // WIRE has to be told at once: the new flag is published right away, which bumps the
+        // DataRevision, so the costume's new keys reach every machine with the next packet
+        // (CostumeGear.OnSettingChanged, the rule of HideSettingChanged above).
+        ConfigHideCreatureGear.SettingChanged += (_, _) => CostumeGear.OnSettingChanged();
     }
 
     /// <summary>Section `5 - Flight`: the keys, the wheel and the speed of the climb.</summary>
