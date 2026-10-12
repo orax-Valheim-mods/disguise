@@ -110,6 +110,25 @@ internal static class GearSkin
             }
 
             Write(visEquipment, gear);
+
+            // One line under Logs, so a bare costume can be read apart from a costume the
+            // lists left bare: the six list lengths of the prefab, then every slot written.
+            if (DisguiseConfig.ConfigLogs.Value)
+            {
+                Disguise.LogInfo(
+                    $"Gear: {prefab.name} lists "
+                        + $"[{Length(Read<GameObject[]>(GameAccess.s_defaultItemsField, humanoid))} "
+                        + $"{Length(Read<GameObject[]>(GameAccess.s_randomShieldField, humanoid))} "
+                        + $"{Length(Read<GameObject[]>(GameAccess.s_randomWeaponField, humanoid))} "
+                        + $"{Length(Read<GameObject[]>(GameAccess.s_randomArmorField, humanoid))} "
+                        + $"{Length(Read<object[]>(GameAccess.s_randomSetsField, humanoid))} "
+                        + $"{Length(Read<object[]>(GameAccess.s_randomItemsField, humanoid))}] -> "
+                        + $"right {gear.Right} (q{gear.RightQuality}), left {gear.Left}, "
+                        + $"chest {gear.Chest}, legs {gear.Leg}, helmet {gear.Helmet}, "
+                        + $"shoulder {gear.Shoulder}, utility {gear.Utility}, "
+                        + $"trinket {gear.Trinket ?? "-"}"
+                );
+            }
         }
         catch (Exception ex)
         {
@@ -118,6 +137,9 @@ internal static class GearSkin
             Disguise.LogWarning($"Gear: cannot dress the copy of {prefab.name}: {ex.Message}");
         }
     }
+
+    /// <summary>The length of a list for the log line above (null reads as nothing there).</summary>
+    private static int Length(System.Collections.ICollection? list) => list?.Count ?? 0;
 
     // ------------------------------------------------------------------ GiveDefaultItems
 
@@ -408,7 +430,14 @@ internal static class GearSkin
     {
         object? shared = Read(GameAccess.s_itemDataSharedField, itemData);
         object? type = Read(GameAccess.s_sharedItemTypeField, shared);
-        return type is int value ? value : Missing;
+        if (type is int value)
+        {
+            return value;
+        }
+        // A boxed ENUM is never `is int` - its runtime type is the enum itself, and only an
+        // unboxing cast accepts it - so the value goes through Convert, which unboxes it. A
+        // null left by a rename stays the Missing below: the item is skipped, not slotted.
+        return type is Enum ? Convert.ToInt32(type) : Missing;
     }
 
     // ------------------------------------------------------------------ reflection helpers
