@@ -30,7 +30,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | gear | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
+                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | armor | weapons | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -61,7 +61,8 @@ internal static class DisguiseCommand
             "refresh",
             "view",
             "logs",
-            "gear",
+            "armor",
+            "weapons",
             "fly",
             "offset",
             "rotation",
@@ -151,8 +152,12 @@ internal static class DisguiseCommand
                 SetLogs(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
-            case "gear":
-                SetGear(ctx, words.Length > 2 ? words[2] : null);
+            case "armor":
+                SetArmor(ctx, words.Length > 2 ? words[2] : null);
+                break;
+
+            case "weapons":
+                SetWeapons(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "fly":
@@ -293,8 +298,14 @@ internal static class DisguiseCommand
             ctx,
             "  disguise logs [on|off]    write the mod's own Info messages to the BepInEx log"
         );
-        Say(ctx, "  disguise gear [on|off]    draw a humanoid costume with the armor and the");
-        Say(ctx, "                            weapon it is born with (on by default)");
+        Say(ctx, "  disguise armor [on|off]   draw the costume with the armor a real creature of");
+        Say(ctx, "                            that prefab is born with (on by default)");
+        Say(ctx, "  disguise weapons [on|off|creature|player|<weapon>]");
+        Say(ctx, "                            draw the costume with weapons (on by default) and,");
+        Say(ctx, "                            while it does, whose they are: the one it is born");
+        Say(ctx, "                            with (the default), yours, or ONE weapon of its own");
+        Say(ctx, "                            pool holding both hands (<weapon> is its name -");
+        Say(ctx, "                            \"disguise weapons\" alone lists them)");
         Say(
             ctx,
             "  disguise fly [on|off]     fly: the creature is raised for the others (visual only)"
@@ -448,39 +459,177 @@ internal static class DisguiseCommand
     }
 
     /// <summary>
-    /// "disguise gear [on|off]": the armor and the weapon a humanoid costume is BORN with -
-    /// the gear the game gives a real creature of that prefab at spawn (its default and
-    /// random items, then the weapon its AI takes into a hand) - drawn on the costume, or
-    /// not (HideCreatureGear, 4 - Own view). ON, which is the default, is the gear drawn,
-    /// like a Fuling in the world: spear and all. It reaches every screen drawing that
-    /// costume: yours here (a rebuild, next call), and the machines running no DLL's, which
-    /// read the gear out of your ZDO - published by the reassert, rolled like the game rolls
-    /// it (CostumeGear). The machines running this DLL keep drawing you with your own
-    /// equipment either way.
+    /// "disguise armor [on|off]": the ARMOR a humanoid costume is born with - the gear the
+    /// game gives a real creature of that prefab at spawn (its default items and one pick of
+    /// each random pool) - drawn on the costume, or not (ShowArmor, 3 - Display). ON, which is
+    /// the default, is the armor drawn, like a Fuling in the world: helmet and all. It reaches
+    /// every screen drawing that costume: yours here (a rebuild, next call), the window's
+    /// picture, and the machines running no DLL's, which read it out of your ZDO - published
+    /// by the reassert, rolled like the game rolls it (CostumeGear). The machines running
+    /// this DLL keep drawing you with your own equipment either way. Whose WEAPON the costume
+    /// holds is the other half of that same pair (disguise weapons).
     /// </summary>
-    private static void SetGear(Terminal? ctx, string? argument)
+    private static void SetArmor(Terminal? ctx, string? argument)
     {
-        // The config hides the gear, the command says whether it is SHOWN: the two spellings
-        // are the same switch, read the way a player says it.
-        bool shown;
+        // ShowArmor is spelled the way it answers - ON is the armor drawn - so the command
+        // and the .cfg entry are one single switch, unlike the old "hide" spelling.
+        bool shown = DisguiseConfig.ConfigShowArmor.Value;
         if (argument == null)
         {
-            shown = DisguiseConfig.ConfigHideCreatureGear.Value;
+            shown = !shown;
         }
         else if (!TryParseOnOff(argument, out shown))
         {
-            Say(ctx, "Usage: disguise gear [on|off]");
+            Say(ctx, "Usage: disguise armor [on|off]");
             return;
         }
-        DisguiseConfig.ConfigHideCreatureGear.Value = !shown;
+        DisguiseConfig.ConfigShowArmor.Value = shown;
 
         Say(
             ctx,
             shown
-                ? "[Disguise] Gear ON: a humanoid costume is drawn with the armor and the "
-                    + "weapon it is born with (this machine only)."
-                : "[Disguise] Gear OFF: a humanoid costume is drawn bare - no armor, no weapon."
+                ? "[Disguise] Armor ON: a humanoid costume is drawn with the armor it is born "
+                    + "with (this machine and every packet leaving it)."
+                : "[Disguise] Armor OFF: a humanoid costume is drawn without it - no helmet, "
+                    + "no chest, no legs, no cape - while its hands keep their own half "
+                    + "(disguise weapons)."
         );
+    }
+
+    /// <summary>
+    /// "disguise weapons [on|off|creature|player|<weapon>]": the two options the hands are
+    /// drawn with - whether a humanoid costume holds a weapon at all (ShowWeapons, off
+    /// leaving it with empty hands) and, while it does, whose those weapons are
+    /// (WhoseWeapons): "creature", the default, being the one a real creature of that prefab
+    /// takes into a hand at spawn, "player" the ones YOU hold in both hands, an empty hand
+    /// drawing nothing - and any other word being ONE item of that very creature's own pool,
+    /// which then holds BOTH hands alone (the other one empty) whatever the roll answers.
+    ///
+    /// The pool is printed with no argument, so a creature carrying several weapons can be
+    /// read before one of them is picked; a weapon the configured creature cannot hold is
+    /// REFUSED rather than kept, since every reader would only ever answer the roll for it,
+    /// and a creature configured after such a pick puts it back on "creature" by itself
+    /// (DisguiseConfig.ReconcileWhoseWeapons). It reaches every screen drawing that costume,
+    /// and the answers are what decide your own held items as well: hidden from the machines
+    /// running no DLL of ours while the costume does not wear them, exactly what it shows
+    /// while it does (EquipmentMask).
+    /// </summary>
+    private static void SetWeapons(Terminal? ctx, string? argument)
+    {
+        if (argument == null)
+        {
+            // Said after the reconciliation, so the state below is the one every screen
+            // draws and the entry on disk says the same thing after this call.
+            DisguiseConfig.ReconcileWhoseWeapons();
+            string? fixedWeapon = DisguiseConfig.FixedWeapon();
+            string state =
+                !DisguiseConfig.ConfigShowWeapons.Value ? "hidden"
+                : DisguiseConfig.PlayerWeapons() ? "yours"
+                : fixedWeapon != null ? $"its own, {fixedWeapon}"
+                : "its own";
+            Say(ctx, $"[Disguise] Weapons of the costume: {state}.");
+            SayWeapons(ctx);
+            Say(ctx, "Usage: disguise weapons [on|off|creature|player|<weapon>]");
+            return;
+        }
+
+        if (TryParseOnOff(argument, out bool on))
+        {
+            DisguiseConfig.ConfigShowWeapons.Value = on;
+
+            Say(
+                ctx,
+                on
+                    ? "[Disguise] Weapons ON: a humanoid costume is drawn with weapons again - "
+                        + "WhoseWeapons says which (disguise weapons <creature|player|weapon>)."
+                    : "[Disguise] Weapons OFF: a humanoid costume is drawn with EMPTY hands, "
+                        + "and your own held items stay hidden from the machines running no "
+                        + "DLL of this mod as well."
+            );
+            return;
+        }
+
+        if (
+            string.Equals(
+                argument,
+                DisguiseConfig.WeaponsCreature,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            DisguiseConfig.ConfigWhoseWeapons.Value = DisguiseConfig.WeaponsCreature;
+            Say(
+                ctx,
+                "[Disguise] Whose weapons = creature: a humanoid costume is held with the "
+                    + "weapon it is born with, and yours stay hidden from the machines running "
+                    + "no DLL of this mod."
+            );
+        }
+        else if (
+            string.Equals(
+                argument,
+                DisguiseConfig.WeaponsPlayer,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            DisguiseConfig.ConfigWhoseWeapons.Value = DisguiseConfig.WeaponsPlayer;
+            Say(
+                ctx,
+                "[Disguise] Whose weapons = player: the costume is held with the ones you "
+                    + "carry - your own items are what every machine draws on it now."
+            );
+        }
+        else
+        {
+            // One weapon of the configured creature's OWN pool, or nothing at all: an item
+            // no creature of that prefab can hold would be answered by the roll at every
+            // read (LocalWeaponHash), so it is refused here rather than written out of a
+            // config that would then be saying one thing and drawing another.
+            string? weapon = GearSkin.WeaponName(PrefabResolver.CreaturePrefab(), argument);
+            if (weapon == null)
+            {
+                Say(
+                    ctx,
+                    $"[Disguise] {PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash)} "
+                        + $"cannot hold \"{argument}\"."
+                );
+                SayWeapons(ctx);
+                Say(ctx, "Usage: disguise weapons [on|off|creature|player|<weapon>]");
+                return;
+            }
+            DisguiseConfig.ConfigWhoseWeapons.Value = weapon;
+            Say(
+                ctx,
+                $"[Disguise] Whose weapons = {weapon}: both hands of the costume hold that "
+                    + "item alone - the other one empty - and yours stay hidden from the "
+                    + "machines running no DLL of this mod."
+            );
+        }
+        if (!DisguiseConfig.ConfigShowWeapons.Value)
+        {
+            Say(ctx, "Note: it draws no weapon at all right now (disguise weapons on).");
+        }
+    }
+
+    /// <summary>
+    /// The weapons the configured creature can be held with, one line (GearSkin.Weapons -
+    /// the same pool the window's list is built from and the command above accepts). Said
+    /// with no argument at all, where there is no other word to name, and after a weapon the
+    /// creature cannot hold, where it is exactly what the caller was looking for.
+    /// </summary>
+    private static void SayWeapons(Terminal? ctx)
+    {
+        IReadOnlyList<string> pool = GearSkin.Weapons(PrefabResolver.CreaturePrefab());
+        string name = PrefabResolver.PrefabName(PrefabResolver.CreaturePrefabHash);
+        if (pool.Count == 0)
+        {
+            Say(ctx, $"  {name} can hold no weapon at all.");
+            return;
+        }
+        string fixedWeapon = DisguiseConfig.FixedWeapon() ?? DisguiseConfig.WeaponsCreature;
+        Say(ctx, $"  Weapons {name} can hold: {string.Join(", ", pool)}");
+        Say(ctx, $"  Picked now: {fixedWeapon}.");
     }
 
     /// <summary>
@@ -851,8 +1000,17 @@ internal static class DisguiseCommand
         );
         Say(
             ctx,
-            $"  Gear of a humanoid costume: {(DisguiseConfig.ConfigHideCreatureGear.Value ? "hidden" : "shown")} (disguise gear, 4 - Own view)"
+            $"  Armor of the costume: {(DisguiseConfig.ConfigShowArmor.Value ? "shown" : "hidden")} (disguise armor, 3 - Display)"
         );
+        // Said after the reconciliation, so the state below is the one every screen draws
+        // and the entry on disk says the same thing after this call.
+        DisguiseConfig.ReconcileWhoseWeapons();
+        string whose =
+            !DisguiseConfig.ConfigShowWeapons.Value ? "hidden"
+            : DisguiseConfig.PlayerWeapons() ? "yours"
+            : DisguiseConfig.FixedWeapon() is string weapon ? $"fixed, {weapon}"
+            : "its own";
+        Say(ctx, $"  Weapons of the costume: {whose} (disguise weapons, 3 - Display)");
         Say(
             ctx,
             $"  Info logs: {(DisguiseConfig.ConfigLogs.Value ? "on" : "off")} (disguise logs)"

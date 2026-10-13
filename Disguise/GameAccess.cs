@@ -153,6 +153,14 @@ internal static class GameAccess
         "m_itemType"
     );
 
+    // The name and the icons of one item: the two things every item one could ever SHOW a
+    // player carries, and the two a creature's own attack items do not - they exist only so
+    // EquipBestWeapon has one ItemDrop per attack to pick between, and no screen of any
+    // player has any business drawing them.
+    internal static readonly FieldInfo? s_sharedNameField = Field(s_sharedDataType, "m_name");
+
+    internal static readonly FieldInfo? s_sharedIconsField = Field(s_sharedDataType, "m_icons");
+
     // VisEquipment's slots: private in the game, and the exact fields its own
     // UpdateEquipmentVisuals falls back to when there is no ZDO - the state of an inert
     // copy, whose GhostNetView carries none (VisEquipment.cs, the else branch). GearSkin

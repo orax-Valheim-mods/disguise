@@ -24,9 +24,16 @@ namespace Disguise;
 ///
 /// WHO decides: the OWNER publishes its choice as a bitmask in its own ZDO (Disguise.HideKey,
 /// written by PublishMask). The server relaying the packet follows that value instead of its
-/// own [3 - Display] config, whose defaults (Hide* = true) would otherwise hide your gear no
-/// matter what your client says. The local config is only the fallback for an owner running
+/// own [3 - Display] config, whose ShowWeapons would otherwise hide your held items on the
+/// wrong side of what your client asks. The local config is the fallback for an owner running
 /// no DLL at all (a disguise kept in the save, restored by the server alone).
+///
+/// Four rows of that mask are no longer a setting (DisguiseConfig, section 3): helmet, chest,
+/// legs and cape are always hidden from a machine drawing no DLL of ours. The reason they
+/// could be dropped is CostumeGear - the costume dresses those very rows itself, so the mask
+/// landed on the same packet whether it touched them or not, and only a costume carrying no
+/// Humanoid at all was ever left reading them. Hiding them for good keeps exactly that case
+/// covered (and the fallback above honest) without an entry nobody can need.
 ///
 /// A second writer shares exactly these keys: CostumeGear, which re-dresses the rows a
 /// humanoid costume is DRAWN with for that same outgoing packet - the costume's own gear
@@ -42,7 +49,13 @@ namespace Disguise;
 /// </summary>
 internal static class EquipmentMask
 {
-    // The five settings, one index per option (see DisguiseConfig).
+    // The mask's options, one index per option: the first four (the armor rows) are no
+    // longer read from any config - BuildMask always puts them in the mask - and the fifth is
+    // read the other way about: the two weapons options are what your hands are for, the
+    // costume wearing the player's own items putting them back and everything else hiding
+    // them (BuildMask). The
+    // indices stay as they are: they are the bit positions of cd_hide, and every machine
+    // reading that bitmask has to agree on them, whatever its own build.
     private const int OptHelmet = 0;
 
     private const int OptChest = 1;
@@ -163,7 +176,9 @@ internal static class EquipmentMask
 
     /// <summary>
     /// The equipment this machine asks the others to hide, as a bitmask: 0 when the disguise
-    /// is off or every "hide" option is unchecked.
+    /// is off or the configured prefab is the player itself. The four armor rows are always
+    /// in it, the held items while the costume is held with the creature's OWN weapon (both
+    /// below).
     /// </summary>
     internal static int BuildMask()
     {
@@ -175,24 +190,27 @@ internal static class EquipmentMask
             return 0;
         }
 
-        int mask = 0;
-        if (OptionEnabled(OptHelmet))
-        {
-            mask |= BitHelmet;
-        }
-        if (OptionEnabled(OptChest))
-        {
-            mask |= BitChest;
-        }
-        if (OptionEnabled(OptLegs))
-        {
-            mask |= BitLegs;
-        }
-        if (OptionEnabled(OptCape))
-        {
-            mask |= BitCape;
-        }
-        if (OptionEnabled(OptHeld))
+        // Helmet, chest, legs and cape are no longer a setting (DisguiseConfig, section 3):
+        // a humanoid costume - every vanilla creature - dresses those very rows with its own
+        // gear (CostumeGear, which rewrites them whether this mask touched them or not, and
+        // lands on the very same packet either way), so an entry there could only ever be
+        // read by a costume carrying no Humanoid at all. Keeping them hidden covers exactly
+        // that case - and the fallback of PublishMask for an owner running no DLL - with no
+        // option anybody can need.
+        int mask = BitHelmet | BitChest | BitLegs | BitCape;
+
+        // The hands are read out of the two weapons options, and the three answers are the
+        // three sides of the same thing. ShowWeapons on and WhoseWeapons = "Player": your
+        // items ARE what every machine has to draw on the costume, so they are never hidden -
+        // the mask then decides nothing at all here. Anything else - the costume wearing its
+        // own weapon (the default), or no weapon at all - has your axe no business being
+        // glued to the creature rig of a client running no DLL of ours: the costume puts
+        // its own weapon there instead (or nothing), and CostumeGear runs right after this
+        // window (Patch_ZDOSerialize) and lands on the same packet either way. What the bit
+        // really decides alone is the costume carrying no Humanoid, which CostumeGear then
+        // leaves alone: it is hidden, or its items would be drawn on a rock.
+        bool playerHands = DisguiseConfig.ConfigShowWeapons.Value && DisguiseConfig.PlayerWeapons();
+        if (!playerHands)
         {
             mask |= BitHeld;
         }
@@ -219,23 +237,6 @@ internal static class EquipmentMask
 
     /// <summary>The mask published by the owner, or -1 when the owner never published one.</summary>
     private static int OwnerMask(ZDO zdo) => zdo.GetInt(Disguise.HideKey, -1);
-
-    private static bool OptionEnabled(int option)
-    {
-        switch (option)
-        {
-            case OptHelmet:
-                return DisguiseConfig.ConfigHideHelmet.Value;
-            case OptChest:
-                return DisguiseConfig.ConfigHideChest.Value;
-            case OptLegs:
-                return DisguiseConfig.ConfigHideLegs.Value;
-            case OptCape:
-                return DisguiseConfig.ConfigHideCape.Value;
-            default:
-                return DisguiseConfig.ConfigHideHeldItems.Value;
-        }
-    }
 
     // ------------------------------------------------------------------ swap windows
 

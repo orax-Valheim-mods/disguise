@@ -46,16 +46,19 @@ internal static class SelfView
     private static bool s_ghostSparkleOption;
 
     /// <summary>
-    /// The same pair for the gear of a humanoid costume (HideCreatureGear): the answer of
-    /// GearSkin.HideGear for the clone's prefab, and the option itself at its build. Here a
-    /// move of the OPTION can show whatever the costume is - a humanoid draws the armor and
-    /// the weapon it is born with, anything else has no gear at all - so the expensive test
-    /// (the humanoid's six lists) runs once per change, and never while the option stands
-    /// still: one bool per frame, the same as the sparkle pair above.
+    /// The same pair for the gear of a humanoid costume (ShowArmor and the weapons pair): the
+    /// look
+    /// the clone was built with (GearSkin.Look for its prefab, its bits) and the
+    /// options themselves at its build. Here a move of the OPTIONS can show whatever the
+    /// costume is - a humanoid draws the armor it is born with and holds its own weapon (or
+    /// yours, or nothing at all while ShowWeapons is off), anything else has no gear at all -
+    /// so the expensive test (the humanoid's six
+    /// lists) runs once per change, and never while the options stand still: three config
+    /// reads per frame, two more than the sparkle pair above.
     /// </summary>
-    private static bool s_ghostHideGear;
+    private static int s_ghostLook;
 
-    private static bool s_ghostGearOption;
+    private static int s_ghostLookOption;
 
     /// <summary>Working buffers for the scan (reused, never allocated per frame).</summary>
     private static readonly List<Renderer> s_renderers = new();
@@ -134,15 +137,15 @@ internal static class SelfView
                 }
             }
 
-            // The same thing for the gear option (HideCreatureGear): the clone standing was
-            // built the other way, so it is built again - which only costs anything when the
-            // difference can show, i.e. for a humanoid costume, whose armor and weapon are
-            // what this option takes off or puts back.
-            bool gearOption = DisguiseConfig.ConfigHideCreatureGear.Value;
-            if (s_ghost != null && gearOption != s_ghostGearOption)
+            // The same thing for the gear options (ShowArmor and the weapons pair): the clone
+            // standing was built the other way, so it is built again - which only costs
+            // anything when the difference can show: the bits are compared first, and
+            // the humanoid's lists are only walked while the armor is on (GearSkin.Look).
+            int lookOption = GearSkin.Options();
+            if (s_ghost != null && lookOption != s_ghostLookOption)
             {
-                s_ghostGearOption = gearOption;
-                if (s_ghostHideGear != GearSkin.HideGear(wanted))
+                s_ghostLookOption = lookOption;
+                if (s_ghostLook != GearSkin.Look(wanted))
                 {
                     Remove(); // rebuilt by the block below, within this same frame
                 }
@@ -178,8 +181,8 @@ internal static class SelfView
                 s_ghostPrefabHash = wanted;
                 s_ghostHideSparkle = GhostFactory.HideSparkle(wanted);
                 s_ghostSparkleOption = DisguiseConfig.ConfigHideItemSparkle.Value;
-                s_ghostHideGear = GearSkin.HideGear(wanted);
-                s_ghostGearOption = DisguiseConfig.ConfigHideCreatureGear.Value;
+                s_ghostLook = GearSkin.Look(wanted);
+                s_ghostLookOption = GearSkin.Options();
                 s_ghostLevel = level;
                 s_failedPrefabHash = 0;
                 s_nextRendererScan = 0f;
@@ -333,8 +336,8 @@ internal static class SelfView
         s_ghostPrefabHash = 0;
         s_ghostHideSparkle = false;
         s_ghostSparkleOption = false;
-        s_ghostHideGear = false;
-        s_ghostGearOption = false;
+        s_ghostLook = 0;
+        s_ghostLookOption = 0;
         s_ghostLevel = 0;
         s_nextRendererScan = 0f;
         GhostAnimation.Reset();

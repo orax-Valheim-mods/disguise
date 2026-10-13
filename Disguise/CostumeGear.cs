@@ -31,16 +31,26 @@ namespace Disguise;
 /// opens first, closes last, so each one hands back the value it found (the PublishKey they
 /// both write is saved and restored once per window, in that order).
 ///
-/// The five [3 - Display] options are not consulted for a humanoid costume: they hid YOUR
-/// gear from a costume that now wears its own. They keep their exact meaning on every other
-/// costume, and on every machine that draws you as a player (Patch_VisEquipment).
+/// ShowArmor and the weapons pair ([3 - Display]) decide WHAT is published, in the two
+/// halves every piece of gear belongs to: the armor rows (and utility, trinket - the rest of
+/// the gear) take the costume's own hash while ShowArmor is on, and nothing at all while it
+/// is off; the two hand rows take the weapon the costume is born with while ShowWeapons is
+/// on and WhoseWeapons says "Creature" - or ONE item of that very pool, which the choice key
+/// below hands over as well - YOUR items being exactly what every machine has to draw there
+/// while it says "Player" (this window then leaves those rows alone, and EquipmentMask no
+/// longer hides them either) - and nothing at all while ShowWeapons is off,
+/// empty hands being what every screen has to draw. A
+/// costume carrying no Humanoid is written by none of this: it has no gear of its own, and
+/// the mask alone keeps its rows as they were.
 ///
-/// HideCreatureGear decides WHAT is published: the owner's own option (published next to
-/// the mask by the reassert), this machine's option on a relaying server whose owner runs no
-/// DLL and published nothing. The flag is a normal Set, so toggling it bumps the
-/// DataRevision and the new state reaches every machine with the next packet - while the
-/// swap itself is silent, its values travelling inside the packet the revision already
-/// carries.
+/// The owner publishes that pair next to the mask (the reassert) - and the fixed weapon, if
+/// WhoseWeapons names one - and a machine serializing
+/// the same ZDO without an owner's value - the relaying server of a player running no DLL -
+/// falls back on its own [3 - Display] config. The pair travels under one key, as the two
+/// bits below, and so does the fixed weapon under its own (a normal Set each): moving any of
+/// them bumps the DataRevision and the new
+/// state reaches every machine with the next packet - while the swap itself is silent, its
+/// values travelling inside the packet the revision already carries.
 ///
 /// The roll is cached per prefab and seed: the lists of a prefab never move inside a
 /// session, and one player is one seed. The variants and qualities are not published: a
@@ -50,10 +60,50 @@ namespace Disguise;
 internal static class CostumeGear
 {
     /// <summary>
-    /// The owner's choice: 1 (default) draws the gear the creature is born with, 0 the bare
-    /// costume. Written into the local player ZDO by Publish, next to the mask.
+    /// The owner's choice, as the bits below - what the costume wears, published next to
+    /// the mask by Publish. It used to be a plain 0 (bare costume) / 1 (the gear it is born
+    /// with), and an older build reading it only ever asks whether the value is 0 at all:
+    /// both readings still land right, 1 now meaning "the armor at least" and 0 "nothing of
+    /// it anywhere" - which is what an old build would draw anyway, since it cannot dress
+    /// the hands of a costume whose weapons come from the player. The one answer an older
+    /// build cannot follow is the empty-handed one (GearWeaponsOff, the newest bit): it
+    /// reads it as "something is on", draws the armor its own bit speaks of and puts the
+    /// creature's weapon in the hands - i.e. a build older than this one on the same
+    /// connection shows those hands armed, never yours.
     /// </summary>
     private static readonly int CdGearKey = Key("cd_costumeGear");
+
+    /// <summary>
+    /// The ONE item the hands are held with while WhoseWeapons names one out of the
+    /// creature's pool, as the item prefab's stable hash - 0 while the roll decides (the two
+    /// words of that entry, or ShowWeapons off), and never published at all by an owner
+    /// running no DLL, which is the -1 the readers below ask for.
+    ///
+    /// Why an answer of its own: the equipment keys a window hands out (BeginOutgoing) hold
+    /// the roll only for the duration of ONE outgoing packet and are given straight back, so
+    /// every machine serializing this ZDO rolls the weapon again for itself - and a forced
+    /// one is nowhere inside that roll. The pair above can only say WHICH KIND of hands to
+    /// draw (empty, the player's, the costume's own), which leaves the item itself nothing
+    /// to travel in: this key is it. The owner decides once, every machine with this DLL
+    /// writes the same hash into those keys, and a screen running no DLL at all never has
+    /// to be told anything - the keys are what it reads. An older build of ours knows of no
+    /// such key, reads nothing here and follows its own roll, which is exactly what it would
+    /// draw anyway.
+    /// </summary>
+    private static readonly int CdWeaponKey = Key("cd_whoseWeapon");
+
+    /// <summary>The bits CdGearKey carries, one answer of the [3 - Display] gear options.</summary>
+    private const int GearArmor = 1;
+
+    /// <summary>The hands hold the LOCAL player's items (WhoseWeapons = "Player").</summary>
+    private const int GearPlayerWeapons = 2;
+
+    /// <summary>
+    /// The hands hold nothing (ShowWeapons off). Never set together with the bit above: the
+    /// pair has ONE answer for the hands - empty, the player's, or the creature's own (no
+    /// bit) - and Choice keeps it that way.
+    /// </summary>
+    private const int GearWeaponsOff = 4;
 
     /// <summary>
     /// The rows this class re-dresses, as indices of EquipmentMask's arrays: the slots a
@@ -90,10 +140,13 @@ internal static class CostumeGear
 
     /// <summary>
     /// Writes the owner's choice into the local player ZDO, next to the mask (Disguise.cs,
-    /// the reassert). The owner is the only machine allowed to decide, and the reassert
-    /// publishes it every ReassertSeconds: ZDO.Set bumps the DataRevision only when the
-    /// value actually changes, so the steady state is free - and the one time it does change
-    /// is exactly when every machine has to be handed the new keys.
+    /// the reassert) - and, under its own key, the weapon the hands are fixed on when
+    /// WhoseWeapons names one (0 being every other answer: the two words of that entry, the
+    /// switch off, or a pool that holds no such item). The owner is the only machine allowed
+    /// to decide, and the reassert publishes both every ReassertSeconds: ZDO.Set bumps the
+    /// DataRevision only when the value actually changes, so the steady state is free - and
+    /// the one time it does change is exactly when every machine has to be handed the new
+    /// keys.
     /// </summary>
     internal static void Publish(ZDO? zdo)
     {
@@ -101,28 +154,52 @@ internal static class CostumeGear
         {
             return;
         }
-        int value = DisguiseConfig.ConfigHideCreatureGear.Value ? 0 : 1;
+        int value = Choice();
         if (zdo.GetInt(CdGearKey, -1) != value)
         {
             zdo.Set(CdGearKey, value);
         }
+        int weapon = GearSkin.LocalWeapon();
+        if (zdo.GetInt(CdWeaponKey, -1) != weapon)
+        {
+            zdo.Set(CdWeaponKey, weapon);
+        }
+    }
+
+    /// <summary>The choice of THIS machine: what its own [3 - Display] options ask for.</summary>
+    private static int Choice()
+    {
+        int value = 0;
+        if (DisguiseConfig.ConfigShowArmor.Value)
+        {
+            value |= GearArmor;
+        }
+        if (!DisguiseConfig.ConfigShowWeapons.Value)
+        {
+            value |= GearWeaponsOff;
+        }
+        else if (DisguiseConfig.PlayerWeapons())
+        {
+            value |= GearPlayerWeapons;
+        }
+        return value;
     }
 
     /// <summary>
-    /// Whether this ZDO's costume is drawn with its gear: the owner's published choice, or
-    /// this machine's own option when the owner runs no DLL and published nothing - the same
-    /// rule the mask follows for its own keys.
+    /// The choice this ZDO's costume follows: the owner's published one, or this machine's
+    /// own option when the owner runs no DLL and published nothing - the same rule the mask
+    /// follows for its own keys.
     /// </summary>
     private static int Published(ZDO zdo)
     {
         int published = zdo.GetInt(CdGearKey, -1);
-        return published < 0 ? (DisguiseConfig.ConfigHideCreatureGear.Value ? 0 : 1) : published;
+        return published < 0 ? Choice() : published;
     }
 
     /// <summary>
-    /// The option moved while you are disguised: the new flag is published at once, which
-    /// bumps the DataRevision, so every machine receives the costume's new keys with the
-    /// next packet instead of keeping the state of the last one (the same rule as
+    /// One of the gear options moved while you are disguised: the new choice is published at
+    /// once, which bumps the DataRevision, so every machine receives the costume's new keys
+    /// with the next packet instead of keeping the state of the last one (the same rule as
     /// EquipmentMask.OnSettingChanged).
     /// </summary>
     internal static void OnSettingChanged()
@@ -133,7 +210,8 @@ internal static class CostumeGear
     // ------------------------------------------------------------------ swap window
 
     /// <summary>
-    /// ZDO.Serialize: re-dresses the eight rows for the duration of the outgoing packet.
+    /// ZDO.Serialize: re-dresses the rows the costume is drawn with for the duration of the
+    /// outgoing packet - every one of them but the hands while they are the player's own.
     /// Opens right AFTER the mask's own window (Patch_ZDOSerialize calls it in that order)
     /// and follows the same route - save what the row held, write, hand it back in End().
     /// Returns true when something was actually swapped - the caller must then call End().
@@ -157,7 +235,10 @@ internal static class CostumeGear
             // of a creature to dress - the mask alone keeps that costume exactly as it was.
             return false;
         }
-        bool bare = Published(zdo) == 0;
+        int published = Published(zdo);
+        bool armor = (published & GearArmor) != 0;
+        bool playerWeapons = (published & GearPlayerWeapons) != 0;
+        bool weaponsOff = (published & GearWeaponsOff) != 0;
 
         s_activeZdo = zdo;
         bool swapped = false;
@@ -168,9 +249,32 @@ internal static class CostumeGear
             for (int i = 0; i < s_rows.Length; i++)
             {
                 int row = s_rows[i];
+                bool hand = row == EquipmentMask.RowLeft || row == EquipmentMask.RowRight;
+                if (hand && playerWeapons)
+                {
+                    // Your own weapons are what every machine has to draw in those two rows
+                    // (WhoseWeapons = "Player"): the mask left them in the packet, and this
+                    // window hands them over untouched - a row never touched keeps holding
+                    // YOUR value, which is also what the save reads back from it.
+                    continue;
+                }
                 int vanillaKey = EquipmentMask.s_vanillaKeys[row];
                 int current = zdo.GetInt(vanillaKey, 0);
-                int wanted = bare ? 0 : Value(gear, i);
+                // The hands keep the weapon the costume is born with whatever ShowArmor says
+                // - that is the other half of the pair - and every other row is the armor,
+                // utility and trinket included (they are the rest of the gear, not a weapon):
+                // nothing at all while ShowArmor is off, which is how a costume is drawn
+                // bare. The hands are empty as well while ShowWeapons is off, which is the
+                // one answer a costume with nothing in them can be drawn with.
+                int wanted;
+                if (hand)
+                {
+                    wanted = weaponsOff ? 0 : Value(gear, i);
+                }
+                else
+                {
+                    wanted = armor ? Value(gear, i) : 0;
+                }
                 if (current == wanted)
                 {
                     // Already what every screen has to draw - and a row never touched keeps
@@ -249,6 +353,8 @@ internal static class CostumeGear
 
     private static int s_cachedSeed;
 
+    private static int s_cachedForced;
+
     private static GearSkin.Gear? s_cachedGear;
 
     /// <summary>
@@ -257,22 +363,50 @@ internal static class CostumeGear
     /// one player this machine serializes - is a pure hit. A second disguised player simply
     /// takes the cache over, which costs one roll of a handful of field reads per packet -
     /// cheap enough to stand the ping-pong, and always the same answer for that (prefab,
-    /// seed) pair, on every machine.
+    /// seed, fixed weapon) triple, on every machine. The third is part of the key because it
+    /// is not in the roll anywhere: it is read out of the owner's choice above (Forced),
+    /// which is a value that can move while the other two stand still.
     /// </summary>
     private static GearSkin.Gear? Roll(ZDO zdo)
     {
         int prefabHash = zdo.GetPrefab();
         int seed = GearSkin.Seed(zdo);
-        if (prefabHash == s_cachedPrefab && seed == s_cachedSeed)
+        ZNetScene? zns = ZNetScene.instance;
+        GameObject? prefab = zns != null ? zns.GetPrefab(prefabHash) : null;
+        if (prefab == null)
+        {
+            // Nothing to dress that costume with - and nothing the cache could hold a
+            // straight answer for either: a slot is only ever filled from a prefab this
+            // machine really has, so it can never be left keyed on a roll it did not make.
+            return null;
+        }
+        int forced = Forced(zdo, prefab);
+        if (prefabHash == s_cachedPrefab && seed == s_cachedSeed && forced == s_cachedForced)
         {
             return s_cachedGear;
         }
-        ZNetScene? zns = ZNetScene.instance;
-        GameObject? prefab = zns != null ? zns.GetPrefab(prefabHash) : null;
         s_cachedPrefab = prefabHash;
         s_cachedSeed = seed;
-        s_cachedGear = GearSkin.Compute(prefab, seed);
+        s_cachedForced = forced;
+        s_cachedGear = GearSkin.Compute(prefab, seed, forced);
         return s_cachedGear;
+    }
+
+    /// <summary>
+    /// The weapon that ZDO's costume's hands are fixed on: the owner's published hash (0
+    /// while the roll decides), or - when the owner runs no DLL and published nothing at all
+    /// - this machine's own entry, the very rule the bits above follow. Checked against THIS
+    /// prefab's pool either way, so a choice that creature cannot hold answers the roll
+    /// instead of drawing an item of another creature: a pool that moved under a value
+    /// published before it did costs one packet of the roll, never one packet of a stray
+    /// item (GearSkin.WeaponHash).
+    /// </summary>
+    private static int Forced(ZDO zdo, GameObject? prefab)
+    {
+        int published = zdo.GetInt(CdWeaponKey, -1);
+        return published >= 0
+            ? GearSkin.WeaponHash(prefab, published)
+            : GearSkin.LocalWeaponHash(prefab);
     }
 
     /// <summary>The gear value of s_rows[position] (0 where the roll drew nothing).</summary>

@@ -20,8 +20,8 @@ namespace Disguise;
 ///
 /// One more reason to build a copy again: the sparkle option (HideItemSparkle), which the
 /// factory reads at build time - the picture then shows the costume as the screen draws it -
-/// and the gear option (HideCreatureGear), read there too: a humanoid costume with its armor
-/// and its weapon, or without.
+/// and the gear options (ShowArmor and the weapons pair), read there too: a humanoid costume
+/// with its armor and its own weapon, with yours, or with empty hands.
 /// </summary>
 internal static class GuiPreview
 {
@@ -51,15 +51,18 @@ internal static class GuiPreview
     private static bool s_shownOption;
 
     /// <summary>
-    /// The same pair for the gear option (HideCreatureGear): what the stage was built WITH
-    /// (the answer of GearSkin.HideGear for its creature) and the option itself at that
-    /// moment. Here the difference can show whatever the creature is - a humanoid draws the
-    /// armor and the weapon it is born with, anything else has no gear at all - so the test
-    /// runs on the move of the option, never per frame, exactly like the pair above.
+    /// The same pair for the gear options (ShowArmor and the weapons pair): what the stage
+    /// was built
+    /// WITH (the look of GearSkin for its creature, its bits) and the options themselves
+    /// at that moment. Here the difference can show whatever the creature is - a humanoid
+    /// draws the armor it is born with and holds its own weapon (or yours, or nothing at all
+    /// while ShowWeapons is off), anything else has
+    /// no gear at all - so the test runs on the move of the options, never per frame,
+    /// exactly like the pair above.
     /// </summary>
-    private static bool s_shownGear;
+    private static int s_shownLook;
 
-    private static bool s_shownGearOption;
+    private static int s_shownLookOption;
 
     /// <summary>
     /// The level the stage was dressed for (LevelSkin, at its build): a level that moves
@@ -188,16 +191,18 @@ internal static class GuiPreview
             }
         }
 
-        // The same thing for the gear option (HideCreatureGear), through the same delay and
-        // the same guard: a humanoid costume then appears on the picture wearing the armor
-        // and the weapon it is born with - or without them - like the screen draws it.
-        bool gearOption = DisguiseConfig.ConfigHideCreatureGear.Value;
-        if (gearOption != s_shownGearOption)
+        // The same thing for the gear options (ShowArmor and the weapons pair), through the
+        // same
+        // delay and the same guard: a humanoid costume then appears on the picture wearing
+        // its armor and its own weapon (or the player's, or with empty hands while
+        // ShowWeapons is off) - like the screen draws it.
+        int lookOption = GearSkin.Options();
+        if (lookOption != s_shownLookOption)
         {
-            s_shownGearOption = gearOption;
+            s_shownLookOption = lookOption;
             if (
                 string.Equals(s_pending, s_shown, System.StringComparison.Ordinal)
-                && s_shownGear != GearSkin.HideGear(s_pending)
+                && s_shownLook != GearSkin.Look(s_pending)
             )
             {
                 s_shown = string.Empty;
@@ -225,7 +230,8 @@ internal static class GuiPreview
         {
             s_shown = s_pending;
             s_shownSparkle = GhostFactory.HideSparkle(s_shown);
-            s_shownGear = GearSkin.HideGear(s_shown);
+            s_shownLook = GearSkin.Look(s_shown);
+            s_shownLookOption = GearSkin.Options();
             CreaturePreview.Show(s_pending);
         }
 
@@ -255,8 +261,8 @@ internal static class GuiPreview
         s_dueAt = 0f;
         s_shownSparkle = false;
         s_shownOption = false;
-        s_shownGear = false;
-        s_shownGearOption = false;
+        s_shownLook = 0;
+        s_shownLookOption = 0;
         s_shownLevel = 0;
     }
 }

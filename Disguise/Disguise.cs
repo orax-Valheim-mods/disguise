@@ -277,15 +277,17 @@ public class Disguise : BaseUnityPlugin
 
         // The owner publishes which equipment must stay hidden from the others: relaying
         // servers mask according to this value instead of their own [3 - Display] config
-        // (whose defaults would hide the gear whatever your client says). Set() only bumps
-        // the DataRevision when the mask really changes, so the steady state is free.
+        // (whose ShowWeapons would otherwise decide your packets instead of you - it is the
+        // one question there is about the hands, and the mask carries its answer on the bit
+        // HideHeldItems used to own). Set() only bumps the DataRevision when the mask really
+        // changes, so the steady state is free.
         EquipmentMask.PublishMask(zdo);
 
-        // And whether a humanoid costume publishes the gear it is born with (HideCreatureGear):
-        // the relaying machines write that choice into the costume's equipment keys
-        // (CostumeGear) instead of their own option, which is only the fallback for an owner
-        // running no DLL. Same bump rule - the one change of value is exactly the moment
-        // every machine needs the new keys.
+        // And what a humanoid costume is dressed with (ShowArmor and the weapons pair): the
+        // relaying machines write those two answers into the costume's equipment keys
+        // (CostumeGear) instead of their own options, which are only the fallback for an
+        // owner running no DLL. Same bump rule - the one change of value is exactly the
+        // moment every machine needs the new keys.
         CostumeGear.Publish(zdo);
 
         // Same rule for the health bar: the owner publishes the relation it wants to be

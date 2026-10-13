@@ -162,18 +162,17 @@ internal static class GhostFactory
             }
             if (keepEquipment)
             {
-                // The pair that draws the gear the creature is born with: the VisEquipment
-                // the strip kept, and the ZNetView-without-a-ZDO it needs to hang from -
-                // without one its m_nview is null and Start throws. The slots are written
-                // while the copy is still inactive, so its own Start draws them the moment
-                // it is activated; and nothing of this writes a single slot when
-                // HideCreatureGear asks for a bare costume, which is then built exactly
-                // like before the gear existed.
+                // The pair that draws the gear the costume wears: the VisEquipment the strip
+                // kept, and the ZNetView-without-a-ZDO it needs to hang from - without one
+                // its m_nview is null and Start throws. The slots are written while the copy
+                // is still inactive, so its own Start draws them the moment it is activated;
+                // and what they hold is the look [3 - Display] asks for, half by half -
+                // GearSkin writes nothing at all into a row the options took off (a bare
+                // costume is then built exactly like before the gear existed), dresses the
+                // hands with the items the local player holds while WhoseWeapons says so, and
+                // leaves them empty while ShowWeapons is off.
                 _ = clone.AddComponent<GhostNetView>();
-                if (!GearSkin.HideGear(prefab))
-                {
-                    GearSkin.Dress(clone, prefab, gearSeed);
-                }
+                GearSkin.Dress(clone, prefab, gearSeed);
             }
             return clone;
         }

@@ -36,12 +36,14 @@ internal static class GuiHelp
 
     /// <summary>
     /// Centre of the box, from the bottom edge of the panel: the 44 px of the status line
-    /// above it (GuiStatus, which keeps the -572..-616 it has always had - six pixels clear
-    /// of this box) leave this line a band of its own - 40 px, from 8 to 48 above the
-    /// bottom edge, six clear of that line and eight of the panel's border. The panel is 40
-    /// px taller than it was for this band and nothing else (GuiWindow.Height, which is why
-    /// GuiStatus.StatusY grew by the same 40: bottom-anchored, it would have moved down
-    /// with the edge otherwise).
+    /// above it (GuiStatus, which keeps the -608..-652 it has had since the option controls
+    /// joined the band over it - six pixels clear of this box) leave this line a band of its
+    /// own - 40 px, from 8 to 48 above the bottom edge, six clear of that line and eight of
+    /// the panel's border. The panel is 40 px taller than it was for this band and nothing
+    /// else under the band (GuiWindow.Height, which is why GuiStatus.StatusY grew by the
+    /// same 40: bottom-anchored, it would have moved down with the edge otherwise; the 36 px
+    /// more the panel grew by since then took the status line up with it, and this box never
+    /// moves - it is anchored to the very edge the height change does not touch).
     /// </summary>
     private const float HelpY = 28f;
 

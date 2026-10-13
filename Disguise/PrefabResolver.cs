@@ -152,6 +152,23 @@ internal static class PrefabResolver
         }
     }
 
+    /// <summary>
+    /// The configured creature's prefab, or null while nothing has it yet - no ZNetScene
+    /// (the config is bound before any world is loaded) or no such prefab, both of which are
+    /// "no answer" rather than "it holds nothing". This is what every reader of the
+    /// creature's own gear asks for its lists, GearSkin's weapon pool above all.
+    /// </summary>
+    internal static GameObject? CreaturePrefab()
+    {
+        int hash = CreaturePrefabHash;
+        if (hash == 0)
+        {
+            return null;
+        }
+        ZNetScene? zns = ZNetScene.instance;
+        return zns != null ? zns.GetPrefab(hash) : null;
+    }
+
     internal static void InvalidateCreatureHash()
     {
         s_creaturePrefabHash = 0;

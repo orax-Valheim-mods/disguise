@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.IO;
 using BepInEx.Configuration;
 using UnityEngine;
 
@@ -44,23 +45,106 @@ internal static class DisguiseConfig
     internal static ConfigEntry<float> ConfigRefreshHold = null!;
 
     // -- 3 - Display: what the OTHER machines see while you are disguised ---------------
-    internal static ConfigEntry<bool> ConfigHideHelmet = null!;
+    // What the costume is DRAWN with, in the two halves every piece of gear belongs to: its
+    // armor, and the weapons - whether there are any at all (ShowWeapons), and whose they
+    // are when there are (WhoseWeapons). The four armour rows (helmet, chest, legs,
+    // cape) have no entry any more: a humanoid costume - every vanilla creature - wears ITS
+    // OWN gear in those rows, whatever the mask says (CostumeGear rewrites them either way),
+    // so a setting could only ever be read for a costume without a humanoid - a case
+    // EquipmentMask simply keeps covered for good (BuildMask). Held items are the same
+    // story now: those two weapons options decide that pair alone, which is why
+    // HideHeldItems is gone (its bit is still the mask's, only read another way). What is
+    // left besides them: the health-bar relation.
     internal static ConfigEntry<bool> ConfigShowAsAlly = null!;
 
-    internal static ConfigEntry<bool> ConfigHideChest = null!;
+    internal static ConfigEntry<bool> ConfigShowArmor = null!;
 
-    internal static ConfigEntry<bool> ConfigHideLegs = null!;
+    /// <summary>The switch of the pair: whether the costume is drawn with weapons at all.</summary>
+    internal static ConfigEntry<bool> ConfigShowWeapons = null!;
 
-    internal static ConfigEntry<bool> ConfigHideCape = null!;
+    internal static ConfigEntry<string> ConfigWhoseWeapons = null!;
 
-    internal static ConfigEntry<bool> ConfigHideHeldItems = null!;
+    /// <summary>
+    /// The two WORDS of WhoseWeapons, spelled the way the .cfg holds them - the answers it
+    /// has always taken, and the two no item name may ever be told from (FixedWeapon).
+    /// </summary>
+    internal const string WeaponsCreature = "Creature";
+
+    internal const string WeaponsPlayer = "Player";
+
+    /// <summary>
+    /// Whether the costume is drawn with the weapons YOU hold rather than with the ones the
+    /// creature is born with - the second half of the pair, read on top of the switch above
+    /// (while ShowWeapons is off there are no weapons at all, and this says nothing a screen
+    /// can show). Compared ignoring case, so a value typed into the .cfg by hand ("player")
+    /// lands the same way as one of the two names above - which is what the entry's
+    /// acceptable values hold, and what the window and the console only ever write.
+    /// </summary>
+    internal static bool PlayerWeapons() =>
+        string.Equals(ConfigWhoseWeapons.Value, WeaponsPlayer, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The ONE item of the creature's own pool WhoseWeapons fixes the costume's hands on,
+    /// read straight out of the entry: null while it still holds one of the two words above
+    /// - "Creature", the seeded roll, and "Player", yours - or nothing at all, which is where
+    /// a fresh install starts. Anything else is an item NAME, trimmed and compared like those
+    /// two (no case), so "club" typed into the .cfg lands the same way as the "Club" the
+    /// window writes.
+    ///
+    /// Not a check of any pool: the entry may name an item no longer held by the creature
+    /// configured at this very moment (another creature was configured under it, or the file
+    /// was edited by hand), and every reader therefore asks GearSkin.WeaponHash for the pool
+    /// it is about to draw - an answer the pool does not hold is the roll, never an item of
+    /// another creature. ReconcileWhoseWeapons is what writes such a stale name back out of
+    /// the entry itself, so the .cfg, the window and the console cannot end up disagreeing.
+    /// </summary>
+    internal static string? FixedWeapon()
+    {
+        string value = ConfigWhoseWeapons.Value.Trim();
+        if (value.Length == 0)
+        {
+            return null;
+        }
+        if (
+            string.Equals(value, WeaponsCreature, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, WeaponsPlayer, StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return null;
+        }
+        return value;
+    }
+
+    /// <summary>
+    /// Puts WhoseWeapons back on "Creature" while it names an item the CONFIGURED creature
+    /// cannot hold - a choice made for the last creature, or a name typed into the .cfg by
+    /// hand. The roll is the only one of the three answers that fits every creature, and
+    /// keeping the name instead would leave the entry saying one thing while every reader
+    /// (LocalWeaponHash) answers another.
+    ///
+    /// Nothing is written while the creature cannot be resolved yet: no ZNetScene (the
+    /// config is bound at startup, before any world is loaded) or no such prefab, both of
+    /// which are "no answer" rather than "no such weapon" - the readers ask the very same
+    /// pool and answer the roll for as long as it stays unreadable.
+    /// </summary>
+    internal static void ReconcileWhoseWeapons()
+    {
+        string? fixedWeapon = FixedWeapon();
+        if (fixedWeapon == null)
+        {
+            return;
+        }
+        GameObject? prefab = PrefabResolver.CreaturePrefab();
+        if (prefab != null && GearSkin.WeaponHash(prefab, fixedWeapon) == 0)
+        {
+            ConfigWhoseWeapons.Value = WeaponsCreature;
+        }
+    }
 
     // -- 4 - Own view: what YOU see on your own screen ----------------------------------
     internal static ConfigEntry<bool> ConfigSeeYourDisguise = null!;
 
     internal static ConfigEntry<bool> ConfigHideItemSparkle = null!;
-
-    internal static ConfigEntry<bool> ConfigHideCreatureGear = null!;
 
     internal static ConfigEntry<KeyboardShortcut> ConfigFlyEnableKey = null!;
 
@@ -160,7 +244,14 @@ internal static class DisguiseConfig
                 + "Console command: disguise list to see the available names."
         );
 
-        ConfigCreature.SettingChanged += (_, _) => PrefabResolver.InvalidateCreatureHash();
+        ConfigCreature.SettingChanged += (_, _) =>
+        {
+            PrefabResolver.InvalidateCreatureHash();
+            // The pool WhoseWeapons is read against just moved with it: a weapon chosen for
+            // the last creature is not one this creature can hold, and the roll is the only
+            // answer that always fits (ReconcileWhoseWeapons).
+            ReconcileWhoseWeapons();
+        };
 
         ConfigCreatureLevel = config.Bind(
             "1 - General",
@@ -234,45 +325,82 @@ internal static class DisguiseConfig
         // -- 3 - Display: the equipment hashes live in your ZDO, and VisEquipment attaches
         // those items to whatever prefab carries it - the creature, on a vanilla client.
         // Hiding them removes the misplaced gear, your own view keeps it (see EquipmentMask).
-        // ShowAsAlly is the other half of that display: the health bar EnemyHud draws over
-        // the very same creature (see AllyView).
-        ConfigHideHelmet = config.Bind(
+        // The four rows the ARMOR sits in have no entry any more (HideHelmet / HideChest /
+        // HideLegs / HideCape): a humanoid costume - every vanilla creature - dresses those
+        // very rows with its own gear (CostumeGear), which reads them whether the mask touched
+        // them or not and lands on the very same packet either way, so an entry there could
+        // only ever be read by a costume carrying no Humanoid at all. They are gone, and
+        // EquipmentMask hides those rows for good (BuildMask). The same reasoning took
+        // HideHeldItems away: what the hands hold is decided by the two weapons options now -
+        // whether the costume is drawn with weapons at all, and whose they are while it is -
+        // and everything but "the player's own" is what hides your items from the other
+        // machines (BuildMask again, on the very bit HideHeldItems used to gate). What is
+        // left of the section: these three and ShowAsAlly, the other half of that display -
+        // the health bar EnemyHud draws over the very same creature (see AllyView).
+        ConfigShowArmor = config.Bind(
             "3 - Display",
-            "HideHelmet",
+            "ShowArmor",
             true,
-            "Hide the helmet from the other machines while you are disguised (fixes a helmet glued "
-                + "at the wrong position on humanoid creatures). Your own view keeps it."
+            "Draw the costume with the ARMOR a real creature of that prefab is born with - the "
+                + "gear Humanoid.Start gives a creature at spawn (its default items and one pick "
+                + "of each random pool). On, the default, is how a Fuling in the world stands: "
+                + "armor and all. Off draws the costume without it (the weapon is ShowWeapons' "
+                + "half, and the two are read together). It reaches every screen drawing that "
+                + "costume: your own here, the window's picture, and the machines running no DLL "
+                + "of this mod - your ZDO publishes that gear itself while you are disguised, "
+                + "rolled the way the game rolls it so every machine agrees on the same pick. The "
+                + "machines running this DLL are never affected: they keep drawing YOU, with "
+                + "your own equipment. Window: the 'Show armor' box under the command buttons. "
+                + "Console command: disguise armor [on|off]."
         );
 
-        ConfigHideChest = config.Bind(
+        // Read BEFORE the switch below binds its own ShowWeapons: the one entry this build
+        // splits in two used to hold the very word WhoseWeapons holds now, and BepInEx drops
+        // a line whose type no longer matches (it logs a warning and keeps the default) -
+        // this hands the choice over instead of letting it fall on the floor, once, on the
+        // first start of a build that holds both entries (LegacyWhoseWeapons).
+        string whose = LegacyWhoseWeapons(config) ?? WeaponsCreature;
+
+        ConfigShowWeapons = config.Bind(
             "3 - Display",
-            "HideChest",
+            "ShowWeapons",
             true,
-            "Hide the chest armour from the other machines while you are disguised. "
-                + "Your own view keeps it."
+            "Draw the costume with weapons at all. On, the default, is how a Fuling in the "
+                + "world stands - spear and all: its hands hold what WhoseWeapons picks. Off "
+                + "draws it with EMPTY hands, like a creature that spawns unarmed, and your "
+                + "own held items stay hidden from the machines running no DLL of this mod "
+                + "then as well (there would be nothing to glue them to). Like ShowArmor it "
+                + "reaches every screen drawing that costume: your own here, the window's "
+                + "picture, and the machines running no DLL - your ZDO publishes it itself "
+                + "while you are disguised. The machines running this DLL are never "
+                + "affected: they keep drawing YOU, with your own equipment. Window: the "
+                + "'Show weapons' box under the command buttons. Console command: "
+                + "disguise weapons [on|off]."
         );
 
-        ConfigHideLegs = config.Bind(
+        ConfigWhoseWeapons = config.Bind(
             "3 - Display",
-            "HideLegs",
-            true,
-            "Hide the leggings from the other machines while you are disguised. "
-                + "Your own view keeps them."
-        );
-
-        ConfigHideCape = config.Bind(
-            "3 - Display",
-            "HideCape",
-            true,
-            "Hide the cape from the other machines while you are disguised. Your own view keeps it."
-        );
-
-        ConfigHideHeldItems = config.Bind(
-            "3 - Display",
-            "HideHeldItems",
-            false,
-            "Hide the items held in your hands and carried on your back from the other machines "
-                + "while you are disguised. Your own view keeps them."
+            "WhoseWeapons",
+            whose,
+            new ConfigDescription(
+                "Whose weapons a humanoid costume is held with, while ShowWeapons is on: "
+                    + "\"Creature\" (the default) is the one a real creature of that prefab "
+                    + "takes into a hand at spawn (MonsterAI takes the best weapon of its "
+                    + "inventory), which is how a Fuling in the world stands - spear and all; "
+                    + "\"Player\" is the ones YOU hold in both hands, an empty hand drawing "
+                    + "nothing; ANY OTHER VALUE is the name of one item out of that "
+                    + "creature's own pool (its default items and every random pool), and "
+                    + "the hands are then that item ALONE - the other one empty, whatever "
+                    + "the roll answers. The window's list holds them all, and a name the "
+                    + "configured creature cannot hold is put back to \"Creature\" the moment "
+                    + "another creature is configured. It reaches every screen drawing that "
+                    + "costume, and it decides what YOUR hands carry there too: hidden from "
+                    + "the machines running no DLL of this mod while the costume wears its "
+                    + "own, exactly what it shows while it wears yours. Read only while "
+                    + "ShowWeapons is on - a costume drawn with empty hands has no weapon for "
+                    + "anyone to own. Window: the list at the right of the 'Show weapons' box. "
+                    + "Console command: disguise weapons <creature|player|weapon>."
+            )
         );
 
         ConfigShowAsAlly = config.Bind(
@@ -285,25 +413,82 @@ internal static class DisguiseConfig
                 + "equipment stay exactly as they are."
         );
 
-        ConfigHideHelmet.SettingChanged += HideSettingChanged;
-        ConfigHideChest.SettingChanged += HideSettingChanged;
-        ConfigHideLegs.SettingChanged += HideSettingChanged;
-        ConfigHideCape.SettingChanged += HideSettingChanged;
-        ConfigHideHeldItems.SettingChanged += HideSettingChanged;
+        // Any of the three can move both halves of what goes out: the armor half of the
+        // costume gear (CostumeGear), and the weapon half - which decides the mask as well,
+        // since YOUR held items are hidden while the costume does not wear them (EquipmentMask).
+        // The publishers only bump the DataRevision when their value really changes, so the
+        // steady state is free.
+        ConfigShowArmor.SettingChanged += DisplaySettingChanged;
+        ConfigShowWeapons.SettingChanged += DisplaySettingChanged;
+        ConfigWhoseWeapons.SettingChanged += DisplaySettingChanged;
         ConfigShowAsAlly.SettingChanged += (_, _) => AllyView.OnSettingChanged();
     }
 
     /// <summary>
-    /// Section `4 - Own view`: what this screen draws - the gear setting excepted, which
-    /// also has something to publish (CostumeGear).
+    /// The value the entry this build split in two used to hold - "Creature" or "Player",
+    /// read straight out of the .cfg file the plugin was just bound to.
+    ///
+    /// Why a file read rather than a binding: ShowWeapons is a SWITCH in this build, so the
+    /// old line ("ShowWeapons = Player") no longer matches its type and BepInEx drops it -
+    /// it logs a warning and keeps the default, and the choice is gone before anybody could
+    /// move it into WhoseWeapons. The line is still on disk at this point (the switch below
+    /// is what makes it disappear), so this reads it first and hands the word over as the
+    /// default of WhoseWeapons - once, on the first start of this build; every later start
+    /// finds the rewritten file and answers null, which is the plain default.
+    ///
+    /// No file, no permission, a file written by a build that has already split the entry:
+    /// all three answer null rather than throwing, and a fresh install has nothing to carry
+    /// over anyway.
+    /// </summary>
+    private static string? LegacyWhoseWeapons(ConfigFile config)
+    {
+        try
+        {
+            foreach (string raw in File.ReadAllLines(config.ConfigFilePath))
+            {
+                string line = raw.Trim();
+                if (line.Length == 0 || line[0] == '#')
+                {
+                    continue; // a comment, not the entry
+                }
+                if (!line.StartsWith("ShowWeapons", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                int split = line.IndexOf('=');
+                if (split < 0)
+                {
+                    continue; // not a config line at all
+                }
+                string value = line.Substring(split + 1).Trim().Trim('"');
+                if (string.Equals(value, WeaponsPlayer, StringComparison.OrdinalIgnoreCase))
+                {
+                    return WeaponsPlayer;
+                }
+                if (string.Equals(value, WeaponsCreature, StringComparison.OrdinalIgnoreCase))
+                {
+                    return WeaponsCreature;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // No file to read: the default below is the answer, exactly like a fresh install.
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Section `4 - Own view`: what this screen draws. Everything of it is local - the two
+    /// settings that decide what the COSTUME wears (armor, weapons) sit in [3 - Display],
+    /// where the wire they are published on belongs (they are read here too, at every build
+    /// of a clone).
     /// </summary>
     private static void BindOwnView(ConfigFile config)
     {
         // -- 4 - Own view: rendering on this screen, polled every frame by SelfView.Tick()
-        // and (while the window is open) by GuiPreview.Tick, so the first two settings need
-        // no SettingChanged handler: a clone already standing rebuilds itself when the
-        // setting moves. The gear is the exception - its clones are polled the same way, but
-        // it also has something to publish (wired after its bind below).
+        // and (while the window is open) by GuiPreview.Tick, so the two settings need no
+        // SettingChanged handler: a clone already standing rebuilds itself when one moves.
         ConfigSeeYourDisguise = config.Bind(
             "4 - Own view",
             "SeeYourDisguise",
@@ -325,28 +510,6 @@ internal static class DisguiseConfig
                 + "builds the real item prefab from the network and has no setting to read. Window: "
                 + "the 'Hide item sparkle' box under the command buttons."
         );
-
-        ConfigHideCreatureGear = config.Bind(
-            "4 - Own view",
-            "HideCreatureGear",
-            false,
-            "Hide the armor and the weapon a humanoid costume is born with: the gear a real creature "
-                + "of that prefab spawns with (Humanoid's default and random items, the weapon its AI "
-                + "takes into a hand). Off - the gear is DRAWN - which is how a Fuling in the world "
-                + "looks, spear and all. Reaches every screen that draws you: your own costume and "
-                + "the window's picture here, and the costume the machines running no DLL of this "
-                + "mod receive - your ZDO publishes that gear itself while you are disguised, rolled "
-                + "the way the game rolls it so every machine agrees on the same pick. The machines "
-                + "running this DLL are never affected: they keep drawing YOU, with your own "
-                + "equipment. Window: the 'Hide armor & weapon' box under the command buttons. "
-                + "Console command: disguise gear [on|off]."
-        );
-
-        // The clones rebuild themselves when this moves (the per-frame poll above), but the
-        // WIRE has to be told at once: the new flag is published right away, which bumps the
-        // DataRevision, so the costume's new keys reach every machine with the next packet
-        // (CostumeGear.OnSettingChanged, the rule of HideSettingChanged above).
-        ConfigHideCreatureGear.SettingChanged += (_, _) => CostumeGear.OnSettingChanged();
     }
 
     /// <summary>Section `5 - Flight`: the keys, the wheel and the speed of the climb.</summary>
@@ -571,11 +734,13 @@ internal static class DisguiseConfig
     }
 
     /// <summary>
-    /// A "hide" option changed: the other machines still hold the state of the last packet,
-    /// EquipmentMask re-sends it right away.
+    /// A display option changed: the other machines still hold the state of the last packet,
+    /// so the new one goes out right away - the mask (EquipmentMask), the costume's gear
+    /// (CostumeGear), or both of them, which is what these two options decide together.
     /// </summary>
-    private static void HideSettingChanged(object sender, EventArgs e)
+    private static void DisplaySettingChanged(object sender, EventArgs e)
     {
         EquipmentMask.OnSettingChanged();
+        CostumeGear.OnSettingChanged();
     }
 }

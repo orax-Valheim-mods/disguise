@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using BepInEx.Configuration;
 using Jotunn.Managers;
 using UnityEngine;
@@ -22,11 +23,13 @@ namespace Disguise;
 /// them, this class only says where they sit - under that line), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
-/// films into it), under it the five command buttons and, under those, the band the level
-/// row holds at the picture's own left edge with the two option boxes to its right - the
-/// sparkle box (HideItemSparkle) over the gear box (HideCreatureGear), the two checkboxes
-/// that are not in the row above because they gate nothing: it is the costume itself that
-/// is drawn differently - then the status line
+/// films into it), under it the five command buttons and, under those, the band the level row
+/// holds at the picture's own left edge - the sparkle box (HideItemSparkle) to its right -
+/// and the two option rows standing under the picture's own left edge, the armor box
+/// (ShowArmor) over the weapons row (ShowWeapons as a box like it, with the WhoseWeapons
+/// list at its right), the
+/// three of them gating nothing in the row above: it is the costume itself that is drawn
+/// differently - then the status line
 /// (GuiStatus), which is the hint while no button has been pressed and the answer of the
 /// last one after that - and, closing the window under it, the help line (GuiHelp), which
 /// holds what the element the pointer is on is for and the idle line while it is on
@@ -41,16 +44,22 @@ internal static class GuiWindow
     /// Height of the panel. The list block takes 338 of them (filter 36 + gap 2 + 300 of
     /// list, GuiCreatureList.BlockHeight) under the -132 it starts at, so it ends at -470;
     /// the two pose rows (GuiPose) take 78 more with their gaps, -476 down to -554; the
-    /// status line keeps the band it has always had under them (-572..-616); and the help
-    /// line (GuiHelp) closes the window below that band. 630 is what left those two rows
-    /// their band above the status line: 540 left 50 px under the list, which fit neither of
-    /// them, and 600 put the Offset row back over the last rows of the list. The help line
-    /// then asked for 40 px at the BOTTOM, and the panel grew downwards for them - so
-    /// nothing above moved a pixel, the status line alone following its own edge (it is
-    /// anchored to the bottom one, which is why GuiStatus.StatusY grew by the same 40 and
-    /// its box stands at -572..-616 exactly as before).
+    /// status line keeps the band it has always had under them (-608..-652 since the third
+    /// option row arrived); and the help line (GuiHelp) closes the window below that band.
+    /// 630 is what left those two rows their band above the status line: 540 left 50 px
+    /// under the list, which fit neither of them, and 600 put the Offset row back over the
+    /// last rows of the list. The help line then asked for 40 px at the BOTTOM, and the
+    /// panel grew downwards for them - so nothing above moved a pixel, the status line alone
+    /// following its own edge (it is anchored to the bottom one, which is why
+    /// GuiStatus.StatusY grew by the same 40). And 706 is that very story one more time: the
+    /// band under the command buttons grew a THIRD option row (WeaponsY, under the armor
+    /// box), which the 94 px left to the two-row band could not hold - the panel grew by the
+    /// 36 px of that row, again downwards, so every top-anchored corner above stands where
+    /// it stood; GuiStatus.StatusY alone grew by those 36 too (bottom-anchored like the help
+    /// line, it would otherwise have travelled down with the edge and stood IN the new row),
+    /// while GuiHelp.HelpY keeps closing the window against the very edge it grew from.
     /// </summary>
-    internal const float Height = 670f;
+    internal const float Height = 706f;
 
     // The band at the very top: the title, Close and the chord all sit on it, 34 px under
     // the top edge - one Y for the three, so the row stays a row when one of them moves.
@@ -110,23 +119,76 @@ internal static class GuiWindow
     private const float ButtonY = ButtonTop - (GuiMetrics.RowHeight * 0.5f);
 
     /// <summary>
-    /// Centre of the sparkle box (HideItemSparkle): the right half of the window has 94 px
-    /// between the bottom of the command row (-478) and the band the status line takes
-    /// (-572), and the two boxes now split them in two rows - this one 14 px under the
-    /// buttons, the gear box (GearY) 20 px above that line, both starting at the picture's
-    /// own left edge's right, after the level row. The same control as the checkbox row
-    /// (GuiCategories builds it), standing alone here with its own entry to write and no
-    /// list to re-filter.
+    /// Centre of the sparkle box (HideItemSparkle): the right half of the window used to
+    /// have 94 px between the bottom of the command row (-478) and the band the status line
+    /// took (-572), split into two rows - this one 14 px under the buttons, the box under it
+    /// 20 px above that line, both starting at the picture's own left edge's right, after
+    /// the level row. The panel is 36 px taller since the band holds three rows (Height), so
+    /// the band ends at -608 now. The same control as the checkbox row (GuiCategories builds
+    /// it), standing alone here with its own entry to write and no list to re-filter.
     /// </summary>
     private const float SparkleY = -504f;
 
     /// <summary>
-    /// Centre of the gear box (HideCreatureGear), on the second row of the band: 36 px under
-    /// the sparkle box, which leaves 12 px between the two rows and 20 above the status
-    /// line's band. Same x as the sparkle box - the two options stand in one column on the
-    /// right of the level row.
+    /// Centre of the armor box (ShowArmor), on the second row of the band: 36 px under the
+    /// sparkle box, and at the picture's OWN left edge (PreviewX) rather than to the right
+    /// of the level row - that row only ever holds the first row of the band, so the two
+    /// rows under it start where the picture starts.
     /// </summary>
-    private const float GearY = -540f;
+    private const float ArmorY = -540f;
+
+    /// <summary>
+    /// Centre of the weapons row (ShowWeapons): its box with the label, then the word that
+    /// names the list and the list itself - which says whose weapons the costume is held
+    /// with - at the right of them: the third and last row of the
+    /// band, 36 px under the armor box and 12 px over the edge of the status line's own
+    /// band. The list opens DOWNWARDS from there, over that line and the help line under it,
+    /// which is why the row is built last of everything (Build).
+    /// </summary>
+    private const float WeaponsY = -576f;
+
+    /// <summary>
+    /// The list of the weapons row: one row tall CLOSED, which is the height Jotunn gives
+    /// the field (CreateDropDown) and the height its own rows stand at when they are open.
+    /// OPEN it is as tall as the entries the configured creature really gives it - one row
+    /// each, up to WeaponsListMaxRows of them - and the template is cut to that very height
+    /// (FillWhose -> ShapeTemplate), which IS the height Unity opens the list at:
+    /// Dropdown.Show sizes the open list from the template and never grows past it, so a
+    /// creature whose pool holds several weapons shows every one of them, and one that holds
+    /// a great many shows the first cap of them and scrolls the rest (what Jotunn's
+    /// template is built with is a ScrollRect over a Masked viewport, so the overflow is
+    /// what lands in it). The cap is also what keeps that list on the screen: it opens
+    /// downwards from the last row of the window, six of its rows already reaching past the
+    /// edge of the panel - and Unity flips a list whose corners leave the canvas over its
+    /// field instead, so nothing of it is ever lost either way.
+    ///
+    /// The width is 50 more than the word is given: Jotunn keeps that much of a list for
+    /// its arrow and for the inset of its label ("width - 50", CreateDropDown), so the
+    /// caption and every row really have WeaponsListWidth - 50 to write in - enough for
+    /// "Creature", "Player" and the names of the weapons between them to stand on one line,
+    /// and ShapeTemplate tells every one of them not to wrap anyway, so a word that ever
+    /// outgrows that draws past it instead of breaking in two.
+    /// </summary>
+    private const float WeaponsListWidth = 150f;
+
+    private const float WeaponsListHeight = 30f;
+
+    private const int WeaponsListMaxRows = 6;
+
+    /// <summary>
+    /// The word in front of the weapons list ("Whose"): it is MEASURED once the window is
+    /// built, exactly the
+    /// way GuiCategories measures a checkbox label (Text.preferredWidth), so the list
+    /// stands at the word's own right whatever the font answers - the first number is only
+    /// the box the word is created in before that measure arrives, and the padding is what
+    /// keeps a rounded pixel from wrapping its last letter.
+    /// </summary>
+    private const float WeaponsWordStart = 40f;
+
+    private const float WeaponsWordPadding = 4f;
+
+    /// <summary>The word of that row to its list, the checkbox box's own inner gap (GuiCategories).</summary>
+    private const float WeaponsItemGap = 8f;
 
     /// <summary>
     /// The band's split, in pixels of the picture above it: the level row stands at the
@@ -203,14 +265,43 @@ internal static class GuiWindow
     private static bool s_sparkleApplied;
 
     /// <summary>
-    /// The gear box on the second row of the band, and what it showed last: the same pair as
+    /// The armor box on the second row of the band, and what it showed last: the same pair as
     /// the sparkle box above, for the same reason - the entry can also be written by
     /// ConfigurationManager while the window is open, and RefreshState pushes that back into
     /// the box. Unity-null once the window is gone, which is the whole safety of it.
     /// </summary>
-    private static Toggle? s_gear;
+    private static Toggle? s_armor;
 
-    private static bool s_gearApplied;
+    private static bool s_armorApplied;
+
+    /// <summary>
+    /// The weapons row of the band, and what it showed last: its box - the same pair as the
+    /// two boxes above, for the same reason (a value from outside, ConfigurationManager or
+    /// the console, is pushed back into it by RefreshState, while a click writes the cache
+    /// itself) - and the list beside it, whose index is the second value of that row. The
+    /// list only says anything while the box is ticked, so it is greyed out with it
+    /// (SyncWhoseList). Unity-null once the window is gone, which is the whole safety of
+    /// both.
+    /// </summary>
+    private static Toggle? s_weapons;
+
+    private static bool s_weaponsApplied;
+
+    private static Dropdown? s_whose;
+
+    private static int s_whoseApplied;
+
+    /// <summary>
+    /// The entries of that list as they stand - Creature, then every weapon the configured
+    /// creature can hold, then Player - and the creature they were read from. The pool moves
+    /// with the configured prefab, so RefreshState fills the list again whenever a row of
+    /// the window or a console command puts another creature there; and because WhoseIndex
+    /// and WhoseAt are the only two readers of it, the row the pointer lands on, the row the
+    /// config is on and the word the console receives can never spell an option two ways.
+    /// </summary>
+    private static List<string> s_whoseOptions = new();
+
+    private static string s_whoseCreature = string.Empty;
 
     internal static GameObject Build(Transform parent)
     {
@@ -219,7 +310,11 @@ internal static class GuiWindow
         s_power = null;
         s_favorite = null;
         s_sparkle = null;
-        s_gear = null;
+        s_armor = null;
+        s_weapons = null;
+        s_whose = null;
+        s_whoseOptions = new();
+        s_whoseCreature = string.Empty;
 
         // Draggable: Jotunn puts its DragWindowCntrl on the panel, and the whole background
         // forwards the gesture, so there is no dedicated title bar to grab.
@@ -356,15 +451,20 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        // The five command buttons under the picture, the two option boxes under them, the
+        // The five command buttons under the picture, the three option rows under them, the
         // line they answer on (which still holds the hint about clicking a row while no
         // button has been pressed), and the help line closing the window under that one.
         CommandButtons(gui, window.transform);
         SparkleBox(window.transform);
-        GearBox(window.transform);
+        ArmorBox(window.transform);
         LevelRow(gui, window.transform);
         GuiStatus.Build(window.transform);
         GuiHelp.Build(window.transform);
+
+        // The weapons row comes LAST of everything, after the two lines it stands over: its
+        // list opens downwards from here, across the status line and the help line under it
+        // (WeaponsRow).
+        WeaponsRow(gui, window.transform);
 
         return window;
     }
@@ -404,33 +504,330 @@ internal static class GuiWindow
     }
 
     /// <summary>
-    /// The box on the second row of the band: HideCreatureGear, the option that takes the
-    /// armor and the weapon a humanoid costume is born with off that costume (GearSkin reads
-    /// it at every build of a copy, CostumeGear at every packet leaving this machine). Same
-    /// control, same column and same rules as the sparkle box above it: a copy already
-    /// standing rebuilds itself when the value moves (SelfView, GuiPreview). The console
-    /// spells the same switch "disguise gear [on|off]", said the way a player says it: ON is
-    /// the gear drawn.
+    /// The box on the second row of the band: ShowArmor, the option that takes the armor a
+    /// humanoid costume is born with off that costume (GearSkin reads it at every build of a
+    /// copy, CostumeGear at every packet leaving this machine). Same control and same rules
+    /// as the sparkle box above it - GuiCategories.BuildBox again - and the same life: a copy
+    /// already standing rebuilds itself when the value moves (SelfView, GuiPreview), and a
+    /// value written from outside while the window is open is pushed back into the box
+    /// (RefreshState). It stands at the picture's OWN left edge rather than to the right of
+    /// the level row: that row only ever holds the first row of the band (LevelRow), so both
+    /// rows under it start where the picture starts. The console spells the same switch
+    /// "disguise armor [on|off]", said the way a player says it: ON is the armor drawn.
     /// </summary>
-    private static void GearBox(Transform parent)
+    private static void ArmorBox(Transform parent)
     {
-        s_gearApplied = DisguiseConfig.ConfigHideCreatureGear.Value;
+        s_armorApplied = DisguiseConfig.ConfigShowArmor.Value;
 
-        float cursor = (Width * 0.5f) + PreviewX + LevelRowWidth + LevelBandGap;
-        s_gear = GuiCategories.BuildBox(
+        float cursor = (Width * 0.5f) + PreviewX;
+        s_armor = GuiCategories.BuildBox(
             parent,
             ref cursor,
-            GearY,
-            "Hide armor & weapon",
-            "Takes the gear a humanoid costume is born with - the armor and the weapon the game gives a real creature of that prefab at spawn - off every costume drawn of you: yours here, the picture above, and the one the machines running no mod receive (your ZDO carries that gear itself while you wear it). The machines running this mod keep drawing you with YOUR equipment, whatever this says.",
-            s_gearApplied,
+            ArmorY,
+            "Show armor",
+            "Draw the costume with the ARMOR a real creature of that prefab is born with - the gear the game gives a creature of it at spawn: its default items and one pick of each random pool. On, the default, is how a Fuling in the world stands - helmet and all; off draws the costume without helmet, chest, legs or cape (whose WEAPON it holds is the row under this one). It reaches every screen drawing that costume: yours here, the picture above, and the machines running no DLL of this mod, whose packets your ZDO carries that gear in - rolled the way the game rolls it, so every machine agrees on the same pick. The machines running this DLL keep drawing YOU with your own equipment, whatever this says. Console: disguise armor [on|off].",
+            s_armorApplied,
             on =>
             {
-                s_gearApplied = on;
-                DisguiseConfig.ConfigHideCreatureGear.Value = on;
+                s_armorApplied = on;
+                DisguiseConfig.ConfigShowArmor.Value = on;
             }
         );
     }
+
+    /// <summary>What the box of the weapons row describes (GuiHelp.Watch).</summary>
+    private const string WeaponsBoxHelp =
+        "Draw the costume with weapons at all: ticked, its hands hold what the list to the right picks (WhoseWeapons); unticked, both hands are empty - and YOUR held items stay hidden from the machines running no DLL of this mod then as well, there being nothing to glue them to. It reaches every screen drawing that costume: yours here, the picture above, and the machines running no DLL, whose packets your ZDO carries that gear in - rolled the way the game rolls it, so every machine agrees on the same pick. The machines running this DLL keep drawing YOU with your own equipment, whatever this says. Console: disguise weapons [on|off].";
+
+    /// <summary>What the word and the list of the weapons row both describe (GuiHelp.Watch).</summary>
+    private const string WhoseHelp =
+        "Whose weapons the costume is held with while the box to the left is ticked: \"Creature\", the default, is the one a real creature of that prefab takes into a hand at spawn - MonsterAI takes the best weapon of its inventory, so a Fuling stands with its spear; the names between the two are every weapon that very creature can hold, and picking one FIXES the costume's hands on it (the other hand empty) whatever the roll answers; \"Player\" is the ones YOU hold in both hands, an empty hand drawing nothing. It reaches every screen drawing that costume, and it decides what YOUR hands carry there too: hidden from the machines running no DLL of this mod while the costume wears its own, exactly what it shows while it wears yours. Greyed out while that box is unticked - a costume drawn with empty hands gives nobody's weapons to name - and put back on \"Creature\" whenever another creature is configured, one that holds no such weapon. Console: disguise weapons <creature|player|weapon>.";
+
+    /// <summary>
+    /// The third and last row of the band, at the picture's own left edge like the armor box
+    /// over it: the BOX (ShowWeapons), then the word naming the list and the Jotunn
+    /// Valheim-styled list of every answer WhoseWeapons can take - its two words, with every
+    /// weapon the configured creature can hold between them - a LIST beside a box because
+    /// the two are one pair of options (the switch decides whether there are any weapons,
+    /// the list which ones while there are), which is also why the console takes both a
+    /// switch and an argument (disguise weapons [on|off|creature|player|weapon]).
+    ///
+    /// The box is the very control the armor box and the sparkle box are built with
+    /// (GuiCategories.BuildBox), so the three of them are one control three times - and
+    /// like them it writes its entry itself, while a click on the LIST runs its sub-command
+    /// (RunCommand) so the answer lands on the status line and the console and the window
+    /// stay one single call. RefreshState then pushes both values back - into the box and
+    /// into the list - which is how either written by the console or by ConfigurationManager
+    /// while the window is open lands without closing it: a bool and an int, the same life
+    /// as the two boxes above. The entries themselves are not constant, though: they come
+    /// out of the configured creature's own pool (FillWhose), so RefreshState fills the list
+    /// again the moment a row of this window or a console command puts another creature
+    /// there - and that same fill is what tells the open list how tall it may open.
+    ///
+    /// The row is built LAST of everything (Build), after the status and the help lines it
+    /// stands over, because the list opens DOWNWARDS across those two lines - and Unity gives
+    /// the open list a canvas of its own (Dropdown.SetupTemplate adds one at sorting order
+    /// 30000), so nothing else of the window can draw over it once it is open either.
+    ///
+    /// Two things of Jotunn's template are corrected here, both in what Unity built before
+    /// the options arrived (ShapeTemplate): the height of the open list, cut to the entries
+    /// the row really holds, and the row's background Image, which ApplyDropdownStyle
+    /// switches off - a Graphic that is off is not raycast, so without it the pointer would
+    /// land on the word alone (or on nothing at all) and a row could not be clicked.
+    /// </summary>
+    private static void WeaponsRow(GUIManager gui, Transform parent)
+    {
+        const int fontSize = 16;
+        float cursor = (Width * 0.5f) + PreviewX;
+
+        // The switch first, at the picture's own left edge like the armor box over it: box
+        // and label are ONE checkbox (GuiCategories.BuildBox), and the list below only names
+        // whose weapons a costume drawn WITH weapons is held with - which is why a click on
+        // it also greys it back in or out (SyncWhoseList).
+        s_weaponsApplied = DisguiseConfig.ConfigShowWeapons.Value;
+        s_weapons = GuiCategories.BuildBox(
+            parent,
+            ref cursor,
+            WeaponsY,
+            "Show weapons",
+            WeaponsBoxHelp,
+            s_weaponsApplied,
+            on =>
+            {
+                s_weaponsApplied = on;
+                DisguiseConfig.ConfigShowWeapons.Value = on;
+                SyncWhoseList();
+            }
+        );
+
+        GameObject word = Label(
+            gui,
+            "Whose",
+            parent,
+            new Vector2(0f, 1f),
+            new Vector2(cursor, WeaponsY),
+            gui.AveriaSerif,
+            fontSize,
+            gui.ValheimBeige,
+            WeaponsWordStart,
+            WeaponsListHeight
+        );
+        GuiHelp.Watch(word, WhoseHelp);
+
+        float wordWidth = WeaponsWordStart;
+        Text? text = word.GetComponent<Text>();
+        if (text != null)
+        {
+            // Measured, so the air before the list is the same whatever the word is - the
+            // rule of every label of this window that has something standing at its right
+            // (GuiCategories measures its checkbox labels the very same way).
+            wordWidth = Mathf.Max(text.preferredWidth, 8f) + WeaponsWordPadding;
+            RectTransform wordRect = word.GetComponent<RectTransform>();
+            if (wordRect != null)
+            {
+                wordRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, wordWidth);
+                wordRect.anchoredPosition = new Vector2(cursor + (wordWidth * 0.5f), WeaponsY);
+            }
+        }
+        cursor += wordWidth + WeaponsItemGap;
+
+        // Jotunn never sets the pivot (it stays in the middle), so the position IS the centre
+        // of the list - the same coordinates the word above was just given, only anchored on
+        // the top-left corner of the window like every other box of this band (BuildBox).
+        GameObject body = gui.CreateDropDown(
+            parent,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(cursor + (WeaponsListWidth * 0.5f), WeaponsY),
+            fontSize,
+            WeaponsListWidth,
+            WeaponsListHeight
+        );
+        GuiHelp.Watch(body, WhoseHelp);
+
+        Dropdown? list = body.GetComponent<Dropdown>();
+        if (list != null)
+        {
+            // A click on a row runs its sub-command (RunCommand), so the word the console
+            // receives is the very entry the pointer landed on - both of them read out of
+            // the entries FillWhose writes below, which is also what puts the one the config
+            // is on in the field, without notifying (or filling it would run the click it is
+            // only standing in for).
+            list.onValueChanged.AddListener(index => RunCommand($"weapons {WhoseAt(index)}"));
+            s_whose = list;
+            FillWhose(list);
+        }
+        SyncWhoseList();
+
+        // Last of everything (see above): the open list draws over the lines under this row.
+        body.transform.SetAsLastSibling();
+    }
+
+    /// <summary>
+    /// Greys the list of the weapons row with the switch beside it, or brings it back: the
+    /// list only says something while the costume is drawn with weapons at all, and leaving
+    /// it clickable there would answer a question the costume cannot show (WhoseWeapons is
+    /// read only while ShowWeapons is on - DisguiseConfig). Called when the box is built,
+    /// when it is clicked and when RefreshState pushes an outside value into it; without a
+    /// window there is no list to grey, which is the whole safety of it.
+    /// </summary>
+    private static void SyncWhoseList()
+    {
+        Dropdown? list = s_whose;
+        if (list != null)
+        {
+            list.interactable = DisguiseConfig.ConfigShowWeapons.Value;
+        }
+    }
+
+    /// <summary>
+    /// The entries of the weapons row as the configured creature gives them: Creature, then
+    /// one name per weapon that very creature can hold (GearSkin.Weapons - the same pool the
+    /// console prints and the config is read against), then Player. The two words stand at
+    /// both ends whatever happens, so a costume that can hold nothing at all still answers a
+    /// list of two - and every name in between is one the pool really holds, never an item
+    /// of some other creature.
+    /// </summary>
+    private static List<string> WhoseOptions()
+    {
+        List<string> options = new() { DisguiseConfig.WeaponsCreature };
+        foreach (string weapon in GearSkin.Weapons(PrefabResolver.CreaturePrefab()))
+        {
+            options.Add(weapon);
+        }
+        options.Add(DisguiseConfig.WeaponsPlayer);
+        return options;
+    }
+
+    /// <summary>
+    /// Fills the weapons list with the entries of the configured creature, cuts the open
+    /// list to them (ShapeTemplate, BEFORE the entries go in - Unity clones the row it finds
+    /// in the template the moment it opens, so the height has to stand first) and puts the
+    /// field back on the answer the config is on, without notifying. Called once when the
+    /// row is built, and once per creature the window is told about while it stands
+    /// (RefreshState) - the pool is the only thing here that can ever move.
+    /// </summary>
+    private static void FillWhose(Dropdown list)
+    {
+        // A name the configured creature cannot hold is put back on the roll first, so the
+        // entries below and the answer the config gives are one and the same thing (the
+        // creature's own handler and the console do this too).
+        DisguiseConfig.ReconcileWhoseWeapons();
+        s_whoseCreature = DisguiseConfig.ConfigCreature.Value ?? string.Empty;
+        s_whoseOptions = WhoseOptions();
+        ShapeTemplate(list, s_whoseOptions.Count);
+        list.ClearOptions();
+        list.AddOptions(s_whoseOptions);
+        s_whoseApplied = WhoseIndex();
+        list.SetValueWithoutNotify(s_whoseApplied);
+        list.RefreshShownValue();
+    }
+
+    /// <summary>
+    /// The two corrections this row makes to Jotunn's dropdown TEMPLATE (WeaponsRow), both in
+    /// what Unity built before the options arrived: the height - the template cut from the
+    /// five rows Unity builds it with to the rows the list really holds (capped at
+    /// WeaponsListMaxRows), with the row and its label at WeaponsListHeight so a 16 px word
+    /// stands inside its line, and the content sized to match (Dropdown.Show sizes the open
+    /// list from what it finds here, so the three of them have to add up or a row is cut off
+    /// at one end - and it only ever SHRINKS that height, which is why the cap is what the
+    /// entries beyond it scroll inside).
+    ///
+    /// And the row's background, switched back ON and kept invisible: ApplyDropdownStyle
+    /// turns it off - it was the highlight the list no longer draws - and a Graphic that is
+    /// off is not raycast, so the pointer would find no row to click. Invisible, it is a hit
+    /// target and nothing else: Jotunn gave that Toggle no transition, so nothing ever tints
+    /// it back. The word of the field and the word of every row are told not to wrap as well,
+    /// since Jotunn gives them width - 50 to stand in (CreateDropDown).
+    /// </summary>
+    private static void ShapeTemplate(Dropdown list, int rows)
+    {
+        RectTransform? template = list.template;
+        if (template == null)
+        {
+            return;
+        }
+
+        // The template hangs from the BOTTOM edge of the field (Unity), so its height alone
+        // says how far the open list reaches under the status and help lines of this window -
+        // and the height Unity opens it at, Dropdown.Show never growing it past this.
+        template.SetSizeWithCurrentAnchors(
+            RectTransform.Axis.Vertical,
+            WeaponsListHeight * Mathf.Clamp(rows, 1, WeaponsListMaxRows)
+        );
+
+        Transform? row = template.Find("Viewport/Content/Item");
+        if (row != null)
+        {
+            RectTransform? body = row as RectTransform;
+            if (body != null)
+            {
+                // Unity builds the row 20 px tall, which no 16 px word fits inside.
+                body.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, WeaponsListHeight);
+            }
+        }
+
+        Transform? content = template.Find("Viewport/Content");
+        RectTransform? box = content as RectTransform;
+        if (box != null)
+        {
+            // One row tall here only: Dropdown.Show writes the real height (one per entry)
+            // into this very rect the moment the list opens, and it is that height the open
+            // list is then cut to - the two must add up with the row above, which is what
+            // makes the last entry stand whole instead of half past the bottom edge.
+            box.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, WeaponsListHeight);
+        }
+
+        if (list.itemText != null)
+        {
+            // Sized to the field while the row was still Unity's 20 px (CreateDropDown), so
+            // it is sized again now that the row is this tall: the word then stands inside
+            // its line instead of overhanging it into the row above.
+            list.itemText.rectTransform.SetSizeWithCurrentAnchors(
+                RectTransform.Axis.Vertical,
+                WeaponsListHeight
+            );
+            list.itemText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        }
+
+        if (list.captionText != null)
+        {
+            list.captionText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        }
+
+        Toggle? toggle = row != null ? row.GetComponent<Toggle>() : null;
+        if (toggle != null && toggle.targetGraphic is Image background)
+        {
+            background.enabled = true;
+            background.color = Color.clear;
+        }
+    }
+
+    /// <summary>
+    /// Which row of the weapons list the config is on right now: the one holding its very
+    /// word, compared the way the entries themselves are read (no case, so a value typed
+    /// into the .cfg by hand still lights the row it was meant to) - and the first one while
+    /// the entry holds something the configured creature cannot hold, which is the answer
+    /// the roll gives then as well (LocalWeaponHash draws nothing else).
+    /// </summary>
+    private static int WhoseIndex()
+    {
+        string value = DisguiseConfig.ConfigWhoseWeapons.Value;
+        for (int i = 0; i < s_whoseOptions.Count; i++)
+        {
+            if (string.Equals(s_whoseOptions[i], value, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /// <summary>The word the console spells the option of that row with (WhoseAt, the click).</summary>
+    private static string WhoseAt(int index) =>
+        index >= 0 && index < s_whoseOptions.Count
+            ? s_whoseOptions[index]
+            : DisguiseConfig.WeaponsCreature;
 
     /// <summary>What the word and the number of the level row both describe (GuiHelp.Watch).</summary>
     private const string LevelHelp =
@@ -696,17 +1093,21 @@ internal static class GuiWindow
 
     /// <summary>
     /// Rewrites the line under the title, the labels of the toggle and of the Favorite button,
-    /// the sparkle box and the six pose fields, writing NONE of them when it is unchanged:
-    /// called once per frame while the window is open (DisguiseGui.Tick), by GuiCreatureList
-    /// after a row was clicked or after a change the console made while the window was open,
-    /// and by the command buttons after they ran their sub-command. Two of the four values
-    /// on the line move on their own - the flight and its height - so the ordinary frame
-    /// costs the line being built and compared, never a write to the Text (which would lay it
-    /// out again for the same words); the Favorite label follows the configured prefab, which
-    /// costs a look at the config and one at the marks (both a string compare and a set
-    /// lookup); the pose fields cost six more string comparisons, and skip the one being typed
-    /// in (GuiPose); the two option boxes cost one bool each - a click on one writes that
-    /// cache itself, so only a value from outside (ConfigurationManager) is ever pushed back.
+    /// the sparkle box, the armor box, the weapons box and its list and the six pose fields,
+    /// writing NONE
+    /// of them when it is unchanged: called once per frame while the window is open
+    /// (DisguiseGui.Tick), by GuiCreatureList after a row was clicked or after a change the
+    /// console made while the window was open, and by the command buttons after they ran
+    /// their sub-command. Two of the four values on the line move on their own - the flight
+    /// and its height - so the ordinary frame costs the line being built and compared, never
+    /// a write to the Text (which would lay it out again for the same words); the Favorite
+    /// label follows the configured prefab, which costs a look at the config and one at the
+    /// marks (both a string compare and a set lookup); the pose fields cost six more string
+    /// comparisons, and skip the one being typed in (GuiPose); the four option controls cost
+    /// one bool each and one int - a click on one writes that cache itself, so only
+    /// a value from outside (ConfigurationManager, the console) is ever pushed back - and the
+    /// weapons list one prefab-hash compare more, filling itself again only when the creature
+    /// behind it has really moved (FillWhose).
     /// Does nothing without a window, which is every frame it is closed and every frame after
     /// a scene change destroyed it.
     /// </summary>
@@ -729,14 +1130,52 @@ internal static class GuiWindow
             }
         }
 
-        Toggle? gear = s_gear;
-        if (gear != null)
+        Toggle? armor = s_armor;
+        if (armor != null)
         {
-            bool hideGear = DisguiseConfig.ConfigHideCreatureGear.Value;
-            if (hideGear != s_gearApplied)
+            bool showArmor = DisguiseConfig.ConfigShowArmor.Value;
+            if (showArmor != s_armorApplied)
             {
-                s_gearApplied = hideGear;
-                gear.SetIsOnWithoutNotify(hideGear);
+                s_armorApplied = showArmor;
+                armor.SetIsOnWithoutNotify(showArmor);
+            }
+        }
+
+        Toggle? weapons = s_weapons;
+        if (weapons != null)
+        {
+            bool showWeapons = DisguiseConfig.ConfigShowWeapons.Value;
+            if (showWeapons != s_weaponsApplied)
+            {
+                s_weaponsApplied = showWeapons;
+                weapons.SetIsOnWithoutNotify(showWeapons);
+                SyncWhoseList(); // the list is greyed out with the switch
+            }
+        }
+
+        Dropdown? whose = s_whose;
+        if (whose != null)
+        {
+            if (
+                !string.Equals(
+                    DisguiseConfig.ConfigCreature.Value,
+                    s_whoseCreature,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                // Another creature, therefore another pool of weapons to pick from: the
+                // entries are read again and the field is put back on the answer the config
+                // gives over them (FillWhose), which a name the new pool does not hold sends
+                // straight to the first one - the roll, exactly what is drawn then as well.
+                FillWhose(whose);
+            }
+            int shown = WhoseIndex();
+            if (shown != s_whoseApplied)
+            {
+                s_whoseApplied = shown;
+                whose.SetValueWithoutNotify(shown);
+                whose.RefreshShownValue();
             }
         }
 
