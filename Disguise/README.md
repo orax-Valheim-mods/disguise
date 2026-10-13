@@ -22,6 +22,8 @@ switch on `SeeYourDisguise`, which draws the creature on your own screen too).
 | `disguise refresh` | Force every loaded player to re-create your object now (needs the DLL on the server) |
 | `disguise view [on|off]` | Show the creature on your own screen instead of your viking (local only) |
 | `disguise logs [on|off]` | Write the mod's own Info messages to the BepInEx log (warnings and errors are always written) |
+| `disguise armor [on\|off]` | Draw a **humanoid** costume with the armor a real creature of that prefab is born with (`on`, the default) or without it (`off`) - `ShowArmor`, toggles without an argument |
+| `disguise weapons [on\|off\|creature\|player\|<weapon>]` | Whether the costume is drawn **with weapons at all** (`on`, the default; `off` empties both hands) and, while it is, **whose** those weapons are: `creature`, the default, is the ones a real creature of that prefab takes into a hand at spawn; `player` is the ones **you** hold in both hands, an empty hand drawing nothing; any other word is the **name of one weapon out of that creature's own pool**, fixing both hands on it alone (`ShowWeapons` + `WhoseWeapons`) - no argument reports the state, **the weapons the configured creature can hold**, and how to write it; a weapon it cannot hold is refused, with the pool printed |
 | `disguise fly [on|off]` | Raise the creature above you for the others (visual only: your player stays on the ground) |
 | `disguise offset <X> <Y> <Z>` | Move the costume that far from you (world units, `1` is one metre; no argument reports where it stands, `0 0 0` puts it back). Visual only: your player never moves |
 | `disguise rotation <X> <Y> <Z>` | Turn the costume in place, in degrees **on top of** the way it already faces (no argument reports it, `0 0 0` is the normal facing). Visual only: your player never turns |
@@ -42,11 +44,14 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `Logs` | `true` | Write the mod's own Info messages to the BepInEx log, the whole output of `disguise list` included (warnings and errors are always written) |
 | `ForceObserverRefresh` | `true` | Other players see a change right away (needs the DLL on the server) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look |
-| `HideHelmet` | `true` | Hide the helmet from the other machines |
-| `HideChest` | `true` | Hide the chest armour from the other machines |
-| `HideLegs` | `true` | Hide the leggings from the other machines |
-| `HideCape` | `true` | Hide the cape from the other machines |
-| `HideHeldItems` | `false` | Hide the items in your hands and on your back |
+| `ShowArmor` | `true` | Draw a **humanoid** costume with the **armor** a real creature of that prefab is born with (its default items plus one seeded pick of each random pool - how a Fuling appears with its helmet and its chest). It reaches **every screen** drawing that costume, your own and the window's picture included; off draws the costume without it. A `Show armor` box under the command buttons; `disguise armor [on\|off]` |
+| `ShowWeapons` | `true` | Draw the costume **with weapons in its hands** at all: on (the default) both hands hold what `WhoseWeapons` below picks, off they are empty - and it is also what decides **your** held items: hidden from the machines running no DLL while the costume does not wear yours (`ShowWeapons` off, or `WhoseWeapons` at `Creature` or at one of the creature's weapons). A `Show weapons` box under the command buttons; `disguise weapons [on\|off]` |
+| `WhoseWeapons` | `Creature` | Whose **weapons** the costume is held with while `ShowWeapons` is on: `Creature`, the default, is the ones a real creature of that prefab takes into a hand at spawn; `Player` is the ones **you** hold in both hands, an empty hand drawing nothing; **any other value** is the name of one item out of that very creature's own pool - cut down
+to what lands in a hand, to what a hand can draw, and to what the world can **name and
+icon**, which keeps the creatures' own attack items (`Greydwarf_attack`,
+`charred_greatsword_thrust` and their shape) out of it - and the hands are then **that item
+alone**, the other one empty, everywhere the same (it travels in its own ZDO key,
+`cd_whoseWeapon`). And it is also what **your** held items are: hidden from the other machines while the costume wears anything but yours, exactly what it shows while it wears yours. Read only while the box is ticked; a name the configured creature cannot hold is put back on `Creature` when another creature is configured. A `Whose` list beside it - `Creature`, then every weapon the configured creature can hold and a hand can draw, then `Player` - greyed out while the box is unticked; `disguise weapons <creature\|player\|weapon>` |
 | `ShowAsAlly` | `false` | Show the creature to the others with the green health bar of an ally instead of the red one of an enemy |
 | `SeeYourDisguise` | `false` | Show the creature on your own screen instead of your viking (local only) |
 | `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (Wood, Stone, a coin). A box under the command buttons of the window; purely local, it changes your own costume and the window's picture, never what another machine draws |
@@ -69,6 +74,11 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `ShowOther` | `true` | Show the prefabs no other category claims (spawners, markers, terrain objects) |
 | `ShowFavorites` | `false` | Tick the window's **Favorites** box: the list then shows **only** the prefabs marked in `Favorites`, and the six category boxes are ignored while it is ticked (one click gets a favorites list, one more the categories back) |
 | `Favorites` | *(empty)* | Comma-separated names of the marked prefabs (e.g. `Troll,Draugr,Wolf`), written by the window's Favorite button or by `disguise favorite [prefab]` and read by its Favorites box. The names are the ones `disguise list` prints; a name no catalogue holds never matches a row |
+
+> **Note on an existing `.cfg`:** `ShowWeapons` used to be the list's own key, holding
+> `Creature` or `Player`, and is now the box's own `true` / `false` - the words having moved
+> to `WhoseWeapons`. An existing file still carrying one of them has it carried over into
+> `WhoseWeapons` once at startup, so nothing of what was chosen is lost.
 
 The four `Fly*Key` values are BepInEx **shortcuts** (`main key + modifiers`): in
 ConfigurationManager (Alt+F10 by default) open `5 - Flight`, click the value and press the new
@@ -104,7 +114,29 @@ buttons and the status line sits the **`Hide item sparkle` box**, the
 same checkbox as the row above though it gates no list: it writes `HideItemSparkle` (`4 - Own
 view`), so an **item** costume then stands without the shimmer every dropped-item prefab
 carries, on your own screen and in the picture - those two only, a machine running no DLL
-keeping the vanilla one because it builds your real item prefab from the network (the branch added them one step at a time; the preview there shows the last
+keeping the vanilla one because it builds your real item prefab from the network - and under
+that box the **`Show armor` box** (`ShowArmor`, `3 - Display`: the armor a humanoid costume
+is born with, off taking it away on every screen drawing the costume) and under THAT one the
+**`Show weapons` row**: the same checkbox again (`ShowWeapons`, `3 - Display` - unticked,
+both hands of the costume stand empty) with the **`Whose` list** beside it (`WhoseWeapons`,
+a dropdown holding **every answer for the configured creature**: the word `Creature` first,
+then one entry per weapon that very creature can really hold, **that a hand can draw**, and
+that carries a **name and an icon** (which leaves the creatures' own **attack items** -
+`Greydwarf_attack`, `charred_greatsword_thrust` and their shape - out: one ItemDrop per
+attack of the creature, for its AI to pick between, never shown in a player's screen), then
+the word `Player` - the
+first keeping the weapon a real creature of that prefab takes at spawn, a weapon between the
+two fixing both hands on that one item alone, and the second putting **yours** there
+instead - here as well as on every other machine drawing
+the costume, an empty hand drawing nothing), the entries rebuilt whenever another creature
+is configured (a weapon the new creature cannot hold going back to `Creature`), the open list
+cut to the entries it holds (six rows at most, the rest scrolling), the list greyed out while
+the box is unticked,
+every click on it
+running `disguise weapons <creature|player|weapon>` like the console would and answering on the
+status line, and a value changed in ConfigurationManager or in the console landing in the box
+and in the list without
+closing the window (the branch added them one step at a time; the preview there shows the last
 creature the pointer was on, filmed by a camera of its own into a texture and framed to fill
 it whatever its shape or size - kept there while
 the pointer is anywhere else, so a row can be looked at and then acted on - and the
@@ -157,12 +189,19 @@ the window is on screen, and only when something on it really changed. The check
 under this line, above the list it filters: `Favorites` first, then the six category boxes,
 alphabetical.
 
-The `Hide*` options fix gear displayed at nonsense positions on humanoid creatures: other
-machines read the equipment hashes from your ZDO and attach them to the creature's model.
-Your own view always keeps your equipment. The choice is published in **your** ZDO
+Gear drawn at nonsense positions on humanoid creatures is fixed by masking the equipment
+hashes: other machines read the equipment hashes from your ZDO and attach them to the
+creature's model. The four armour rows (helmet, chest, legs, cape) are **always** masked -
+a humanoid costume dresses those very rows with its own gear, so no option can be read
+there - and `ShowWeapons` with `WhoseWeapons` are the pair left to gate the rest: while the
+box is off, or on `Creature` (the default) or on one of the creature's own weapons, your held items are hidden and the costume holds
+the weapon a real creature of that prefab takes at spawn (empty hands while the box is
+unticked, that one item alone when the list names one), `Player` putting **your** own back on it on every screen. `ShowArmor` decides
+the other half - the armor that very costume wears, on your own screen as well as on the
+others'. Your own view always keeps your equipment. The choice is published in **your** ZDO
 (`cd_hide`): a dedicated server relaying your packets follows it, so your own config is the
-only thing that matters - its `Hide*` defaults are just a fallback for a player whose client
-has no DLL.
+only thing that matters - its defaults being just a fallback for a player
+whose client has no DLL.
 
 `ShowAsAlly` travels the same way (`cd_rel`): the other machines draw the green health bar
 of an ally instead of the red one of an enemy, and only that display changes - never your
@@ -170,7 +209,10 @@ own view, the game rules or your equipment.
 
 `SeeYourDisguise` (also `disguise view`) is the opposite for your own screen only: your
 viking's renderers and cloth are switched off and a purely local, inert copy of the creature
-takes its place - no ZDO, no collision, no AI, nothing sent to the server. It never changes
+takes its place - no ZDO, no collision, no AI, nothing sent to the server. That copy is
+dressed the way `ShowArmor`, `ShowWeapons` and `WhoseWeapons` ask (`Player` putting your own
+weapon in the hands of the creature you see, a weapon name fixing them on that item of the
+creature's own pool, the box unticked empty hands instead). It never changes
 what the other machines see.
 
 `HideItemSparkle` (the `Hide item sparkle` box under the command buttons) takes the shimmer
