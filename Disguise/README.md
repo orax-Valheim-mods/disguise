@@ -51,7 +51,7 @@ to what lands in a hand, to what a hand can draw, and to what the world can **na
 describe**, which keeps the creatures' own attack items (`Greydwarf_attack`,
 `charred_greatsword_thrust` and their shape) out of it - and the hands are then **that item
 alone**, the other one empty, everywhere the same (it travels in its own ZDO key,
-`cd_whoseWeapon`). And it is also what **your** held items are: hidden from the other machines while the costume wears anything but yours, exactly what it shows while it wears yours. Read only while the box is ticked; a name the configured creature cannot hold is put back on `Creature` when another creature is configured. A `Whose` list beside it - `Creature`, then every weapon the configured creature can hold and a hand can draw, then `Player` - greyed out while the box is unticked; `disguise weapons <creature\|player\|weapon>`. A new answer in that list is drawn at once on every screen drawing the costume - your own costume and the window's picture rebuilding themselves with it |
+`cd_whoseWeapon`). And it is also what **your** held items are: hidden from the other machines while the costume wears anything but yours, exactly what it shows while it wears yours. Read only while the box is ticked; a name the configured creature cannot hold is put back on `Creature` when another creature is configured. A list beside it - `Creature default` (the value behind it stays the bare `Creature`, the word the console and the `.cfg` take), then every weapon the configured creature can hold and a hand can draw, then `Player` - greyed out while the box is unticked; `disguise weapons <creature\|player\|weapon>`. A new answer in that list is drawn at once on every screen drawing the costume - your own costume and the window's picture rebuilding themselves with it |
 | `ShowAsAlly` | `false` | Show the creature to the others with the green health bar of an ally instead of the red one of an enemy |
 | `SeeYourDisguise` | `false` | Show the creature on your own screen instead of your viking (local only) |
 | `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (Wood, Stone, a coin). A box under the command buttons of the window; purely local, it changes your own costume and the window's picture, never what another machine draws |
@@ -118,9 +118,10 @@ keeping the vanilla one because it builds your real item prefab from the network
 that box the **`Show armor` box** (`ShowArmor`, `3 - Display`: the armor a humanoid costume
 is born with, off taking it away on every screen drawing the costume) and under THAT one the
 **`Show weapons` row**: the same checkbox again (`ShowWeapons`, `3 - Display` - unticked,
-both hands of the costume stand empty) with the **`Whose` list** beside it (`WhoseWeapons`,
-a dropdown holding **every answer for the configured creature**: the word `Creature` first,
-then one entry per weapon that very creature can really hold, **that a hand can draw**, and
+both hands of the costume stand empty) with the **weapons list** beside it (`WhoseWeapons`,
+a dropdown holding **every answer for the configured creature**: the words `Creature default`
+first (the value behind them still the bare `Creature`, the word the console and the `.cfg`
+keep), then one entry per weapon that very creature can really hold, **that a hand can draw**, and
 that carries a **name and a description** (which leaves the creatures' own **attack items** -
 `Greydwarf_attack`, `charred_greatsword_thrust` and their shape - out: one ItemDrop per
 attack of the creature, for its AI to pick between, never shown in a player's screen), then

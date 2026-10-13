@@ -138,9 +138,9 @@ internal static class GuiWindow
     private const float ArmorY = -540f;
 
     /// <summary>
-    /// Centre of the weapons row (ShowWeapons): its box with the label, then the word that
-    /// names the list and the list itself - which says whose weapons the costume is held
-    /// with - at the right of them: the third and last row of the
+    /// Centre of the weapons row (ShowWeapons): its box with the label, then the list
+    /// itself - which says whose weapons the costume is held with - at their right: the
+    /// third and last row of the
     /// band, 36 px under the armor box and 12 px over the edge of the status line's own
     /// band. The list opens DOWNWARDS from there, over that line and the help line under it,
     /// which is why the row is built last of everything (Build).
@@ -162,33 +162,34 @@ internal static class GuiWindow
     /// edge of the panel - and Unity flips a list whose corners leave the canvas over its
     /// field instead, so nothing of it is ever lost either way.
     ///
-    /// The width is 50 more than the word is given: Jotunn keeps that much of a list for
-    /// its arrow and for the inset of its label ("width - 50", CreateDropDown), so the
-    /// caption and every row really have WeaponsListWidth - 50 to write in - enough for
-    /// "Creature", "Player" and the names of the weapons between them to stand on one line,
-    /// and ShapeTemplate tells every one of them not to wrap anyway, so a word that ever
-    /// outgrows that draws past it instead of breaking in two.
+    /// The width is the picture's own minus what the switch in front of it takes: the list
+    /// is the LAST thing of the row, so its right edge lands on the picture's, exactly like
+    /// the button row above lands on it (CommandCount) - no word stands between the switch
+    /// and the list anymore, the list being the only thing of the row that can name the
+    /// answer. Of that width Jotunn keeps 50 for its arrow and for the inset of its label
+    /// ("width - 50", CreateDropDown), so the caption and every row really have the rest to
+    /// write in - enough for "Creature default", "Player" and the names of the weapons
+    /// between them to stand on one line, and ShapeTemplate tells every one of them not to
+    /// wrap anyway, so a word that ever outgrows that draws past it instead of breaking in
+    /// two. WeaponsListMinWidth is what the field never goes under, a switch label measured
+    /// so wide that the picture's own width would leave it less being worth those few
+    /// pixels past the picture's edge.
     /// </summary>
-    private const float WeaponsListWidth = 150f;
+    private const float WeaponsListMinWidth = 150f;
 
     private const float WeaponsListHeight = 30f;
 
     private const int WeaponsListMaxRows = 6;
 
     /// <summary>
-    /// The word in front of the weapons list ("Whose"): it is MEASURED once the window is
-    /// built, exactly the
-    /// way GuiCategories measures a checkbox label (Text.preferredWidth), so the list
-    /// stands at the word's own right whatever the font answers - the first number is only
-    /// the box the word is created in before that measure arrives, and the padding is what
-    /// keeps a rounded pixel from wrapping its last letter.
+    /// How the roll's own word is written in the LIST: "Creature default", so the row says
+    /// what that answer really is - the pick a real creature of that prefab takes at spawn
+    /// - without anybody having to know the bare word. Displayed only: the entry itself
+    /// stays DisguiseConfig.WeaponsCreature in s_whoseOptions, which is what the click runs
+    /// (WhoseAt), what the config is matched against (WhoseIndex) and what the .cfg, the
+    /// console and ReconcileWhoseWeapons keep spelling, so nothing of the value moves.
     /// </summary>
-    private const float WeaponsWordStart = 40f;
-
-    private const float WeaponsWordPadding = 4f;
-
-    /// <summary>The word of that row to its list, the checkbox box's own inner gap (GuiCategories).</summary>
-    private const float WeaponsItemGap = 8f;
+    private const string CreatureDefaultLabel = "Creature default";
 
     /// <summary>
     /// The band's split, in pixels of the picture above it: the level row stands at the
@@ -539,13 +540,13 @@ internal static class GuiWindow
     private const string WeaponsBoxHelp =
         "Draw the costume with weapons at all: ticked, its hands hold what the list to the right picks (WhoseWeapons); unticked, both hands are empty - and YOUR held items stay hidden from the machines running no DLL of this mod then as well, there being nothing to glue them to. It reaches every screen drawing that costume: yours here, the picture above, and the machines running no DLL, whose packets your ZDO carries that gear in - rolled the way the game rolls it, so every machine agrees on the same pick. The machines running this DLL keep drawing YOU with your own equipment, whatever this says. Console: disguise weapons [on|off].";
 
-    /// <summary>What the word and the list of the weapons row both describe (GuiHelp.Watch).</summary>
+    /// <summary>What the list of the weapons row describes (GuiHelp.Watch - the box beside it has its own).</summary>
     private const string WhoseHelp =
-        "Whose weapons the costume is held with while the box to the left is ticked: \"Creature\", the default, is the one a real creature of that prefab takes into a hand at spawn - MonsterAI takes the best weapon of its inventory, so a Fuling stands with its spear; the names between the two are every weapon that very creature can hold, and picking one FIXES the costume's hands on it (the other hand empty) whatever the roll answers; \"Player\" is the ones YOU hold in both hands, an empty hand drawing nothing. It reaches every screen drawing that costume, and it decides what YOUR hands carry there too: hidden from the machines running no DLL of this mod while the costume wears its own, exactly what it shows while it wears yours. Greyed out while that box is unticked - a costume drawn with empty hands gives nobody's weapons to name - and put back on \"Creature\" whenever another creature is configured, one that holds no such weapon. Console: disguise weapons <creature|player|weapon>.";
+        "Whose weapons the costume is held with while the box to the left is ticked: \"Creature default\", the default, is the one a real creature of that prefab takes into a hand at spawn - MonsterAI takes the best weapon of its inventory, so a Fuling stands with its spear; the names between the two are every weapon that very creature can hold, and picking one FIXES the costume's hands on it (the other hand empty) whatever the roll answers; \"Player\" is the ones YOU hold in both hands, an empty hand drawing nothing. It reaches every screen drawing that costume, and it decides what YOUR hands carry there too: hidden from the machines running no DLL of this mod while the costume wears its own, exactly what it shows while it wears yours. Greyed out while that box is unticked - a costume drawn with empty hands gives nobody's weapons to name - and put back on \"Creature default\" whenever another creature is configured, one that holds no such weapon. Console: disguise weapons <creature|player|weapon>.";
 
     /// <summary>
     /// The third and last row of the band, at the picture's own left edge like the armor box
-    /// over it: the BOX (ShowWeapons), then the word naming the list and the Jotunn
+    /// over it: the BOX (ShowWeapons), then the Jotunn
     /// Valheim-styled list of every answer WhoseWeapons can take - its two words, with every
     /// weapon the configured creature can hold between them - a LIST beside a box because
     /// the two are one pair of options (the switch decides whether there are any weapons,
@@ -579,6 +580,7 @@ internal static class GuiWindow
     {
         const int fontSize = 16;
         float cursor = (Width * 0.5f) + PreviewX;
+        float rowStart = cursor;
 
         // The switch first, at the picture's own left edge like the armor box over it: box
         // and label are ONE checkbox (GuiCategories.BuildBox), and the list below only names
@@ -600,47 +602,26 @@ internal static class GuiWindow
             }
         );
 
-        GameObject word = Label(
-            gui,
-            "Whose",
-            parent,
-            new Vector2(0f, 1f),
-            new Vector2(cursor, WeaponsY),
-            gui.AveriaSerif,
-            fontSize,
-            gui.ValheimBeige,
-            WeaponsWordStart,
-            WeaponsListHeight
+        // No word stands in front of the list anymore (the row used to spell "Whose" there):
+        // the field is the only thing of the row that can name the answer, so it takes what
+        // the switch leaves of the picture's own width - its right edge landing on the
+        // picture's, like the button row above (CommandCount) - and WhoseHelp is watched on
+        // the body below alone, the word being gone.
+        float listWidth = Mathf.Max(
+            WeaponsListMinWidth,
+            CreaturePreview.PictureWidth - (cursor - rowStart)
         );
-        GuiHelp.Watch(word, WhoseHelp);
-
-        float wordWidth = WeaponsWordStart;
-        Text? text = word.GetComponent<Text>();
-        if (text != null)
-        {
-            // Measured, so the air before the list is the same whatever the word is - the
-            // rule of every label of this window that has something standing at its right
-            // (GuiCategories measures its checkbox labels the very same way).
-            wordWidth = Mathf.Max(text.preferredWidth, 8f) + WeaponsWordPadding;
-            RectTransform wordRect = word.GetComponent<RectTransform>();
-            if (wordRect != null)
-            {
-                wordRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, wordWidth);
-                wordRect.anchoredPosition = new Vector2(cursor + (wordWidth * 0.5f), WeaponsY);
-            }
-        }
-        cursor += wordWidth + WeaponsItemGap;
 
         // Jotunn never sets the pivot (it stays in the middle), so the position IS the centre
-        // of the list - the same coordinates the word above was just given, only anchored on
-        // the top-left corner of the window like every other box of this band (BuildBox).
+        // of the list - starting where the switch's own label leaves off (BuildBox), anchored
+        // on the top-left corner of the window like every other box of this band.
         GameObject body = gui.CreateDropDown(
             parent,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(cursor + (WeaponsListWidth * 0.5f), WeaponsY),
+            new Vector2(cursor + (listWidth * 0.5f), WeaponsY),
             fontSize,
-            WeaponsListWidth,
+            listWidth,
             WeaponsListHeight
         );
         GuiHelp.Watch(body, WhoseHelp);
@@ -650,9 +631,11 @@ internal static class GuiWindow
         {
             // A click on a row runs its sub-command (RunCommand), so the word the console
             // receives is the very entry the pointer landed on - both of them read out of
-            // the entries FillWhose writes below, which is also what puts the one the config
-            // is on in the field, without notifying (or filling it would run the click it is
-            // only standing in for).
+            // s_whoseOptions (the VALUES FillWhose fills from), never out of what the row
+            // SPELLS: the first entry reads "Creature default" in the list and still runs
+            // "weapons Creature" (WhoseLabels, WhoseAt), which is also what puts the one
+            // the config is on in the field, without notifying (or filling it would run the
+            // click it is only standing in for).
             list.onValueChanged.AddListener(index => RunCommand($"weapons {WhoseAt(index)}"));
             s_whose = list;
             FillWhose(list);
@@ -717,10 +700,36 @@ internal static class GuiWindow
         s_whoseOptions = WhoseOptions();
         ShapeTemplate(list, s_whoseOptions.Count);
         list.ClearOptions();
-        list.AddOptions(s_whoseOptions);
+        list.AddOptions(WhoseLabels());
         s_whoseApplied = WhoseIndex();
         list.SetValueWithoutNotify(s_whoseApplied);
         list.RefreshShownValue();
+    }
+
+    /// <summary>
+    /// The entries as the LIST writes them: the roll's own word (WeaponsCreature, always
+    /// the first one, WhoseOptions) spelled "Creature default", so the row says what that
+    /// answer really is without anybody having to know the bare word - every other entry as
+    /// itself. A copy: s_whoseOptions keeps the values, which are what the click runs
+    /// (WhoseAt), what the config is matched against (WhoseIndex) and what the console, the
+    /// .cfg and ReconcileWhoseWeapons spell - the label is a face the window paints, never
+    /// the answer itself.
+    /// </summary>
+    private static List<string> WhoseLabels()
+    {
+        List<string> labels = new(s_whoseOptions);
+        if (
+            labels.Count > 0
+            && string.Equals(
+                labels[0],
+                DisguiseConfig.WeaponsCreature,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            labels[0] = CreatureDefaultLabel;
+        }
+        return labels;
     }
 
     /// <summary>
