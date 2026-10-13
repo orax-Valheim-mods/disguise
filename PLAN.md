@@ -1,4 +1,4 @@
-# DEV.md — A line in the pause menu, and taking it out again
+# PLAN.md — A line in the pause menu, and taking it out again
 
 **Scope.** How to add a line of your own to Valheim's pause menu (the list Escape
 draws), and how to remove it when the plugin is unloaded. Written so the same
@@ -344,7 +344,7 @@ In game:
 ## 6. Conventions of this repository
 
 - `README.md` is the user documentation (long, and the single source of truth for
-  the options and the troubleshooting); `DEV.md` — this file — is the developer
+  the options and the troubleshooting); `PLAN.md` — this file — is the developer
   note for one feature and is not linked from the README;
 - one `internal static` class per file; `#nullable enable` at the top of a new file;
 - GUI strings in English;
