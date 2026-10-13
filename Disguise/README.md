@@ -51,7 +51,7 @@ to what lands in a hand, to what a hand can draw, and to what the world can **na
 describe**, which keeps the creatures' own attack items (`Greydwarf_attack`,
 `charred_greatsword_thrust` and their shape) out of it - and the hands are then **that item
 alone**, the other one empty, everywhere the same (it travels in its own ZDO key,
-`cd_whoseWeapon`). And it is also what **your** held items are: hidden from the other machines while the costume wears anything but yours, exactly what it shows while it wears yours. Read only while the box is ticked; a name the configured creature cannot hold is put back on `Creature` when another creature is configured. A `Whose` list beside it - `Creature`, then every weapon the configured creature can hold and a hand can draw, then `Player` - greyed out while the box is unticked; `disguise weapons <creature\|player\|weapon>` |
+`cd_whoseWeapon`). And it is also what **your** held items are: hidden from the other machines while the costume wears anything but yours, exactly what it shows while it wears yours. Read only while the box is ticked; a name the configured creature cannot hold is put back on `Creature` when another creature is configured. A `Whose` list beside it - `Creature`, then every weapon the configured creature can hold and a hand can draw, then `Player` - greyed out while the box is unticked; `disguise weapons <creature\|player\|weapon>`. A new answer in that list is drawn at once on every screen drawing the costume - your own costume and the window's picture rebuilding themselves with it |
 | `ShowAsAlly` | `false` | Show the creature to the others with the green health bar of an ally instead of the red one of an enemy |
 | `SeeYourDisguise` | `false` | Show the creature on your own screen instead of your viking (local only) |
 | `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (Wood, Stone, a coin). A box under the command buttons of the window; purely local, it changes your own costume and the window's picture, never what another machine draws |
@@ -134,7 +134,8 @@ cut to the entries it holds (six rows at most, the rest scrolling), the list gre
 the box is unticked,
 every click on it
 running `disguise weapons <creature|player|weapon>` like the console would and answering on the
-status line, and a value changed in ConfigurationManager or in the console landing in the box
+status line (and redrawing your own costume and the window's picture with the new pick at
+once), and a value changed in ConfigurationManager or in the console landing in the box
 and in the list without
 closing the window (the branch added them one step at a time; the preview there shows the last
 creature the pointer was on, filmed by a camera of its own into a texture and framed to fill

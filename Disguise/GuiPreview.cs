@@ -65,6 +65,18 @@ internal static class GuiPreview
     private static int s_shownLookOption;
 
     /// <summary>
+    /// The same pair for a choice naming ONE weapon of the pool (WhoseWeapons at an item):
+    /// the entry as it was when the picture was last drawn, and the weapon hash the stage
+    /// was dressed with (the very one GearSkin.Dress hands to Compute). The bits above
+    /// cannot carry WHICH item the hands hold - two different weapons of one pool answer the
+    /// same - so the entry itself is watched, by reference, and the pool walk of
+    /// GearSkin.LocalWeaponHash is only paid on the move - exactly like the pair above.
+    /// </summary>
+    private static string? s_shownFixedChoice;
+
+    private static int s_shownWeapon;
+
+    /// <summary>
     /// The level the stage was dressed for (LevelSkin, at its build): a level that moves
     /// while the picture stands makes the creature be shown again, through the same delay
     /// and the same guard as any other change of creature - one int compared per frame, and
@@ -209,6 +221,29 @@ internal static class GuiPreview
             }
         }
 
+        // The same thing for a choice naming ONE weapon of the pool (WhoseWeapons at an
+        // item): the bits above only say which KIND of hands the picture's creature wears,
+        // and two different weapons of one pool answer the same, so the entry itself is
+        // watched, by reference - one compare per frame - and the pool walk of
+        // GearSkin.LocalWeaponHash (the very hash the stage is dressed with) only when it
+        // moved, through the same delay and the same guard as any other change.
+        string? fixedChoice = GearSkin.FixedChoice;
+        if (!ReferenceEquals(fixedChoice, s_shownFixedChoice))
+        {
+            s_shownFixedChoice = fixedChoice;
+            if (string.Equals(s_pending, s_shown, System.StringComparison.Ordinal))
+            {
+                ZNetScene? zns = ZNetScene.instance;
+                if (
+                    GearSkin.LocalWeaponHash(zns != null ? zns.GetPrefab(s_shown) : null)
+                    != s_shownWeapon
+                )
+                {
+                    s_shown = string.Empty;
+                }
+            }
+        }
+
         // The level moved under a picture that is already standing: the stage was dressed
         // for the old one, so the creature is shown AGAIN - through the same delay and the
         // same guard as any other change of creature (s_shown emptied rather than the show
@@ -232,6 +267,9 @@ internal static class GuiPreview
             s_shownSparkle = GhostFactory.HideSparkle(s_shown);
             s_shownLook = GearSkin.Look(s_shown);
             s_shownLookOption = GearSkin.Options();
+            s_shownFixedChoice = GearSkin.FixedChoice;
+            ZNetScene? zns = ZNetScene.instance;
+            s_shownWeapon = GearSkin.LocalWeaponHash(zns != null ? zns.GetPrefab(s_shown) : null);
             CreaturePreview.Show(s_pending);
         }
 

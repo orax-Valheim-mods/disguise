@@ -60,6 +60,20 @@ internal static class SelfView
 
     private static int s_ghostLookOption;
 
+    /// <summary>
+    /// The same pair for a choice naming ONE weapon of the pool (WhoseWeapons at an item):
+    /// the entry as it was at the build, and the weapon hash the clone was dressed with
+    /// (the very one GearSkin.Dress hands to Compute). The bits above cannot carry WHICH
+    /// item the hands hold - two different weapons of one pool answer the same - so the
+    /// entry itself is watched, by reference (one field read and one compare per frame),
+    /// and the pool walk of GearSkin.LocalWeaponHash is only paid when the entry moved.
+    /// The wire needs none of this: CostumeGear publishes the choice the moment it changes,
+    /// which is why the machines running no DLL have always drawn the new weapon at once.
+    /// </summary>
+    private static string? s_ghostFixedChoice;
+
+    private static int s_ghostWeapon;
+
     /// <summary>Working buffers for the scan (reused, never allocated per frame).</summary>
     private static readonly List<Renderer> s_renderers = new();
 
@@ -151,6 +165,26 @@ internal static class SelfView
                 }
             }
 
+            // The same thing for a choice naming ONE weapon of the pool (WhoseWeapons at an
+            // item): the bits above only say which KIND of hands the clone wears, and two
+            // different weapons of one pool answer the same, so the entry itself is watched
+            // - one reference compare while it stands still - and the pool walk of
+            // GearSkin.LocalWeaponHash (the very hash the clone is dressed with) only when
+            // it moved.
+            string? fixedChoice = GearSkin.FixedChoice;
+            if (s_ghost != null && !ReferenceEquals(fixedChoice, s_ghostFixedChoice))
+            {
+                s_ghostFixedChoice = fixedChoice;
+                ZNetScene? zns = ZNetScene.instance;
+                if (
+                    GearSkin.LocalWeaponHash(zns != null ? zns.GetPrefab(wanted) : null)
+                    != s_ghostWeapon
+                )
+                {
+                    Remove(); // rebuilt by the block below, within this same frame
+                }
+            }
+
             if (s_ghost == null)
             {
                 if (s_failedPrefabHash == wanted && Time.unscaledTime < s_nextBuildAttempt)
@@ -183,6 +217,11 @@ internal static class SelfView
                 s_ghostSparkleOption = DisguiseConfig.ConfigHideItemSparkle.Value;
                 s_ghostLook = GearSkin.Look(wanted);
                 s_ghostLookOption = GearSkin.Options();
+                s_ghostFixedChoice = GearSkin.FixedChoice;
+                ZNetScene? zns = ZNetScene.instance;
+                s_ghostWeapon = GearSkin.LocalWeaponHash(
+                    zns != null ? zns.GetPrefab(wanted) : null
+                );
                 s_ghostLevel = level;
                 s_failedPrefabHash = 0;
                 s_nextRendererScan = 0f;

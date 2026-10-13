@@ -662,6 +662,18 @@ internal static class GearSkin
     }
 
     /// <summary>
+    /// The WhoseWeapons entry itself, as the cheap signal SelfView and GuiPreview compare on
+    /// every frame: the bits of Options say WHICH KIND of hands a copy is drawn with (empty,
+    /// the player's, the costume's own), and two different weapons of one pool answer the
+    /// same, so a choice naming one item is a state only the entry can carry. The config
+    /// hands out the very object it stores, which a real change alone replaces - one field
+    /// read and one reference compare per frame - and only a moved entry pays for the
+    /// weapon (LocalWeaponHash, whose pool walk answers what the copy is really drawn
+    /// with).
+    /// </summary>
+    internal static string? FixedChoice => DisguiseConfig.ConfigWhoseWeapons.Value;
+
+    /// <summary>
     /// The weapon THIS machine fixes that costume's hands on: 0 while the roll decides -
     /// ShowWeapons off (there are no hands to fill at all), WhoseWeapons on the player's own
     /// items, WhoseWeapons still at Creature, or a name this prefab's pool does not hold.
