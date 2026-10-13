@@ -412,10 +412,12 @@ internal static class GearSkin
     /// and ammo simply never appear, and the unarmed weapon is left out as well since
     /// GiveDefaultItems never gives it either), DrawnInHand keeps what a hand would really
     /// DRAW (an item no attach child stands for is an item no screen shows in a hand), and
-    /// IsRealItem keeps what every player-facing screen could NAME and ICON - which takes
-    /// the creatures' own attack items out: greydwarf_attack, charred_greatsword_thrust and
-    /// every such prefab is one attack of the creature's set, listed for EquipBestWeapon to
-    /// pick the situational one, and never shown in any player's UI.
+    /// IsRealItem keeps what a hover could NAME and DESCRIBE - which takes the creatures'
+    /// own attack items out: greydwarf_attack, charred_greatsword_thrust and every such
+    /// prefab is one attack of the creature's set, listed for EquipBestWeapon to pick the
+    /// situational one, and never shown in any player's UI. (The description, not the
+    /// icons: a weapon only a creature ever carries - the Fuling's GoblinClub - ships an
+    /// empty icon array as well and would be cut out with them.)
     /// </summary>
     internal static IReadOnlyList<string> Weapons(GameObject? prefab)
     {
@@ -581,12 +583,17 @@ internal static class GearSkin
     /// its own listed in its Humanoid, and MonsterAI's EquipBestWeapon picks the
     /// situational one out of the inventory: greydwarf_attack is the greydwarf's claws,
     /// greydwarf_throw its thrown stone, charred_greatsword_thrust / _feint the charred
-    /// knight's four greatsword attacks. No player's inventory, no shop, no catalogue and no
-    /// hover will ever show one, so it carries neither the NAME nor the ICONS every item one
-    /// could talk about has - while the weapon the costume should hold (greatsword, spear,
-    /// club) carries both. The pool is therefore cut down to those, which also keeps the
-    /// window's list free of the blank rows an unnamed entry would draw. Read the very way
-    /// Give reads an item, through the two field handles GameAccess holds.
+    /// knight's four greatsword attacks. No hover of any player ever writes one, so its
+    /// m_description stands EMPTY in the prefab - while a weapon carries the one its kind
+    /// was given (the Fuling's GoblinClub, a weapon only a Fuling ever carries, still
+    /// answers $item_club_description). The name stays a test as well, for the rare entry
+    /// named by nothing at all - which also keeps the window's list free of blank rows.
+    ///
+    /// NOT m_icons, whatever these attacks look like first: an empty icon array belongs to
+    /// every weapon no player's inventory ever draws (GoblinClub, GoblinSpear, GoblinSword
+    /// and GoblinTorch all ship zero icons), so icons would cut the very weapons this list
+    /// is for. Read the very way Give reads an item, through the two field handles
+    /// GameAccess holds.
     /// </summary>
     private static bool IsRealItem(GameObject item)
     {
@@ -598,8 +605,8 @@ internal static class GearSkin
         object? itemData = Read(GameAccess.s_itemDropItemDataField, itemDrop);
         object? shared = Read(GameAccess.s_itemDataSharedField, itemData);
         string name = Read<string>(GameAccess.s_sharedNameField, shared, "");
-        object? icons = Read(GameAccess.s_sharedIconsField, shared);
-        return !string.IsNullOrEmpty(name) && icons is Array { Length: > 0 };
+        string description = Read<string>(GameAccess.s_sharedDescriptionField, shared, "");
+        return !string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(description);
     }
 
     /// <summary>

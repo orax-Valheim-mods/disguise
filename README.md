@@ -537,12 +537,12 @@ creature**: `Creature` first, then one entry per weapon that very creature can r
 (`GearSkin.Weapons` - its default items and every random pool, cut down by three tests read
 off the game's own rules: one hand slot (`IsHeld`, the very switch `Give` replicates - so
 armor, materials and ammo never appear), one `attach` child a hand could draw from
-(`DrawnInHand`, the child `VisEquipment.AttachItem` looks for), and a **name and an icon**
-(`IsRealItem`) - which is what keeps the creatures' own **attack items** out:
+(`DrawnInHand`, the child `VisEquipment.AttachItem` looks for), and a **name and a
+description** (`IsRealItem`) - which is what keeps the creatures' own **attack items** out:
 `Greydwarf_attack` has nothing a hand could draw, while `charred_greatsword_thrust` and its
-siblings DO carry the sword's `attach` yet no name and no icon, each being one attack of the
-knight's set for `EquipBestWeapon` to pick the situational one and never a thing a player's
-screen shows; the same pool the console prints and accepts), then `Player`. `Creature`
+siblings DO carry the sword's `attach` yet ship an EMPTY description, each being one attack
+of the knight's set for `EquipBestWeapon` to pick the situational one and never a thing a
+player's screen shows; the same pool the console prints and accepts), then `Player`. `Creature`
 leaves the weapons the costume was born with where they are, `Player` puts YOUR
 weapons on it instead, on this screen as well as on every other machine drawing the
 costume, and a weapon between the two FIXES the costume's hands on it (the other one
@@ -1700,11 +1700,13 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `Give` replicates (so armor, materials and ammo never appear), `DrawnInHand`, the
   child named `attach` (or `attach_skin`) `VisEquipment.AttachItem` looks for when it
   dresses a hand and finds nothing at all without, and `IsRealItem`, the **name and the
-  icons** every player-facing item carries. The third is what keeps the creatures' own
-  **attack items** out of the list: each attack of a creature's set (`Greydwarf_attack`,
-  `charred_greatsword_thrust`) is an ItemDrop of its own listed for `EquipBestWeapon` to
-  pick the situational one - drawn or not (the charred knight's attacks DO carry the
-  sword's `attach`), but never named nor iconned, since no player's screen ever shows one.
+  description** every item a player could hold carries - NOT its icons, whose empty arrays
+  belong to the weapons only a creature ever draws (the Fuling's `GoblinClub`). The third
+  is what keeps the creatures' own **attack items** out of the list: each attack of a
+  creature's set (`Greydwarf_attack`, `charred_greatsword_thrust`) is an ItemDrop of its
+  own listed for `EquipBestWeapon` to pick the situational one - drawn or not (the charred
+  knight's attacks DO carry the sword's `attach`), but never described, since no player's
+  screen ever shows one.
   `WeaponName` / `WeaponHash` validate a name against that pool, `ForceHands` putting one
   such item alone into the hands (the roll's own pair cleared first), and `LocalWeaponHash`
   the one answer every reader wants (0 while the roll decides). `Compute` / `Seed` are the
@@ -1859,9 +1861,9 @@ through the same `Enum.Parse`, and the names through the same
 `StringExtensionMethods.GetStableHashCode` - and what cuts the creatures' own attack items
 out of that list costs nothing either: `DrawnInHand` only walks a prefab's **children** to
 find the `attach` child `VisEquipment.AttachItem` instantiates in a hand slot - Unity's own
-`Transform`, no game member at all - and `IsRealItem` reads `m_name` and `m_icons` through
-two more `FieldInfo` handles of `GameAccess` (string lookups the audit cannot count), the
-icon array being Unity's own `Sprite[]`. The count still stands at **90**.
+`Transform`, no game member at all - and `IsRealItem` reads `m_name` and `m_description`
+through two more `FieldInfo` handles of `GameAccess` (string lookups the audit cannot
+count), the description being the game's own `string`. The count still stands at **90**.
 
 ---
 

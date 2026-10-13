@@ -48,7 +48,7 @@ File: `BepInEx\config\orax.Disguise.cfg`
 | `ShowWeapons` | `true` | Draw the costume **with weapons in its hands** at all: on (the default) both hands hold what `WhoseWeapons` below picks, off they are empty - and it is also what decides **your** held items: hidden from the machines running no DLL while the costume does not wear yours (`ShowWeapons` off, or `WhoseWeapons` at `Creature` or at one of the creature's weapons). A `Show weapons` box under the command buttons; `disguise weapons [on\|off]` |
 | `WhoseWeapons` | `Creature` | Whose **weapons** the costume is held with while `ShowWeapons` is on: `Creature`, the default, is the ones a real creature of that prefab takes into a hand at spawn; `Player` is the ones **you** hold in both hands, an empty hand drawing nothing; **any other value** is the name of one item out of that very creature's own pool - cut down
 to what lands in a hand, to what a hand can draw, and to what the world can **name and
-icon**, which keeps the creatures' own attack items (`Greydwarf_attack`,
+describe**, which keeps the creatures' own attack items (`Greydwarf_attack`,
 `charred_greatsword_thrust` and their shape) out of it - and the hands are then **that item
 alone**, the other one empty, everywhere the same (it travels in its own ZDO key,
 `cd_whoseWeapon`). And it is also what **your** held items are: hidden from the other machines while the costume wears anything but yours, exactly what it shows while it wears yours. Read only while the box is ticked; a name the configured creature cannot hold is put back on `Creature` when another creature is configured. A `Whose` list beside it - `Creature`, then every weapon the configured creature can hold and a hand can draw, then `Player` - greyed out while the box is unticked; `disguise weapons <creature\|player\|weapon>` |
@@ -121,7 +121,7 @@ is born with, off taking it away on every screen drawing the costume) and under 
 both hands of the costume stand empty) with the **`Whose` list** beside it (`WhoseWeapons`,
 a dropdown holding **every answer for the configured creature**: the word `Creature` first,
 then one entry per weapon that very creature can really hold, **that a hand can draw**, and
-that carries a **name and an icon** (which leaves the creatures' own **attack items** -
+that carries a **name and a description** (which leaves the creatures' own **attack items** -
 `Greydwarf_attack`, `charred_greatsword_thrust` and their shape - out: one ItemDrop per
 attack of the creature, for its AI to pick between, never shown in a player's screen), then
 the word `Player` - the

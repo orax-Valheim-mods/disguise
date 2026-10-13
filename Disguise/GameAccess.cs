@@ -153,13 +153,18 @@ internal static class GameAccess
         "m_itemType"
     );
 
-    // The name and the icons of one item: the two things every item one could ever SHOW a
-    // player carries, and the two a creature's own attack items do not - they exist only so
-    // EquipBestWeapon has one ItemDrop per attack to pick between, and no screen of any
-    // player has any business drawing them.
+    // The name and the description of one item: what a hover writes of every item a player
+    // could ever hold, and what a creature's own attack items do not have - they exist only
+    // so EquipBestWeapon has one ItemDrop per attack to pick between, and no screen of any
+    // player has any business drawing them. NOT m_icons: a weapon only a creature carries
+    // (the Fuling's GoblinClub) ships an EMPTY icon array too, so icons would cut the very
+    // weapons the list is for, while a description is the attack items that never show one.
     internal static readonly FieldInfo? s_sharedNameField = Field(s_sharedDataType, "m_name");
 
-    internal static readonly FieldInfo? s_sharedIconsField = Field(s_sharedDataType, "m_icons");
+    internal static readonly FieldInfo? s_sharedDescriptionField = Field(
+        s_sharedDataType,
+        "m_description"
+    );
 
     // VisEquipment's slots: private in the game, and the exact fields its own
     // UpdateEquipmentVisuals falls back to when there is no ZDO - the state of an inert
