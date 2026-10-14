@@ -44,6 +44,14 @@ internal static class DisguiseConfig
 
     internal static ConfigEntry<float> ConfigRefreshHold = null!;
 
+    /// <summary>
+    /// Leave THIS player's entry out of the player list the server broadcasts (OffList):
+    /// every other game then shows it nowhere on that list - the "Players" line and count
+    /// of its F2 overlay, the session player list of its map menu and the pins of its map.
+    /// The choice travels in the player ZDO (cd_offlist), like the fake map position.
+    /// </summary>
+    internal static ConfigEntry<bool> ConfigHideFromPlayerList = null!;
+
     // -- 3 - Display: what the OTHER machines see while you are disguised ---------------
     // What the costume is DRAWN with, in the two halves every piece of gear belongs to: its
     // armor, and the weapons - whether there are any at all (ShowWeapons), and whose they
@@ -317,6 +325,34 @@ internal static class DisguiseConfig
                 + "observer refresh. The change becomes visible to other players after roughly this delay. "
                 + "Increase it (e.g. 2.5) on a laggy connection if clients do not refresh."
         );
+
+        ConfigHideFromPlayerList = config.Bind(
+            "2 - Multiplayer",
+            "HideFromPlayerList",
+            false,
+            "Leave YOUR entry out of the player list the server broadcasts: every other game "
+                + "then shows you nowhere on that list - the \"Players\" line and count of its "
+                + "F2 overlay, the session player list of its map menu, the pins of its map. "
+                + "The choice travels in your player ZDO (cd_offlist), exactly like the fake "
+                + "map position: only the machine playing can decide, and a server running no "
+                + "DLL of this mod has no patch to leave anything out - while vanilla clients "
+                + "need none of it, they only ever show what the server sends them. The server "
+                + "writes one list for every joining game: while this is on it holds every name "
+                + "but yours, your own F2 too while you play as a client (the host's own F2 "
+                + "reads the server's list, whole again after every write). Nothing of the "
+                + "game itself moves - the server keeps the full list for its own logic, its "
+                + "console and its save. Off, the default, is the plain list. Window: the "
+                + "'Hide from player list' box under the command buttons. Console command: "
+                + "disguise offlist [on|off]."
+        );
+
+        // Published at once, like the other options deciding what the others see: the list
+        // goes out on its own rhythm (SendPlayerList, a few seconds) and the reassert keeps
+        // it current anyway, but a click or a command here should reach the server without
+        // waiting for either. No local player (main menu, dedicated server): the handler is
+        // a no-op and the next spawn publishes it.
+        ConfigHideFromPlayerList.SettingChanged += (_, _) =>
+            OffList.Publish(GameAccess.GetLocalPlayerZDO());
     }
 
     /// <summary>Section `3 - Display`: what the OTHER machines see while you are disguised.</summary>

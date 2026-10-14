@@ -18,10 +18,12 @@ namespace Disguise;
 /// The answer stays until the next button, and the hint comes back with the next window, so
 /// there is nothing to do per frame: this class only holds the label. The help line
 /// (GuiHelp) closes the window under it and the band of the level row and the option
-/// controls (GuiWindow) stands over it, which is the reason the panel is 76 px taller than
-/// it once was - this box sits at the very same -608..-652 it settled at when the help line
-/// arrived (StatusY grew by 40 then and by 36 more for the third row of that band and by
-/// 100 when that line was given its seven lines, the box being anchored to the bottom edge).
+/// controls (GuiWindow) stands over it, which is the reason the panel is 212 px taller than
+/// it once was - this box stands at -644..-688 since the fourth option row arrived, riding
+/// the very edge it is anchored to (StatusY grew by 40 when the help line arrived, by 36
+/// more for the third row of that band and by 100 when that line was given its seven lines
+/// - and the fourth row's 36 were the first it never felt: the box stays 176 above the
+/// bottom edge, which grew away from it).
 /// </summary>
 internal static class GuiStatus
 {
@@ -32,12 +34,14 @@ internal static class GuiStatus
     /// <summary>
     /// The centre of the box as a height from the BOTTOM edge of the panel, which is what it
     /// is anchored to: 44 px are two lines of 16 px, so a long answer wraps instead of being
-    /// cut in the middle of its first one. 176 puts the box at -608..-652 on a panel 806
-    /// tall - the very place 76 gave it on the 706 it was before the help line (GuiHelp) got
-    /// its seven lines, 40 on the 670 it was when that line arrived, and 36 on the 630 it
-    /// grew from: anchored to the edge, the box would otherwise have moved down with the
-    /// panel and stood in the band those three changes needed above it (the help line under
-    /// it, the level row and the option controls over it).
+    /// cut in the middle of its first one. 176 puts the box at -644..-688 on a panel 842
+    /// tall - the very place the same 176 gave it at -608..-652 on the 806 it was before the
+    /// band got its fourth row (76 on the 706 before the help line (GuiHelp) got its seven
+    /// lines, 40 on the 670 when that line arrived, and 36 on the 630 it grew from):
+    /// anchored to the edge, the box rides every growth of the panel down with it, and only
+    /// the changes BETWEEN the band and that edge ever move its number - the help line and
+    /// the option rows stand over it, the help line under it - the fourth row being the
+    /// first that did not, the panel simply growing under the box.
     /// </summary>
     private const float StatusY = 176f;
 

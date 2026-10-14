@@ -36,8 +36,8 @@ internal static class GuiHelp
 
     /// <summary>
     /// Centre of the box, from the bottom edge of the panel: the 44 px of the status line
-    /// above it (GuiStatus, which keeps the -608..-652 it has had since the option controls
-    /// joined the band over it - six pixels clear of this box) leave this line a band of its
+    /// above it (GuiStatus, standing at -644..-688 since the fourth option row arrived -
+    /// six pixels clear of this box) leave this line a band of its
     /// own - HelpHeight of it, from 8 to 148 above the bottom edge, six clear of that line
     /// and eight of the panel's border. The band was 40 px, two lines of this font, and that
     /// was the one band of the window the long helps did not fit: squeezed to the minimum

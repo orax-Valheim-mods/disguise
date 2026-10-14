@@ -30,7 +30,7 @@ internal static class DisguiseCommand
             }
             _ = new Terminal.ConsoleCommand(
                 "disguise",
-                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | armor | weapons | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
+                "Disguise: status | set <prefab> [level] | level <1-9> | enable | disable | refresh | view | logs | armor | weapons | offlist | fly | offset | rotation | setFakePosition | perf | list [filter] | favorite [prefab] | gui | help",
                 OnDisguiseCommand,
                 isCheat: false,
                 isNetwork: false,
@@ -63,6 +63,7 @@ internal static class DisguiseCommand
             "logs",
             "armor",
             "weapons",
+            "offlist",
             "fly",
             "offset",
             "rotation",
@@ -158,6 +159,10 @@ internal static class DisguiseCommand
 
             case "weapons":
                 SetWeapons(ctx, words.Length > 2 ? words[2] : null);
+                break;
+
+            case "offlist":
+                SetOffList(ctx, words.Length > 2 ? words[2] : null);
                 break;
 
             case "fly":
@@ -306,6 +311,10 @@ internal static class DisguiseCommand
         Say(ctx, "                            with (the default), yours, or ONE weapon of its own");
         Say(ctx, "                            pool holding both hands (<weapon> is its name -");
         Say(ctx, "                            \"disguise weapons\" alone lists them)");
+        Say(ctx, "  disguise offlist [on|off]  leave YOUR line out of the player list the other");
+        Say(ctx, "                            games receive: their F2 (Players), the session");
+        Say(ctx, "                            list of the map menu, their map pins - needs the");
+        Say(ctx, "                            DLL on the server (off by default: you are listed)");
         Say(
             ctx,
             "  disguise fly [on|off]     fly: the creature is raised for the others (visual only)"
@@ -493,6 +502,52 @@ internal static class DisguiseCommand
                 : "[Disguise] Armor OFF: a humanoid costume is drawn without it - no helmet, "
                     + "no chest, no legs, no cape - while its hands keep their own half "
                     + "(disguise weapons)."
+        );
+    }
+
+    /// <summary>
+    /// "disguise offlist [on|off]": this player's entry OUT of the player list the server
+    /// broadcasts (HideFromPlayerList, 2 - Multiplayer) - every other game then shows it
+    /// nowhere on that list: the "Players" line and count of its F2 overlay, the session
+    /// player list of its map menu and the pins of its map. ON is hidden, spelled the way a
+    /// player says it, like "disguise armor": the .cfg entry asks the same question
+    /// (HideFromPlayerList). The choice is the owner's and travels in its player ZDO
+    /// (cd_offlist, OffList) exactly like the fake map position: a server running no DLL
+    /// of ours has no patch to leave anything out, and vanilla clients need none - they
+    /// only ever show what the server sends them. The server writes ONE list for every
+    /// joining game, so while this is ON that list holds every name but yours - your own F2
+    /// too, while you play as a client (the host's own F2 reads the server's list, whole
+    /// again after every write). Written straight into the
+    /// entry, whose handler publishes it into the ZDO at once (DisguiseConfig
+    /// .BindMultiplayer) - the next list the server writes, seconds later, carries it to
+    /// the others.
+    /// </summary>
+    private static void SetOffList(Terminal? ctx, string? argument)
+    {
+        bool hidden = DisguiseConfig.ConfigHideFromPlayerList.Value;
+        if (argument == null)
+        {
+            hidden = !hidden;
+        }
+        else if (!TryParseOnOff(argument, out hidden))
+        {
+            Say(ctx, "Usage: disguise offlist [on|off]");
+            return;
+        }
+        // Written into the entry like any other switch: its handler publishes the choice
+        // into the player ZDO at once, and the reassert keeps it there for every server
+        // that has to read it later.
+        DisguiseConfig.ConfigHideFromPlayerList.Value = hidden;
+
+        Say(
+            ctx,
+            hidden
+                ? "[Disguise] Off the player list: the server leaves your entry out of the "
+                    + "list the other games receive (their F2 overlay, the session list of "
+                    + "the map menu, their map pins) - published on your player ZDO, on the "
+                    + "next list the server writes."
+                : "[Disguise] On the player list again: the other games receive your entry "
+                    + "with everyone's, at the next list the server writes."
         );
     }
 
@@ -1011,6 +1066,10 @@ internal static class DisguiseCommand
             : DisguiseConfig.FixedWeapon() is string weapon ? $"fixed, {weapon}"
             : "its own";
         Say(ctx, $"  Weapons of the costume: {whose} (disguise weapons, 3 - Display)");
+        Say(
+            ctx,
+            $"  On the player list of the others: {(DisguiseConfig.ConfigHideFromPlayerList.Value ? "hidden" : "shown")} (disguise offlist, 2 - Multiplayer)"
+        );
         Say(
             ctx,
             $"  Info logs: {(DisguiseConfig.ConfigLogs.Value ? "on" : "off")} (disguise logs)"

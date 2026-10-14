@@ -44,7 +44,7 @@ internal static class GuiWindow
     /// Height of the panel. The list block takes 338 of them (filter 36 + gap 2 + 300 of
     /// list, GuiCreatureList.BlockHeight) under the -132 it starts at, so it ends at -470;
     /// the two pose rows (GuiPose) take 78 more with their gaps, -476 down to -554; the
-    /// status line keeps the band it has always had under them (-608..-652 since the third
+    /// status line keeps the band it has always had under them (-644..-688 since the fourth
     /// option row arrived); and the help line (GuiHelp) closes the window below that band.
     /// 630 is what left those two rows their band above the status line: 540 left 50 px
     /// under the list, which fit neither of them, and 600 put the Offset row back over the
@@ -58,16 +58,17 @@ internal static class GuiWindow
     /// it stood; GuiStatus.StatusY alone grew by those 36 too (bottom-anchored like the help
     /// line, it would otherwise have travelled down with the edge and stood IN the new row),
     /// while GuiHelp.HelpY keeps closing the window against the very edge it grew from.
-    /// And 806 is the fourth telling of the same story: the help line's band was two lines
-    /// of its own font (40 px), and the long helps - the armor box alone spells around nine
-    /// hundred characters, the weapons list's a thousand - did not fit it even shrunk to
-    /// the minimum size, losing their tails past it. The band is SEVEN lines now
-    /// (GuiHelp.HelpHeight, 140 px), and the panel grew by those 100 DOWNWARDS like every
-    /// time - the status line alone following its own edge again (GuiStatus.StatusY grew by
-    /// the same 100), while GuiHelp.HelpY moved from 28 to 78 to keep its own box eight
-    /// pixels off the very edge the height change does not touch.
+    /// And 806 was the help line's own asking - its band grew to SEVEN lines for the long
+    /// helps (GuiHelp.HelpHeight), the two bottom-anchored lines moving with it. And 842 is
+    /// the next telling of the same story, and the first that cost those two lines nothing
+    /// of their own: the band got a FOURTH option row (OfflistY, the off-list box closing
+    /// it under the weapons row), and the panel grew by those 36 DOWNWARDS like every time
+    /// - but the status line and the help line are both anchored to the very edge the
+    /// panel grew away from, so both rode the edge down and neither of their numbers moved
+    /// (StatusY, HelpY): the status box simply stands at -644..-688 now, on the taller
+    /// panel, where it stood at -608..-652 on the 806.
     /// </summary>
-    internal const float Height = 806f;
+    internal const float Height = 842f;
 
     // The band at the very top: the title, Close and the chord all sit on it, 34 px under
     // the top edge - one Y for the three, so the row stays a row when one of them moves.
@@ -131,8 +132,8 @@ internal static class GuiWindow
     /// have 94 px between the bottom of the command row (-478) and the band the status line
     /// took (-572), split into two rows - this one 14 px under the buttons, the box under it
     /// 20 px above that line, both starting at the picture's own left edge's right, after
-    /// the level row. The panel is 36 px taller since the band holds three rows (Height), so
-    /// the band ends at -608 now. The same control as the checkbox row (GuiCategories builds
+    /// the level row. The panel is 72 px taller since the band holds four rows (Height), so
+    /// the band ends at -644 now. The same control as the checkbox row (GuiCategories builds
     /// it), standing alone here with its own entry to write and no list to re-filter.
     /// </summary>
     private const float SparkleY = -504f;
@@ -148,10 +149,10 @@ internal static class GuiWindow
     /// <summary>
     /// Centre of the weapons row (ShowWeapons): its box with the label, then the list
     /// itself - which says whose weapons the costume is held with - at their right: the
-    /// third and last row of the
-    /// band, 36 px under the armor box and 12 px over the edge of the status line's own
-    /// band. The list opens DOWNWARDS from there, over that line and the help line under it,
-    /// which is why the row is built last of everything (Build).
+    /// third row of the band, 36 px under the armor box - the off-list box closes the band
+    /// 36 px under this one (OfflistY). The list opens DOWNWARDS from there, across that
+    /// box, the status line and the help line under it, which is why the row is built last
+    /// of the lines it stands over (Build).
     /// </summary>
     private const float WeaponsY = -576f;
 
@@ -198,6 +199,18 @@ internal static class GuiWindow
     /// console and ReconcileWhoseWeapons keep spelling, so nothing of the value moves.
     /// </summary>
     private const string CreatureDefaultLabel = "Creature default";
+
+    /// <summary>
+    /// Centre of the off-list box (HideFromPlayerList): the fourth and last row of the
+    /// band, 36 px under the weapons row and at the picture's own left edge like the two
+    /// rows above that one. The panel grew by those 36 DOWNWARDS for it (Height) - and this
+    /// time the two lines closing the window felt nothing of it: both are anchored to the
+    /// very edge the panel grew from, so the status box simply stands at -644..-688 now and
+    /// StatusY and HelpY keep their numbers. Unlike everything else of the band it changes
+    /// no picture: it decides what the OTHER screens receive (the player list the server
+    /// broadcasts, OffList), not what this one draws.
+    /// </summary>
+    private const float OfflistY = -612f;
 
     /// <summary>
     /// The band's split, in pixels of the picture above it: the level row stands at the
@@ -301,6 +314,17 @@ internal static class GuiWindow
     private static int s_whoseApplied;
 
     /// <summary>
+    /// The off-list box closing the band, and what it showed last: the same pair as the
+    /// three boxes above, for the same reason - the entry can also be written by
+    /// ConfigurationManager or the console while the window is open, and RefreshState pushes
+    /// that back into the box, while a click writes the cache itself. Unity-null once the
+    /// window is gone, which is the whole safety of it.
+    /// </summary>
+    private static Toggle? s_offlist;
+
+    private static bool s_offlistApplied;
+
+    /// <summary>
     /// The entries of that list as they stand - Creature, then every weapon the configured
     /// creature can hold, then Player - and the creature they were read from. The pool moves
     /// with the configured prefab, so RefreshState fills the list again whenever a row of
@@ -322,6 +346,7 @@ internal static class GuiWindow
         s_armor = null;
         s_weapons = null;
         s_whose = null;
+        s_offlist = null;
         s_whoseOptions = new();
         s_whoseCreature = string.Empty;
 
@@ -460,7 +485,7 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        // The five command buttons under the picture, the three option rows under them, the
+        // The five command buttons under the picture, the four option rows under them, the
         // line they answer on (which still holds the hint about clicking a row while no
         // button has been pressed), and the help line closing the window under that one.
         CommandButtons(gui, window.transform);
@@ -470,9 +495,14 @@ internal static class GuiWindow
         GuiStatus.Build(window.transform);
         GuiHelp.Build(window.transform);
 
-        // The weapons row comes LAST of everything, after the two lines it stands over: its
-        // list opens downwards from here, across the status line and the help line under it
-        // (WeaponsRow).
+        // The off-list box closes the band under the weapons row: no list of its own and no
+        // picture to redraw, so it is built with the other rows - before the weapons row,
+        // which stays the LAST thing built.
+        OfflistBox(window.transform);
+
+        // The weapons row comes LAST of everything, after the lines it stands over: its
+        // list opens downwards from here, across the status line, the help line and the
+        // off-list box under them (WeaponsRow).
         WeaponsRow(gui, window.transform);
 
         return window;
@@ -544,6 +574,42 @@ internal static class GuiWindow
         );
     }
 
+    /// <summary>
+    /// The box on the fourth and last row of the band: HideFromPlayerList, the option that
+    /// takes this player OUT of the player list the server broadcasts (OffList publishes it
+    /// into the player ZDO, the modded server leaves the entry out of the packet it writes
+    /// for the other peers - their F2 overlay, the session list of their map menu, their map
+    /// pins and the count beside the list). Same control and same rules as the three boxes
+    /// over it - GuiCategories.BuildBox again - and the same life: a value written from
+    /// outside while the window is open is pushed back into the box (RefreshState), while a
+    /// click writes the cache itself. It stands at the picture's OWN left edge like the two
+    /// rows over the weapons row, 36 px under it - the row that closes the band, the panel
+    /// growing by those 36 for it (Height). The console spells the same switch "disguise
+    /// offlist [on|off]", said the way a player says it: ON is this player kept OFF the
+    /// list. And unlike every other row of the band it changes no picture on this screen:
+    /// it decides what the OTHER machines receive, not what this one draws - there is
+    /// nothing for SelfView or GuiPreview to rebuild when it moves.
+    /// </summary>
+    private static void OfflistBox(Transform parent)
+    {
+        s_offlistApplied = DisguiseConfig.ConfigHideFromPlayerList.Value;
+
+        float cursor = (Width * 0.5f) + PreviewX;
+        s_offlist = GuiCategories.BuildBox(
+            parent,
+            ref cursor,
+            OfflistY,
+            "Hide from player list",
+            "Leave YOUR line out of the player list every other game receives: the server (which must run this DLL - the host or the dedicated one) then leaves you out of the list it writes for the others, so their F2 overlay (Players), the session player list of their map menu and the pins of their map no longer hold you, and the count beside the list shrinks with it. The choice travels in your player ZDO like the fake map position: only this machine decides, a server running no DLL of ours has no patch to leave anything out, and vanilla clients need none of it - they only ever show what the server sends them. The server writes ONE list for every joining game: while this is ticked it holds every name but yours, your own F2 too while you play as a client (the host's own F2 reads the server's list, whole again after every write). Off, the default, is the plain list. Console: disguise offlist [on|off].",
+            s_offlistApplied,
+            on =>
+            {
+                s_offlistApplied = on;
+                DisguiseConfig.ConfigHideFromPlayerList.Value = on;
+            }
+        );
+    }
+
     /// <summary>What the box of the weapons row describes (GuiHelp.Watch).</summary>
     private const string WeaponsBoxHelp =
         "Draw the costume with weapons at all: ticked, its hands hold what the list to the right picks (WhoseWeapons); unticked, both hands are empty - and YOUR held items stay hidden from the machines running no DLL of this mod then as well, there being nothing to glue them to. It reaches every screen drawing that costume: yours here, the picture above, and the machines running no DLL, whose packets your ZDO carries that gear in - rolled the way the game rolls it, so every machine agrees on the same pick. The machines running this DLL keep drawing YOU with your own equipment, whatever this says. Console: disguise weapons [on|off].";
@@ -553,8 +619,9 @@ internal static class GuiWindow
         "Whose weapons the costume is held with while the box to the left is ticked: \"Creature default\", the default, is the one a real creature of that prefab takes into a hand at spawn - MonsterAI takes the best weapon of its inventory, so a Fuling stands with its spear; the names between the two are every weapon that very creature can hold, and picking one FIXES the costume's hands on it (the other hand empty) whatever the roll answers; \"Player\" is the ones YOU hold in both hands, an empty hand drawing nothing. It reaches every screen drawing that costume, and it decides what YOUR hands carry there too: hidden from the machines running no DLL of this mod while the costume wears its own, exactly what it shows while it wears yours. Greyed out while that box is unticked - a costume drawn with empty hands gives nobody's weapons to name - and put back on \"Creature default\" whenever another creature is configured, one that holds no such weapon. Console: disguise weapons <creature|player|weapon>.";
 
     /// <summary>
-    /// The third and last row of the band, at the picture's own left edge like the armor box
-    /// over it: the BOX (ShowWeapons), then the Jotunn
+    /// The third row of the band, at the picture's own left edge like the armor box
+    /// over it - the off-list box closes the band 36 px under this one (OfflistY): the BOX
+    /// (ShowWeapons), then the Jotunn
     /// Valheim-styled list of every answer WhoseWeapons can take - its two words, with every
     /// weapon the configured creature can hold between them - a LIST beside a box because
     /// the two are one pair of options (the switch decides whether there are any weapons,
@@ -562,7 +629,7 @@ internal static class GuiWindow
     /// switch and an argument (disguise weapons [on|off|creature|player|weapon]).
     ///
     /// The box is the very control the armor box and the sparkle box are built with
-    /// (GuiCategories.BuildBox), so the three of them are one control three times - and
+    /// (GuiCategories.BuildBox), so the four of them are one control four times - and
     /// like them it writes its entry itself, while a click on the LIST runs its sub-command
     /// (RunCommand) so the answer lands on the status line and the console and the window
     /// stay one single call. RefreshState then pushes both values back - into the box and
@@ -573,8 +640,9 @@ internal static class GuiWindow
     /// again the moment a row of this window or a console command puts another creature
     /// there - and that same fill is what tells the open list how tall it may open.
     ///
-    /// The row is built LAST of everything (Build), after the status and the help lines it
-    /// stands over, because the list opens DOWNWARDS across those two lines - and Unity gives
+    /// The row is built LAST of everything (Build), after the status line, the help line and
+    /// the off-list box closing the band under it, because the list opens DOWNWARDS across
+    /// those three lines - and Unity gives
     /// the open list a canvas of its own (Dropdown.SetupTemplate adds one at sorting order
     /// 30000), so nothing else of the window can draw over it once it is open either.
     ///
@@ -1120,7 +1188,7 @@ internal static class GuiWindow
     /// a write to the Text (which would lay it out again for the same words); the Favorite
     /// label follows the configured prefab, which costs a look at the config and one at the
     /// marks (both a string compare and a set lookup); the pose fields cost six more string
-    /// comparisons, and skip the one being typed in (GuiPose); the four option controls cost
+    /// comparisons, and skip the one being typed in (GuiPose); the five option controls cost
     /// one bool each and one int - a click on one writes that cache itself, so only
     /// a value from outside (ConfigurationManager, the console) is ever pushed back - and the
     /// weapons list one prefab-hash compare more, filling itself again only when the creature
@@ -1167,6 +1235,17 @@ internal static class GuiWindow
                 s_weaponsApplied = showWeapons;
                 weapons.SetIsOnWithoutNotify(showWeapons);
                 SyncWhoseList(); // the list is greyed out with the switch
+            }
+        }
+
+        Toggle? offlist = s_offlist;
+        if (offlist != null)
+        {
+            bool hidden = DisguiseConfig.ConfigHideFromPlayerList.Value;
+            if (hidden != s_offlistApplied)
+            {
+                s_offlistApplied = hidden;
+                offlist.SetIsOnWithoutNotify(hidden);
             }
         }
 

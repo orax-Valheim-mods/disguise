@@ -62,6 +62,7 @@ no mod). What the server DLL adds:
 | `ProtectSaveFile` (§ 2): the world save stores `Player` | yes | **no**: the server is what writes the save, so it stores the creature |
 | Real `Player` object on the server (the `cd_disguise` marker patch) | yes | no: the server instantiates the creature prefab for your player |
 | Fake map position (`disguise setFakePosition`, § 2) | **yes**: the server writes it into the player list it broadcasts | **no**: the other maps keep showing your real position |
+| Off the player list (`disguise offlist`, § 2) | **yes**: the server leaves your entry out of the list it broadcasts | **no**: the other games keep receiving it - you stay on their F2, their session list and their map |
 | Flight seen by the others (`disguise fly`, § 2) | **yes**: the server raises the outgoing position only | **no**: only your own view flies, everyone else keeps you on the ground |
 
 > ⚠️ Without the server DLL, run **`disguise disable` before stopping / saving the server**
@@ -123,6 +124,7 @@ In game, open the console with **F5**:
 | `disguise logs [on|off]` | Write the mod's own **Info** messages to the BepInEx log (toggles without an argument; warnings and errors are always written, § 2) |
 | `disguise armor [on\|off]` | Draw a **humanoid** costume with the **armor** a real creature of that prefab is born with (`on`, the default) or without it (`off`) - `ShowArmor`, the same switch spelled the way a player says it (toggles without an argument, § 2) |
 | `disguise weapons [on\|off\|creature\|player\|<weapon>]` | Whether the costume is drawn **with weapons at all** (`on`, the default; `off` empties both hands) and, while it is, **whose** those weapons are: `creature`, the default, is the ones a real creature of that prefab takes into a hand at spawn; `player` is the ones **you** hold in both hands, an empty hand drawing nothing; any other word is the **name of one weapon out of that creature's own pool**, fixing both hands on it alone (the other one empty) - `ShowWeapons` + `WhoseWeapons`, § 2. No argument reports the state, **the weapons the configured creature can hold** and how to write it; a weapon it cannot hold is refused, with the pool printed |
+| `disguise offlist [on\|off]` | Leave **your line** out of the player list every other game receives: the `Players` line and count of its F2 overlay, the session player list of its map menu, the pins of its map (`HideFromPlayerList`, § 2; toggles without an argument, needs the DLL on the server, § 1.b) |
 | `disguise fly [on|off]` | **Raise the creature above you** for the other machines (toggles without an argument, § 2). Purely visual: your player never leaves the ground |
 | `disguise offset <X> <Y> <Z>` | **Move the costume** that far from you - world units, `1` is one metre (no argument reports where it stands, `0 0 0` puts it back, § 3). Purely visual: your player never moves |
 | `disguise rotation <X> <Y> <Z>` | **Turn the costume** in place, in degrees **on top of** the way it already faces (no argument reports it, `0 0 0` is the normal facing, § 3). Purely visual: your player never turns |
@@ -166,6 +168,47 @@ maps moves.
 > back as `0` on the next join), while `disguise setFakePosition off` clears it on the
 > spot. It works whether or not the disguise itself is enabled.
 
+### Off the player list (`disguise offlist`)
+
+That same broadcast list (`ZNet.SendPlayerList` -> `RPC_PlayerList`) is more than the map:
+every client keeps it as **its** `m_players`, which feeds the `Players` line **and count**
+of the F2 overlay (`ConnectPanel`), the **session player list** of the map menu
+(`SessionPlayerList`) and `GetNrOfPlayers` itself. `disguise offlist on` takes **your
+entry out of the list the server writes for the others**, and every one of those screens
+then holds every player but you - on the other machines only.
+
+- `disguise offlist on` hides you from the next list the server writes (a few seconds),
+  the config `HideFromPlayerList` doing the same from the `.cfg` or the
+  `Hide from player list` box under the command buttons of the window;
+- `disguise offlist off` puts you back on it, at the next list as well (and a client
+  publishing no DLL never leaves the list in the first place);
+- `disguise status` shows which it is right now, and the server log gets one
+  `Player-list hiding for ZDO ...` line per hidden player the first time it applies.
+
+Same contract as `cd_hide` / `cd_rel` / `cd_fake` (**the owner decides**): the choice
+travels in your own ZDO (`cd_offlist`, republished every `ReassertSeconds`, and disabled
+by writing an explicit `0`, never by removing the key - § 3, step 5), and the modded
+server takes the entry out of the packet for the duration of the write only
+(`OffList`, inside `Patch_WritePlayerInfo`): **its own list stays whole** - the count it
+decides with, its console, the player history of the save and the moderation commands all
+keep every player. The server writes ONE list for every joining game, and while this is on
+that list has no line of yours in it - **your own F2 too**, while you play as a client:
+only the host's own screen reads the server's list, which is whole again the moment the
+packet is built, so a hiding host still sees everyone on it, itself included.
+
+> ⚠️ The dedicated server must run this DLL (§ 1.b): a server running no DLL has no patch
+> to leave anything out, and vanilla clients need none of this mod - they only ever show
+> what the server sends them. A few vanilla readers then meet a shorter list than they are
+> used to, all of them harmlessly: the fishing line another player draws to your float
+> (`FishingFloat.GetOwner` resolves an owner through that list), the `host` authorship
+> placeholder on a dedicated server (`RelationsManager.UpdateAuthorIfHost` takes its first
+> entry), and your **public position** pin, which is off their map while you are (the map
+> draws no pin of you either way, with the *public position* box of the enlarged map
+> unticked). Kill credits for a creature owned by another **client** go through that list
+> too - bosses and monsters are owned by the server, whose copy is always whole. It is
+> session state like the flag above: restarting your game republishes `0` on the next
+> join, and it works whether or not the disguise itself is enabled.
+
 ### Configuration (`.cfg` file)
 
 File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
@@ -180,6 +223,7 @@ File: `...\profiles\<profile>\BepInEx\config\orax.Disguise.cfg`
 | `Logs` | `false` | Write the mod's own **Info/Debug** messages to the BepInEx log - the whole output of `disguise list` included (§ 7). **Off by default**: a working install keeps its log quiet, and `disguise logs [on|off]` switches it (the command writes the value back, so the choice stays for the next start). Warnings and errors are always written (§ 7) |
 | `ForceObserverRefresh` | `true` | Automatically make other players re-create your object after a change (§ 4.1) |
 | `RefreshHoldSeconds` | `1.5` | Delay (seconds) before other players see the new look; increase on a laggy connection |
+| `HideFromPlayerList` | `false` | Leave **your line** out of the player list the server broadcasts: the `Players` line and count of the other games' F2 overlay, their session player list of the map menu, their map pins (§ 2; needs the DLL on the server, § 1.b - vanilla clients need none). Travels in your ZDO like the fake map position, so only the machine playing decides; while it is on, the list every joining game receives holds every name but yours - your own F2 too, playing as a client (the host's F2 reads the server's own list). Window: the `Hide from player list` box under the command buttons; `disguise offlist [on\|off]` |
 | `SeeYourDisguise` | `true` | Show the creature on **your own screen** (`4 - Own view`, local only) |
 | `HideItemSparkle` | `false` | Hide the shimmer beside an **item** costume - the looping particle every dropped-item prefab carries on its root (`4 - Own view`, local only: your own costume and the window's picture, never what another machine draws; § 2) |
 
@@ -524,7 +568,7 @@ the status line below. The number is rewritten per frame, so a level typed into 
 or into ConfigurationManager lands without closing the window; and the two buttons stop
 being clickable at the ends of the span (1 and 9) rather than running a command that could
 not move the level. To its right sits the **sparkle box** - `Hide item sparkle`, the first of the
-three checkboxes the band holds: it writes `HideItemSparkle`
+four checkboxes the band holds: it writes `HideItemSparkle`
 (`4 - Own view`) and nothing else, the same control the row above is made of (box and label
 are one hit target, `GuiCategories.BuildBox`); a click on it takes the shimmer off an item
 costume at once, on your own screen and in the picture (both rebuild themselves, § 2), and a
@@ -563,14 +607,22 @@ with the configured creature: a click on a row of the list or a console command 
 another creature there fills the list again (`RefreshState` -> `FillWhose`), which also puts
 a weapon the new creature cannot hold back on `Creature` (`ReconcileWhoseWeapons`), and the
 open list is cut to the entries it really holds - up to six rows, the rest scrolling inside
-(`ShapeTemplate`, Jotunn's own scrollable template) - since it opens DOWNWARDS from the last
-row of the window. A click on the
+(`ShapeTemplate`, Jotunn's own scrollable template) - since it opens DOWNWARDS from its row,
+across the off-list box, the status line and the help line under those. A click on the
 list goes through the very same `disguise weapons <creature|player|weapon>` call the console takes
 (so the answer lands on the status line below, and the new pick is drawn at once on your own
 costume and in the picture of the window), a click on the box writes `ShowWeapons`
 directly, like the two boxes over it write theirs, and a value changed anywhere else - the
 console, ConfigurationManager - is pushed back into the box and into the list every frame
-like every other label. The **line under the
+like every other label. Under THAT row, closing the band on its fourth and last row, sits
+the **off-list box** - `Hide from player list`, the same checkbox in the same column a third
+time: it writes `HideFromPlayerList` (`2 - Multiplayer`) and takes YOUR line out of the
+player list every other game receives (`OffList`, § 2) - the other machines' F2 overlay
+(`Players` line and count), the session player list of their map menu and the pins of their
+map - while it changes **no picture on any screen**: it decides what the other machines
+receive, not what this one draws, so nothing here rebuilds itself when it moves, and the
+panel grew 36 px taller for this row. A value from outside is pushed back into it like the
+three over it, and the console spells the same switch `disguise offlist [on|off]`. The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -624,13 +676,17 @@ with the picture itself. The line is a band of **seven lines** (`GuiHelp.HelpHei
 px): the helps of this window are whole paragraphs - the armor box alone spells around nine
 hundred characters, the weapons list's a thousand - and a band of two lines had them shrunk
 to the minimum size and lost their tails past it, so the band grew and the best fit now
-settles every help at its own size or a little under. The panel is 806 px tall for these two
-lines and for the third row of the option band: it grew DOWNWARDS by the help line's 40 and
-then by the 36 that row needed and then by the 100 that gave the help line its seven lines,
-so nothing above the status line moved any of those times, and `GuiStatus.StatusY` grew by
-the same 40, 36 and 100 to keep that line's box at `-608..-652` - while the help band's own
-centre (`GuiHelp.HelpY`) moved from 28 to 78, its box keeping the eight pixels it has always
-had off the very edge the panel grew from. The **checkbox row**: seven
+settles every help at its own size or a little under. The panel is 842 px tall for these two
+lines and for the four rows of the option band: it grew DOWNWARDS by the help line's 40 and
+then by the 36 the weapons row needed and then by the 100 that gave the help line its seven
+lines and then by the 36 the off-list box needed - so nothing above the status line moved any
+of those times, and `GuiStatus.StatusY` grew by the same 40, 36 and 100 to keep that line's
+box at `-608..-652` on the 806 - while the help band's own centre (`GuiHelp.HelpY`) moved
+from 28 to 78, its box keeping the eight pixels it has always had off the very edge the panel
+grew from. The fourth row's 36 were the first those two closing lines never felt: anchored to
+the very edge the panel grew away from, both simply rode the edge down with it - the status
+box now stands at `-644..-688` with neither `StatusY` nor `HelpY` having moved, the same
+numbers giving that place on the taller panel. The **checkbox row**: seven
 boxes in the band under the state line and over the list - `Favorites` first, then the six
 categories in alphabetical order of their label, `Buildings`, `Creatures`, `Items`, `Nature`,
 `Other`, `Static` - the last six one per
@@ -1269,7 +1325,7 @@ both locations:
 Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file**:
 
 - `Disguise.cs` - the plugin class: constants (`PluginGUID`, `cd_disguise`, `cd_refresh`,
-  `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`), the log helpers and the lifecycle (`Awake` /
+  `cd_hide`, `cd_rel`, `cd_fake` / `cd_fpos`, `cd_offlist`), the log helpers and the lifecycle (`Awake` /
   `OnDestroy` / `Update`), which wires the other classes together. `OnDestroy` is a COMPLETE
   unload, not a formality: ScriptEngine reloads the mod by destroying the object holding every
   script plugin and loading the new DLL into a NEW assembly (fresh statics), so whatever this
@@ -1278,7 +1334,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   (`PauseMenuEntry`), the terrain tiles it built to read the ground (`GroundProbe`), and every
   Harmony patch (`UnpatchSelf`), before the logger goes with the
   instance. Everything it does not share stays `private`.
-- `DisguiseConfig.cs` - the thirty-seven settings and their binding to `orax.Disguise.cfg`.
+- `DisguiseConfig.cs` - the thirty-five settings and their binding to `orax.Disguise.cfg`.
 - `GameAccess.cs` - the only class reaching non-public game members: the reflection
   handles (its `s_*` fields) plus the helpers built on them (`GetNView`,
   `GetLocalPlayerZDO`, `GetZDO`, `BumpDataRevision`, `SetZdoIntSilent`,
@@ -1356,6 +1412,10 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `FakePosition.cs` - the fake map position (`disguise setFakePosition`): what the owner
   publishes (`cd_fake` / `cd_fpos`), and the swap the server runs over the player list
   before it writes it, always restored right after (§ 2).
+- `OffList.cs` - the player-list hiding (`disguise offlist`, § 2): what the owner publishes
+  (`cd_offlist`), and the entries the server takes OUT of that same outgoing list while it
+  writes it - before `FakePosition` swaps any position, every one of them restored right
+  after, the server's own list always whole.
 - `FlightControl.cs` - the flight (`disguise fly`, § 2): the local state (on / off, height),
   the four key shortcuts read straight from their `KeyboardShortcut` entries, the scroll
   wheel while the flight owns it, the throttled
@@ -1490,12 +1550,13 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   corner of the two pose rows (`GuiPose.Build` gets the band the layout leaves under the
   list BLOCK - the scroll view is only its lower part, the filter field and its gap being
   part of the block too, measured through `GuiCreatureList.BlockHeight`, which is what keeps
-  the rows off the last rows of the list; the panel is 806 px tall because of them, of the
-  two lines that close it and of the third row of the option band, the status line being
+  the rows off the last rows of the list; the panel is 842 px tall because of them, of the
+  two lines that close it and of the four rows of the option band, the status line being
   anchored to the bottom edge (nothing above moves when the panel grows, and `StatusY` is
   the number that keeps its own box where it was across the 40 px it grew by for the help
   line, the 36 more the weapons row asked for and the 100 the help band grew by for its
-  seven lines)), the
+  seven lines - the fourth row's 36 being the first it never felt: box and edge simply
+  ride the taller panel down together)), the
   row of five command buttons under the picture (Favorite first, then Enable/Disable,
   Refresh, Own view, Flight; each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
@@ -1942,6 +2003,9 @@ again - so it costs nothing on top either. The count still stands at **90**.
 | Your secondary attack (middle click by default) plays exactly the same animation as your normal attack | The creature's weapon pool holds a single attack (a boar or a wolf really has no special attack) or could not be read: both attack keys play the normal one, by design (§ 3). The `Attack bridge:` line ends with `(normal attack)` in that case, `(special attack)` when a special attack really exists |
 | Your block (right click by default) animates nothing on the creature | There is no third attack to designate: the pool has two attacks or fewer (a goblin, a greydwarf, a draugr) - or none readable at all (a boar's pool animation `base_attack` is a chain the controller only carries as `base_attack0..3`). `Attack bridge: block -> ...` in the log says `no third attack (...)`, and ends with `(block attack)` on a creature that really has a middle one (a Troll, a wolf). Left and middle click are unaffected |
 | The other maps still show your real position although `disguise setFakePosition` ran | The fake is written **by the server**, into the player list it broadcasts (§ 2): check `disguise status` (is it published?), then the server log for `Map position spoof for ZDO ...`. The dedicated server must run the current DLL (§ 1.b) |
+| The other players still see you on their F2 (or session list) although `disguise offlist on` ran | The entries are taken out **by the server**, while it writes that list (§ 2): check `disguise status` (is it published?), then the server log for `Player-list hiding for ZDO ...` - the very first hidden write of a session prints it. The dedicated server must run the current DLL (§ 1.b); vanilla clients need none of ours, they only show what the server sends them, and the next list arrives a few seconds after the toggle. While it works, the list every
+joining game receives holds no line of yours - **your own F2 too**, playing as a client (the host's own F2 reads the
+server's full list) |
 | Crash at startup | Search `Disguise` in `BepInEx\LogOutput.log` on both sides |
 | The mod "restarts" by itself | Normal: re-application every `ReassertSeconds` |
 | You fly on your own screen but nobody else sees you in the air | The raise is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, a vanilla client receives your creature already raised; without it, only your own view flies (`disguise fly on` then `disguise status` to confirm the height is published). Two older mistakes produce the same symptom, both fixed by deploying the **current** build on the server and restarting it (§ 6): a server whose DLL predates the flight, or one whose DLL raised the position inside `ZDO.Serialize` - the body of a ZDO, which the receiver never reads for a position |

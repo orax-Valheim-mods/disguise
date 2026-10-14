@@ -68,6 +68,14 @@ public class Disguise : BaseUnityPlugin
     public const string RelationKey = "cd_rel";
 
     /// <summary>
+    /// Int flag written by the OWNER of a player: 1 while the other games must NOT receive
+    /// its entry in the player list the server broadcasts (see OffList). Disabled by
+    /// writing an explicit 0, like cd_fake: a removed key never reaches the server, which
+    /// would keep leaving the player out forever.
+    /// </summary>
+    public const string HideListKey = "cd_offlist";
+
+    /// <summary>
     /// Int flag written by the OWNER of a player: 1 while the other maps must display a
     /// fake position instead of the real one (see FakePosition). Disabled by writing an
     /// explicit 0, like cd_refresh: a removed key never reaches the server, which would
@@ -300,6 +308,13 @@ public class Disguise : BaseUnityPlugin
         // the player list it broadcasts (Patch_WritePlayerInfo). Nothing else - the ZDO
         // position, peer.m_refPos, the save, your own screen - ever moves.
         FakePosition.Publish(zdo);
+
+        // And the same rule for the list itself: while this is on, the modded server takes
+        // your entry OUT of the list the other games receive (cd_offlist, OffList,
+        // Patch_WritePlayerInfo) - their F2 overlay, the session list of their map menu,
+        // their map pins and the count beside the list then hold every player but you. Same
+        // bump rule as everything above: Set writes only when the value really moves.
+        OffList.Publish(zdo);
     }
 
     public void LateUpdate()
