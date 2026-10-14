@@ -571,6 +571,36 @@ internal static class CreaturePreview
         }
     }
 
+    /// <summary>
+    /// Puts every node of the creature on the stage's layer, and reports whether anything
+    /// had to be moved.
+    ///
+    /// SetLayer is where the copy is built - and the gear is not there yet: GearSkin writes
+    /// the slots while the copy is STILL INACTIVE, and VisEquipment instantiates the armor
+    /// and the weapon of each of them a moment later, when its own Start runs on the
+    /// activated copy. Every one of those objects carries the layer of its own PREFAB (a
+    /// layer belongs to a GameObject, it is not inherited from its parent), and the stage
+    /// camera draws one single layer - which is why the picture showed the creature but
+    /// never what it wears, whatever Show armor and Show weapons said. The walk runs once
+    /// per film (Render), before the film is taken: one layer test per node, and only what
+    /// a spawn just brought in is written. A caller that gets true back re-measures the
+    /// creature, so what arrived late is framed into the picture too.
+    /// </summary>
+    private static bool StageLayer(Transform transform)
+    {
+        bool moved = false;
+        if (transform.gameObject.layer != s_layer)
+        {
+            transform.gameObject.layer = s_layer;
+            moved = true;
+        }
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            moved |= StageLayer(transform.GetChild(i));
+        }
+        return moved;
+    }
+
     // ------------------------------------------------------------------ building the stage
 
     /// <summary>Builds the stage once; false when this machine has no layer left to show it on.</summary>
@@ -759,6 +789,20 @@ internal static class CreaturePreview
 
         if (creature != null)
         {
+            // The gear of the picture lands on the stage a moment AFTER the copy does
+            // (VisEquipment.Start instantiates it from the slots GearSkin wrote while the
+            // copy was inactive), and every new object carries the layer of its own PREFAB -
+            // while the camera draws one single layer. Anything a spawn just brought in is
+            // therefore put back on the stage before the film is taken, and the creature is
+            // measured once more when something arrived: a spear held out can reach beyond
+            // the box the picture was framed on. The walk finds its own silence within a
+            // frame or two - nothing else ever adds a node to the copy (the strip took every
+            // script) - and only a node off the stage is ever written.
+            if (StageLayer(creature.transform))
+            {
+                _ = Frame(creature);
+            }
+
             s_yaw += TurnDegreesPerSecond * Time.unscaledDeltaTime;
             float yaw = s_yaw * Mathf.Deg2Rad;
             float pitch = Tilt * Mathf.Deg2Rad;

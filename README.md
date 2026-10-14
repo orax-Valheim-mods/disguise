@@ -739,7 +739,21 @@ rounding with every step of the turntable - an Acorn or an AxeHead trembled in t
 while a creature, metres farther off, did not. What the framing would put nearer is **grown
 on the stage** instead (the picture does not change: a projection cannot tell a bigger object
 from a receded camera, and the box grows with the clone), and the rounding falls to a
-twentieth of a pixel. Each film holds the world's fog and
+twentieth of a pixel. **The gear** of the picture lands on the stage a moment AFTER the
+copy does: `GearSkin` writes the slots while the copy is still inactive, and
+`VisEquipment.Start` instantiates the armor and the weapon of each of them the moment the
+copy is activated - every new object on the **layer of its own prefab** (a layer belongs to
+a `GameObject`, it is never inherited from its parent), where `SetLayer` could only walk the
+copy as it stood at its build, and the camera of the stage draws that one single layer.
+Without a second walk the picture therefore showed the creature but never what it wears,
+whatever `Show armor` and `Show weapons` said - the armor and the weapon were instantiated
+outside the only layer that camera draws, `StageLayer` putting them back on it once per
+film (one layer test per node, and only what a spawn just brought in written) and `Frame`
+measuring the creature again the moment anything arrived - a spear held out reaches beyond
+the box the picture was framed on - and only that moment: nothing else ever adds a node to
+a copy whose scripts were all stripped, so the walk falls silent within a frame or two of
+the build, and a clone already grown does not grow twice (the second measure finds the
+40 m it was left at). Each film holds the world's fog and
 ambient off the stage and restores them before Unity renders anything else (cameras run after
 every `Update`, and `DisguiseGui.Tick` is one). A hover is held back 0.15 s before its copy
 is built: a pointer sweeping the list would otherwise ask for one inert copy - up to ten strip
