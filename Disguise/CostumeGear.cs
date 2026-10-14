@@ -32,10 +32,12 @@ namespace Disguise;
 /// both write is saved and restored once per window, in that order).
 ///
 /// ShowArmor and the weapons pair ([3 - Display]) decide WHAT is published, in the two
-/// halves every piece of gear belongs to: the armor rows (and utility, trinket - the rest of
-/// the gear) take the costume's own hash while ShowArmor is on, and nothing at all while it
-/// is off; the two hand rows take the weapon the costume is born with while ShowWeapons is
-/// on and WhoseWeapons says "Creature" - or ONE item of that very pool, which the choice key
+/// halves every piece of gear belongs to: the armor rows (the worn utility and trinket
+/// with them) take the costume's own hash while ShowArmor is on, and nothing at all while
+/// it is off - a WIELDED utility (the shamans' staffs, bound to a hand joint) being the
+/// costume's weapon, it answers ShowWeapons with the hands instead; the two hand rows take
+/// the weapon the costume is born with while ShowWeapons is on and WhoseWeapons says
+/// "Creature" - or ONE item of that very pool, which the choice key
 /// below hands over as well - YOUR items being exactly what every machine has to draw there
 /// while it says "Player" (this window then leaves those rows alone, and EquipmentMask no
 /// longer hides them either) - and nothing at all while ShowWeapons is off,
@@ -261,13 +263,17 @@ internal static class CostumeGear
                 int vanillaKey = EquipmentMask.s_vanillaKeys[row];
                 int current = zdo.GetInt(vanillaKey, 0);
                 // The hands keep the weapon the costume is born with whatever ShowArmor says
-                // - that is the other half of the pair - and every other row is the armor,
-                // utility and trinket included (they are the rest of the gear, not a weapon):
-                // nothing at all while ShowArmor is off, which is how a costume is drawn
-                // bare. The hands are empty as well while ShowWeapons is off, which is the
-                // one answer a costume with nothing in them can be drawn with.
+                // - that is the other half of the pair - and so does the utility slot while
+                // what sits in it is WIELDED: bound to a hand joint it is the creature's own
+                // weapon (the shamans' staffs, drawn by no other slot) and answers
+                // ShowWeapons with the hands, not the armor. Every other row is the armor,
+                // the worn utility and the trinket included (they are the rest of the gear,
+                // not a weapon): nothing at all while ShowArmor is off, which is how a
+                // costume is drawn bare. The hands are empty as well while ShowWeapons is
+                // off, which is the one answer a costume with nothing in them can be drawn
+                // with.
                 int wanted;
-                if (hand)
+                if (hand || (row == EquipmentMask.RowUtility && gear.UtilityWielded))
                 {
                     wanted = weaponsOff ? 0 : Value(gear, i);
                 }

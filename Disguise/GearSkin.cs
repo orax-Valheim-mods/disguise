@@ -578,6 +578,34 @@ internal static class GearSkin
     }
 
     /// <summary>
+    /// Whether the utility slot HOLDS that item rather than wears it. The slot is drawn the
+    /// way VisEquipment.AttachArmor dresses any body slot: every child of the item named
+    /// "attach_" brings the JOINT after that prefix (found on the costume's own visual), so
+    /// a joint that is a hand is what the creature fights with - the shamans' staffs
+    /// (attach_L_Hand), the dvergr staffs and arbalest (attach_r.hand) - while a body joint
+    /// or the skin wears it (the brute's LegBones, attach_skin; the belt and the skates the
+    /// same way), and an item with no such child (the Wishbone) is drawn by nothing here
+    /// either way. Only the children of the prefab are walked, like DrawnInHand above, so
+    /// the game is touched by nothing and the audit counts nothing for it.
+    /// </summary>
+    private static bool BindsToHand(GameObject item)
+    {
+        Transform root = item.transform;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            string name = root.GetChild(i).gameObject.name;
+            if (
+                name.StartsWith("attach_", StringComparison.Ordinal)
+                && name.IndexOf("hand", StringComparison.OrdinalIgnoreCase) >= 0
+            )
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Whether that item is a real item of the world rather than one of a CREATURE'S OWN
     /// ATTACKS. On every creature whose AI grew an attack set, each attack is an ItemDrop of
     /// its own listed in its Humanoid, and MonsterAI's EquipBestWeapon picks the
@@ -767,6 +795,7 @@ internal static class GearSkin
         else if (type == s_utility)
         {
             gear.Utility = hash;
+            gear.UtilityWielded = BindsToHand(itemPrefab);
         }
         else if (type == s_trinket)
         {
@@ -778,10 +807,12 @@ internal static class GearSkin
 
     /// <summary>
     /// The slots onto the copy's VisEquipment: the fields its own fallback reads. The body
-    /// (chest, legs, helmet, shoulder, utility, trinket) is the armor half and follows
-    /// ShowArmor; the hands are the weapon half - empty while ShowWeapons is off, the
-    /// costume's own while WhoseWeapons says "Creature", the local player's while it says
-    /// "Player".
+    /// (chest, legs, helmet, shoulder, trinket) is the armor half and follows ShowArmor;
+    /// the hands are the weapon half - empty while ShowWeapons is off, the costume's own
+    /// while WhoseWeapons says "Creature", the local player's while it says "Player". The
+    /// utility slot alone answers both rows: worn on the body it is armor like the rest,
+    /// while one bound to a hand joint (BindsToHand - the shamans' staffs, drawn by no
+    /// other slot) is the creature's own weapon and follows ShowWeapons with the hands.
     /// </summary>
     private static void Write(
         Component visEquipment,
@@ -799,11 +830,15 @@ internal static class GearSkin
             Set(GameAccess.s_visShoulderItemField, visEquipment, gear.Shoulder);
             Set(GameAccess.s_visShoulderItemVariantField, visEquipment, gear.ShoulderVariant);
             Set(GameAccess.s_visShoulderItemQualityField, visEquipment, gear.ShoulderQuality);
-            Set(GameAccess.s_visUtilityItemField, visEquipment, gear.Utility);
             if (gear.Trinket != null)
             {
                 Set(GameAccess.s_visTrinketItemField, visEquipment, gear.Trinket);
             }
+        }
+
+        if (gear != null && (gear.UtilityWielded ? !weaponsOff : armor))
+        {
+            Set(GameAccess.s_visUtilityItemField, visEquipment, gear.Utility);
         }
 
         if (weaponsOff)
@@ -894,6 +929,15 @@ internal static class GearSkin
         internal int ShoulderQuality;
 
         internal int Utility;
+
+        /// <summary>
+        /// Whether what sits in the Utility slot is WIELDED rather than worn - an attach
+        /// child of the item naming a HAND joint (the shamans' staffs, the dvergrs'
+        /// staffs and arbalest) instead of a body one (the brute's leg bones). A wielded
+        /// utility is the creature's weapon and follows ShowWeapons; a worn one is gear
+        /// like the rest of the armor row.
+        /// </summary>
+        internal bool UtilityWielded;
 
         internal string? Trinket;
 

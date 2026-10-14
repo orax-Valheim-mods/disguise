@@ -192,8 +192,8 @@ only** - your own view always keeps your equipment.
 
 | Option | Default | Role |
 |---|---|---|
-| `ShowArmor` | `true` | Draw a **humanoid** costume with the **armor** a real creature of that prefab is born with: `Humanoid.Start` gives it its default items and one seeded pick of each random pool (`GiveDefaultItems`), which is how a Fuling appears with its helmet and its chest - like a Fuling in the world. It reaches **every screen** drawing that costume: your own screen and the window's picture here, and the machines running no DLL, whose gear your ZDO publishes itself while you are disguised (`CostumeGear`, § 3). Off draws the costume without it (its hands are the `ShowWeapons` / `WhoseWeapons` pair's half). Window: the `Show armor` box under the command buttons; `disguise armor [on\|off]` |
-| `ShowWeapons` | `true` | Draw the costume **with weapons in its hands** at all: on (the default) both hands hold what `WhoseWeapons` below picks, off they are empty - and it is what decides **your** held items as well: hidden from the machines running no DLL of ours while the costume does not wear yours (`ShowWeapons` off, or `WhoseWeapons` below at `Creature`), exactly what it shows while it does (`CostumeGear`, § 3). It reaches **every screen** drawing that costume, like `ShowArmor`. Window: the `Show weapons` **box** under the command buttons; `disguise weapons [on\|off]` |
+| `ShowArmor` | `true` | Draw a **humanoid** costume with the **armor** a real creature of that prefab is born with: `Humanoid.Start` gives it its default items and one seeded pick of each random pool (`GiveDefaultItems`), which is how a Fuling appears with its helmet and its chest - like a Fuling in the world. It reaches **every screen** drawing that costume: your own screen and the window's picture here, and the machines running no DLL, whose gear your ZDO publishes itself while you are disguised (`CostumeGear`, § 3). Off draws the costume without it (its hands are the `ShowWeapons` / `WhoseWeapons` pair's half - and so is a **wielded** utility piece, the shamans' staffs, which this option therefore never takes off either: `ShowWeapons` below). Window: the `Show armor` box under the command buttons; `disguise armor [on\|off]` |
+| `ShowWeapons` | `true` | Draw the costume **with weapons in its hands** at all: on (the default) both hands hold what `WhoseWeapons` below picks, off they are empty - and a **wielded utility** piece answers this row too: the slot's item is asked the very question `VisEquipment.AttachArmor` asks when it attaches it (`GearSkin.BindsToHand`, an `attach_` child naming a **hand** joint of the costume's rig - the shamans' staffs, the dvergr staffs and arbalest are the creature's weapon there), while a worn utility (the brute's leg bones, bound to the skin) stays with `ShowArmor`. And it is what decides **your** held items as well: hidden from the machines running no DLL of ours while the costume does not wear yours (`ShowWeapons` off, or `WhoseWeapons` below at `Creature`), exactly what it shows while it does (`CostumeGear`, § 3). It reaches **every screen** drawing that costume, like `ShowArmor`. Window: the `Show weapons` **box** under the command buttons; `disguise weapons [on\|off]` |
 | `WhoseWeapons` | `Creature` | Whose **weapons** the costume is held with while `ShowWeapons` is on: `Creature`, the default, is the one a real creature of that prefab takes into a hand at spawn (`MonsterAI.Start` -> `EquipBestWeapon` takes the best weapon of that inventory), a Fuling therefore with its spear; `Player` is the ones **you** hold in both hands, an empty hand drawing nothing; **any other value** is the name of one item out of that very creature's own pool - its default items and every random pool, cut down to what the hands can really hold and draw, and to what the world can really NAME and ICON, which is what keeps the creatures' own **attack items** out (`Greydwarf_attack`, `charred_greatsword_thrust` and every such prefab: one ItemDrop per attack of the creature, listed for `EquipBestWeapon` to pick the situational one and never shown in any player's screen) - and the hands are then **that item alone**, the other one empty, whatever the roll answers. It reaches every screen drawing that costume as well, and it is what decides **your** held items there: hidden from the other machines while the costume wears anything but yours (`Creature` or a weapon name), exactly what it shows while it wears yours (`Player`) - a fixed weapon travels in its own ZDO key `cd_whoseWeapon` next to `cd_costumeGear` (`CostumeGear`, § 3). Read only while `ShowWeapons` is on. A name the configured creature cannot hold is put back on `Creature` the moment another creature is configured. Window: the **list** beside that box, holding `Creature default` (the value behind it stays the bare `Creature`, the word the console and the `.cfg` take), every weapon the configured creature can hold, and `Player` - greyed out while the box is unticked; `disguise weapons <creature\|player\|weapon>`. A new answer in that list is drawn at once on every screen drawing the costume - your own costume and the window's picture rebuilding themselves with it |
 | `ShowAsAlly` | `false` | Draw the creature with the **green** health bar of an ally instead of the red one of an enemy |
 
@@ -275,17 +275,24 @@ exactly the state of a clone, whose `GhostNetView` carries none. The game's own 
 then attaches each item to the clone's bones, drawing the gear itself in `Start` and once
 per frame after: nothing of the attaching is replicated, it is the vanilla code. The two
 halves are written independently of each other: the body - chest, legs, helmet, shoulder,
-and utility and trinket with them - only while `ShowArmor` is on; the hands not at all while
+and the worn utility and the trinket with them - only while `ShowArmor` is on; the hands not
+at all while
 `ShowWeapons` is off (both of them empty), from the creature's own roll while it is on with
 `WhoseWeapons` at `Creature`, from **that one weapon** while it names an item of the
 creature's own pool (both hands on it, the other one empty), and from **your** ZDO's items
 while it is on with
 `WhoseWeapons` at `Player` (the very keys the game writes a player's equipment with, so the
 copy holds your axe and your shield exactly as you hold them, an empty hand drawing
-nothing). A Fuling costume therefore appears with its spear and its armor, like a Fuling in
+nothing). The utility slot alone answers **both** rows, by what it holds: bound to a hand
+joint of the rig it is the costume's weapon and is written with the hands - `BindsToHand`
+asks the item the very question `VisEquipment.AttachArmor` asks when it attaches it, an
+`attach_` child naming that joint (the shamans' staffs and the dvergrs' bind a hand, the
+brute's leg bones the skin) - while worn on the body it is armor like the rest. A Fuling
+costume therefore appears with its spear and its armor, like a Fuling in
 the world - `Show armor` off takes the armor off it, `Show weapons` unticked empties its
 hands, `WhoseWeapons` on `Player` puts your own weapons into those hands instead, and
-`WhoseWeapons` on one of its own weapons fixes them on that one. The gear reaches **every screen drawing that costume**:
+`WhoseWeapons` on one of its own weapons fixes them on that one - and a shaman costume,
+`Show armor` off keeping its staff while `Show weapons` unticked takes it. The gear reaches **every screen drawing that costume**:
 your own costume and the picture of the window here, and the costume the machines running
 no DLL receive - while you are disguised your ZDO carries that gear itself (`CostumeGear`,
 § 3), rolled the same way there, so a vanilla client draws the very pick your own screen
@@ -1684,7 +1691,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   very same lists in the very same order (the ZDO's own `s_seed` seeding the roll - the very
   seed the game uses - a copy with no ZDO to read falling back to the prefab's own name),
   writes the very same slots on the copy's own
-  `VisEquipment` (the slots `Humanoid.EquipItem` would fill, its type switch replicated), and
+  `VisEquipment` (the slots `Humanoid.EquipItem` would fill, its type switch replicated -
+  and the utility slot noting whether what fills it is **held in a hand** or worn
+  (`BindsToHand`), which of the two rows it answers), and
   leaves the attaching to the game: `VisEquipment` runs on the copy - with no ZDO, it reads
   its own fields, the branch it takes whenever a `ZNetView` carries none - and draws each item
   on the copy's own bones in `Start` and once per frame after. The components are found by
@@ -1866,7 +1875,10 @@ out of that list costs nothing either: `DrawnInHand` only walks a prefab's **chi
 find the `attach` child `VisEquipment.AttachItem` instantiates in a hand slot - Unity's own
 `Transform`, no game member at all - and `IsRealItem` reads `m_name` and `m_description`
 through two more `FieldInfo` handles of `GameAccess` (string lookups the audit cannot
-count), the description being the game's own `string`. The count still stands at **90**.
+count), the description being the game's own `string`. The wielded-or-worn test of the
+utility slot (`BindsToHand`, § 2) walks those same children the same way - an `attach_`
+child naming a hand joint, a `string` prefix and an `IndexOf` on Unity's own `Transform`
+again - so it costs nothing on top either. The count still stands at **90**.
 
 ---
 
