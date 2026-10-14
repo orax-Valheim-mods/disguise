@@ -166,7 +166,9 @@ the field and brings every row back - over a scrollable list of every vanilla pr
 minus what the checkboxes have switched off - the first one is `Favorites`, which is not a
 category but a mark: while it is ticked the list shows the marked prefabs **alone**, the six
 category boxes then being ignored, and the marks are kept in `6 - GUI` / `Favorites` (the
-Favorite button writes them, and `disguise favorite [prefab]` as well) - and after it the six
+Favorite button writes them, and `disguise favorite [prefab]` as well) - and after it `All`,
+those six categories at once with no entry of its own (ticked while all six are, one click
+writing them together, one click on any of the six moving it), then the six
 categories, alphabetical: `Buildings`, `Creatures`, `Items`, `Nature`, `Other`, `Static`
 (one category each, state kept in `6 - GUI` / `Show*`, so a choice survives a restart; the
 rows a box owes are **not built** at all, and are built the first time it is ticked - once)
@@ -206,7 +208,7 @@ line says `height` and not `offset` because the **Offset row** of the pose (abov
 different thing: this one is about the flight alone.
 The flight values are the two that move on their own, so the line is rewritten every frame
 the window is on screen, and only when something on it really changed. The checkbox row sits
-under this line, above the list it filters: `Favorites` first, then the six category boxes,
+under this line, above the list it filters: `Favorites`, `All`, then the six category boxes,
 alphabetical.
 
 Gear drawn at nonsense positions on humanoid creatures is fixed by masking the equipment

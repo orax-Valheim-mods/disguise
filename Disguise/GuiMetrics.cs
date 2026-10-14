@@ -3,7 +3,7 @@
 namespace Disguise;
 
 /// <summary>
-/// The two measures the window shares with the lines under it. The width is the 860 of the
+/// The two measures the window shares with the lines under it. The width is the 940 of the
 /// window minus the margin it keeps on both sides: the help line, the status line and the
 /// state line are all cut to it, so they line up with the columns of the window instead of
 /// each drifting a few pixels. The height is one row: a command button, the state line, a
@@ -19,7 +19,7 @@ namespace Disguise;
 internal static class GuiMetrics
 {
     /// <summary>The measure every line spanning the window is cut to.</summary>
-    internal const float LineWidth = 800f;
+    internal const float LineWidth = 880f;
 
     /// <summary>The height of one row of the window.</summary>
     internal const float RowHeight = 40f;

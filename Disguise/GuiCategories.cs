@@ -11,11 +11,14 @@ namespace Disguise;
 /// <summary>
 /// The row of checkboxes of the Disguise window: six boxes, one per PrefabKind, which decide
 /// the categories the list shows (the console's "disguise list" always prints every kind),
-/// and one - Favorites - which is not a kind at all but a mark beside them (a prefab keeps
-/// the one kind PrefabCatalog gave it). Favorites is drawn FIRST and the six kinds follow it
-/// in alphabetical order of their label (s_kinds); while it is on, the six are ignored and the
-/// list shows the marked prefabs only: one click to leaf through a favorites list, one more
-/// to be back on the categories.
+/// and two which are not kinds at all: Favorites - a mark beside them (a prefab keeps the one
+/// kind PrefabCatalog gave it) - and All, which stands for the six at once: it is on while
+/// all six are, one click on it writes the six Show* entries together, and one click on any
+/// of the six moves it too. It has no entry of its own, being those six values in one box.
+/// Favorites is drawn FIRST, All right after it, then the six kinds in alphabetical order of
+/// their label (s_kinds); while Favorites is on, the six are ignored and the list shows the
+/// marked prefabs only: one click to leaf through a favorites list, one more to be back on
+/// the categories.
 ///
 /// The state lives in the config ([6 - GUI], the six Show* = true by default, ShowFavorites
 /// = false, the marks themselves in Favorites as one comma-separated line), so a choice
@@ -52,13 +55,15 @@ internal static class GuiCategories
     /// <summary>Kept beside the measured text so a rounded pixel can never wrap its last letter.</summary>
     private const float LabelPadding = 4f;
 
-    /// <summary>The six kind boxes, with Favorites before them: seven boxes, seven entries of config.</summary>
-    private const int BoxCount = PrefabCatalog.KindCount + 1;
+    /// <summary>
+    /// The eight boxes of the row: Favorites, All, then the six kinds - eight boxes, seven
+    /// entries of config (All is not one of them: it writes the six Show* entries at once).
+    /// </summary>
+    private const int BoxCount = PrefabCatalog.KindCount + 2;
 
     /// <summary>
-    /// The order the boxes are DRAWN in, left to right: Favorites first - the mark is the one
-    /// thing here that is not a category, and it is the one the window was asked for - then
-    /// the six kinds in alphabetical order of their label (Buildings, Creatures, Items,
+    /// The six kinds in the order their boxes are DRAWN in, after Favorites and All: in
+    /// alphabetical order of their label (Buildings, Creatures, Items,
     /// Nature, Other, Static). The enum keeps its own order, which is the order "disguise
     /// list" prints the categories in; no box reads a kind by its number any more, so a kind
     /// added later has to find its place in this array.
@@ -90,13 +95,17 @@ internal static class GuiCategories
     // ------------------------------------------------------------------ build
 
     /// <summary>
-    /// Builds the seven checkboxes at (x, y) with y the CENTRE of the row: box, then its
+    /// Builds the eight checkboxes at (x, y) with y the CENTRE of the row: box, then its
     /// label sized to the text it really has (measured through Text.preferredWidth, so the
     /// gap before the next box is the same whatever the word is). The row grows right from
-    /// the list's x and stops well inside the window: seven short labels never reach
+    /// the list's x and stops well inside the window: eight short labels never reach
     /// GuiWindow.Width - 24 of margin (the widest of them, "Creatures" or "Favorites", is
     /// the one to watch). One box per entry is built by BuildBox, which this row shares with
     /// GuiWindow's sparkle box.
+    ///
+    /// The index a box is built with IS its place in the row: 0 is Favorites, 1 is All, and
+    /// the six kinds run from 2 (BoxCount boxes either way) - the same index Sync, ShownAt
+    /// and OnToggled speak in, so the three can never be pointing at two different boxes.
     /// </summary>
     internal static void Build(Transform parent, float x, float y)
     {
@@ -109,25 +118,34 @@ internal static class GuiCategories
             bool shown = ShownAt(i);
             s_applied[i] = shown;
             int captured = i;
-
-            // What this box is for, on the help line (GuiHelp): the first one is about marks
-            // rather than a category and says so, the six others are the list's filter.
-            string help =
-                i == 0
-                    ? "Show the marked prefabs only - the six boxes are ignored while this one is on, so the list becomes a favorites list."
-                    : $"Filter the list to {TitleAt(i)}: every box can be on at once, and \"disguise list\" in the console prints every category whatever the boxes say.";
             s_toggles.Add(
                 BuildBox(
                     parent,
                     ref cursor,
                     y,
                     TitleAt(i),
-                    help,
+                    HelpAt(i),
                     shown,
                     on => OnToggled(captured, on)
                 )
             );
         }
+    }
+
+    /// <summary>
+    /// What a box says on the help line (GuiHelp): the mark, then All, then one category.
+    /// </summary>
+    private static string HelpAt(int index)
+    {
+        if (index == 0)
+        {
+            return "Show the marked prefabs only - the six boxes are ignored while this one is on, so the list becomes a favorites list.";
+        }
+        if (index == 1)
+        {
+            return "All six categories at once: tick it to switch every one of them on, untick it to switch them all off - it stands ticked only while all six are.";
+        }
+        return $"Filter the list to {TitleAt(index)}: every box can be on at once, and \"disguise list\" in the console prints every category whatever the boxes say.";
     }
 
     /// <summary>
@@ -315,29 +333,90 @@ internal static class GuiCategories
         return FavoritesOn() ? PrefabFavorites.Contains(name) : Shown(kind);
     }
 
-    /// <summary>The value a box shows: Favorites first, then the six kinds (BoxCount of them).</summary>
+    /// <summary>The value a box shows: Favorites (0), All (1), then the six kinds (BoxCount of them).</summary>
     private static bool ShownAt(int index)
     {
-        return index == 0 ? FavoritesOn() : Shown(s_kinds[index - 1]);
+        if (index == 0)
+        {
+            return FavoritesOn();
+        }
+        if (index == 1)
+        {
+            return AllOn();
+        }
+        return Shown(s_kinds[index - 2]);
     }
 
-    /// <summary>The label of a box: "Favorites" first, then the plural of the kind.</summary>
+    /// <summary>The label of a box: "Favorites", "All", then the plural of the kind.</summary>
     private static string TitleAt(int index)
     {
-        return index == 0 ? "Favorites" : Title(s_kinds[index - 1]);
+        if (index == 0)
+        {
+            return "Favorites";
+        }
+        return index == 1 ? "All" : Title(s_kinds[index - 2]);
     }
 
+    /// <summary>
+    /// One box was clicked: its entry takes the value, and the list is re-filtered once.
+    /// All is the special case - it writes the six kind entries at once (and pushes the same
+    /// value into their boxes right away, Sync would a frame later), while the six kinds move
+    /// the All box with them, without a click of its own (writing a value never re-runs a
+    /// listener).
+    /// </summary>
     private static void OnToggled(int index, bool on)
     {
+        if (index == 1)
+        {
+            s_applied[1] = on;
+            for (int i = 0; i < s_kinds.Length; i++)
+            {
+                KindEntry(s_kinds[i]).Value = on;
+                s_applied[2 + i] = on;
+                Toggle? kind = BoxAt(2 + i);
+                kind?.SetIsOnWithoutNotify(on);
+            }
+            GuiCreatureList.Refilter();
+            return;
+        }
+
         s_applied[index] = on;
         Entry(index).Value = on;
+        if (index > 1)
+        {
+            bool all = AllOn();
+            s_applied[1] = all;
+            Toggle? box = BoxAt(1);
+            box?.SetIsOnWithoutNotify(all);
+        }
         GuiCreatureList.Refilter();
     }
 
-    /// <summary>The Show* entry of a box: Favorites has its own, the six kinds the six entries.</summary>
+    /// <summary>What the All box stands for: the six Show* entries, all of them on.</summary>
+    private static bool AllOn()
+    {
+        for (int i = 0; i < s_kinds.Length; i++)
+        {
+            if (!KindEntry(s_kinds[i]).Value)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>One box of the row by its index: null while the window is not fully built.</summary>
+    private static Toggle? BoxAt(int index)
+    {
+        return s_toggles.Count == BoxCount && index >= 0 && index < BoxCount
+            ? s_toggles[index]
+            : null;
+    }
+
+    /// <summary>The Show* entry of a box: Favorites its own, the six kinds the six - All has none.</summary>
     private static ConfigEntry<bool> Entry(int index)
     {
-        return index == 0 ? DisguiseConfig.ConfigShowFavorites : KindEntry(s_kinds[index - 1]);
+        return index == 0 ? DisguiseConfig.ConfigShowFavorites : KindEntry(s_kinds[index - 2]);
     }
 
     /// <summary>The Show* entry of a kind: the six boxes are the six entries, no copy anywhere.</summary>

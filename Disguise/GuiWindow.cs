@@ -18,8 +18,8 @@ namespace Disguise;
 ///
 /// The window as the branch built it, in four steps: title and, directly under it, the line
 /// that says what is configured (with the GuiKey chord on the title row, next to Close), the
-/// row of checkboxes that gate the list (Favorites first, then the six categories
-/// alphabetically - GuiCategories builds
+/// row of checkboxes that gate the list (Favorites first, All beside it, then the six
+/// categories alphabetically - GuiCategories builds
 /// them, this class only says where they sit - under that line), the
 /// prefab list with its filter (GuiCreatureList builds that block, this class only tells it
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
@@ -40,8 +40,13 @@ namespace Disguise;
 /// </summary>
 internal static class GuiWindow
 {
-    /// <summary>Final size of the window: it must not jump when the last step arrives.</summary>
-    internal const float Width = 860f;
+    /// <summary>
+    /// Final size of the window: it must not jump when the last step arrives. The width is
+    /// the row of checkboxes' - eight short labels have to stop 24 px short of the right
+    /// edge (GuiCategories), and the margin keeps the lines spanning the window on both
+    /// sides of it (GuiMetrics.LineWidth).
+    /// </summary>
+    internal const float Width = 940f;
 
     /// <summary>
     /// Height of the panel. The list block takes 338 of them (filter 36 + gap 2 + 300 of
@@ -248,7 +253,7 @@ internal static class GuiWindow
     /// and that one the middle of the air between the rows ending at -554 and the status
     /// line starting at -722, which is the room the panel has there.
     /// </summary>
-    private const float FlyKeysX = -206f;
+    private const float FlyKeysX = -246f;
 
     private const float FlyKeysY = -640f;
 
@@ -447,8 +452,9 @@ internal static class GuiWindow
         // The chord on the title row, between the title and Close: the window shows the keys
         // that call it back after it is closed, read from the config at every open (the same
         // value ConfigurationManager records), so it is never a stale guess. Anchored to the
-        // top-right corner like Close, whose centre it keeps: x -240 is 190 right of the
-        // middle of the window, 13 px left of the button.
+        // top-right corner like Close, whose centre it keeps: the two centres stand 168 px
+        // apart (Close sits at -72) and the boxes are 200 and 110 wide, so 13 px of air are
+        // between them whatever the width of the window is.
         GameObject chord = Label(
             gui,
             "Open / close\n" + DescribeChord(),
@@ -504,7 +510,7 @@ internal static class GuiWindow
             "What is configured right now: the prefab, the disguise on or off, the flight with the height it lifts the costume by, and the size of that prefab in metres (left out while it has no mesh to measure)."
         );
 
-        // The checkbox row - Favorites first, then the six categories alphabetically - under
+        // The checkbox row - Favorites, All, then the six categories alphabetically - under
         // the state line and over
         // the block it filters.
         GuiCategories.Build(window.transform, ListX, CategoryY);

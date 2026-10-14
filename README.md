@@ -677,7 +677,7 @@ until the next button, and the hint comes back with the next window): a command 
 several lines, the console keeps them all, and the first one is the headline - the notes a
 command goes on printing after it stay in the console. Closing the window under that line is
 the **help line**: it holds what the element the pointer is on is FOR - one sentence for the
-five buttons and the sub-command each of them runs, for the seven boxes and the filter they
+five buttons and the sub-command each of them runs, for the eight boxes and the filter they
 ask of the list, for the filter field and Clear, for the two pose rows and their six fields,
 for the picture, the level row, the sparkle box, the armor box, the weapons row (box and list), the off-list box, the wheel switch, the flight's number row and its four chords, the state line, the chord, Close and the answer line
 itself - and an idle line while the pointer rests on nothing that describes itself
@@ -723,17 +723,19 @@ very edge the panel grew away from, both simply rode the edge down with it - the
 standing at `-644..-688` on the 842, `StatusY` still 176 - and the flight's rows
 moved them again: the box travelled 78 down with the band above it while the help line
 handed 70 of its own height back - those 70 coming out of `StatusY` (176 to 106) so that
-the edge itself grew by only 8 - the box standing at `-722..-766` on the 850. The **checkbox row**: seven
-boxes in the band under the state line and over the list - `Favorites` first, then the six
-categories in alphabetical order of their label, `Buildings`, `Creatures`, `Items`, `Nature`,
-`Other`, `Static` - the last six one per
+the edge itself grew by only 8 - the box standing at `-722..-766` on the 850. The **checkbox row**: eight
+boxes in the band under the state line and over the list - `Favorites` first, `All` right after
+it, then the six categories in alphabetical order of their label, `Buildings`, `Creatures`,
+`Items`, `Nature`, `Other`, `Static` - the last six one per
 category, each hiding the rows of its category in the list below (the state is kept in
 `6 - GUI` / `Show*`, so a choice survives a restart, and `disguise list` prints every category
 whatever they say), and the first about the **marks** instead of a category: a favorite is
 not a category of its own - the prefab keeps the one category it has - but a checkbox of its
 own, and while `Favorites` is ticked the list shows the marked prefabs **alone**, the six
 category boxes then being ignored (one click giving a favorites list, one more the categories
-back - `ShowFavorites`, `Favorites` in `6 - GUI`). A mark is set by the last button of the
+back - `ShowFavorites`, `Favorites` in `6 - GUI`). The second box, `All`, is those six at once
+and has no entry of its own: it stands ticked while all six are, one click on it writes the six
+`Show*` values together, and one click on any of the six moves it too. A mark is set by the last button of the
 picture - on the **selected** prefab, the one the state line names, the very call
 `disguise favorite` makes with no name - or by `disguise favorite [prefab]` for any other
 one, and taken off by the same two; the window follows
@@ -1571,7 +1573,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   strand it outside the monitor), the
   title with the `GuiKey` chord beside it (`DescribeChord`: the config value, main key first,
   or `Not set`), the state line directly under the title and the checkbox row in
-  the band under that line (Favorites first, the six categories alphabetically - this class only
+  the band under that line (Favorites, All, then the six categories alphabetically - this class only
   tells `GuiCategories.Build` where they sit), the centred labels, the state line
   (`Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the
   height is the raise the flight owns, in metres with one decimal, `0.0` while it is off and
@@ -1658,8 +1660,8 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   that is how `GuiWindow.RefreshState` keeps `DescribeState`, `DescribePower` and
   `DescribeFavorite` from running for a window a scene change already destroyed. A null
   label is a label that scene change took, and costs nothing.
-- `GuiMetrics.cs` - the two measures the window shares with the lines around it: the 800 px
-  every line spanning the window is cut to (the 860 of the window minus the margin it keeps
+- `GuiMetrics.cs` - the two measures the window shares with the lines around it: the 880 px
+  every line spanning the window is cut to (the 940 of the window minus the margin it keeps
   on both sides - the help line, the status line and the state line all line up on it), and
   the 40 px of one row (a command button, a line of the list - the help line's band is its
   own three lines, `GuiHelp.HelpHeight` (seven of them while its helps were paragraphs), the one line of the window that stopped being one
@@ -1667,7 +1669,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   replace two private constants each plus one raw literal, so the measure a player sees
   line up cannot drift apart in four files again; the status line keeps its own 44 (it sits
   under the window's frame) and the title row its `TitleRowY`, in `GuiWindow`.
-- `GuiCategories.cs` - the row of seven checkboxes: Jotunn's `CreateToggle` box (the
+- `GuiCategories.cs` - the row of eight checkboxes: Jotunn's `CreateToggle` box (the
   Valheim checkbox, orange marker) with a label measured to its own text
   (`Text.preferredWidth`, so the air before the next box is the same whatever the word), the
   `Show*` entry of each kind as the only state of the last six - a choice survives a
@@ -1676,17 +1678,19 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   open) - and `Refilter` on every change, which first builds the rows the boxes just started
   OWING (the opening only builds what they owe already: the six categories, or the marks
   when `Favorites` was already ticked) and then re-runs the filter over them. The row is
-  drawn **Favorites first, the six kinds after it in alphabetical order** (`s_kinds` - the
+  drawn **Favorites first, All right after it, then the six kinds in alphabetical order** (`s_kinds` - the
   enum keeps the order `disguise list` prints in, and no box reads a kind by its number any
-  more); the first box reads `ShowFavorites`, and `ShowRow` holds the one rule of a row: the
+  more); the first box reads `ShowFavorites`, the second reads no entry at all - it IS the six
+  `Show*` values in one box (ticked while all six are, one click writing them together, one
+  click on any of the six moving it), and `ShowRow` holds the one rule of a row: the
   marks alone while it is on, the box of the kind otherwise. A category and a mark part
   company in one thing
   only, the scroll: a category is another list to look at, so the list goes back to its first
   row (`Refilter`), a mark is one row more or less behind the pointer, so the list keeps the
   place it was in (`RefilterInPlace`). One box of that row is a method the window borrows:
   `BuildBox` builds a single checkbox (box, label measured to its text, the label carrying the
-  Button that flips the box) and hands the cursor on, so the row is seven calls of it and the
-  sparkle box and the armor box of `GuiWindow` are the eighth and ninth with their own listener - the caller giving each one
+  Button that flips the box) and hands the cursor on, so the row is eight calls of it and the
+  sparkle box and the armor box of `GuiWindow` are the ninth and tenth with their own listener - the caller giving each one
   the help to show on the bottom line, which `BuildBox` puts on BOTH halves of the checkbox:
   the box and its label are two objects, and the event system stops at the first one that
   handles the pointer, so the label - the one that carries the Button - is where the pointer
