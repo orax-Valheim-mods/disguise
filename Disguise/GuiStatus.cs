@@ -18,12 +18,17 @@ namespace Disguise;
 /// The answer stays until the next button, and the hint comes back with the next window, so
 /// there is nothing to do per frame: this class only holds the label. The help line
 /// (GuiHelp) closes the window under it and the band of the level row and the option
-/// controls (GuiWindow) stands over it, which is the reason the panel is 212 px taller than
-/// it once was - this box stands at -644..-688 since the fourth option row arrived, riding
-/// the very edge it is anchored to (StatusY grew by 40 when the help line arrived, by 36
-/// more for the third row of that band and by 100 when that line was given its seven lines
-/// - and the fourth row's 36 were the first it never felt: the box stays 176 above the
-/// bottom edge, which grew away from it).
+/// controls (GuiWindow) stands over it, which is the reason the panel is 220 px taller than
+/// it once was - this box stands at -722..-766 on the 850, riding the very edge it is
+/// anchored to (StatusY is one sum - the border, the help line, the air between them and
+/// half of this box - so only ever the HELP LINE moves it: +40 when that line arrived,
+/// +100 when it was given its seven lines, the option rows of the band standing over the
+/// box never entering it - those pushed the box down with the edge instead; then the
+/// flight settings added two rows to the band - the second one a whole row of fields -
+/// while the help line gave 70 of those seven lines back for three bigger ones, which is
+/// how 176 became 106: the box travelled DOWN 78 with the band above it, while the help
+/// line's 70 came out of the distance between the box and the edge it hangs on - the edge
+/// itself growing by only the 8 that are left).
 /// </summary>
 internal static class GuiStatus
 {
@@ -34,16 +39,18 @@ internal static class GuiStatus
     /// <summary>
     /// The centre of the box as a height from the BOTTOM edge of the panel, which is what it
     /// is anchored to: 44 px are two lines of 16 px, so a long answer wraps instead of being
-    /// cut in the middle of its first one. 176 puts the box at -644..-688 on a panel 842
-    /// tall - the very place the same 176 gave it at -608..-652 on the 806 it was before the
-    /// band got its fourth row (76 on the 706 before the help line (GuiHelp) got its seven
-    /// lines, 40 on the 670 when that line arrived, and 36 on the 630 it grew from):
-    /// anchored to the edge, the box rides every growth of the panel down with it, and only
-    /// the changes BETWEEN the band and that edge ever move its number - the help line and
-    /// the option rows stand over it, the help line under it - the fourth row being the
-    /// first that did not, the panel simply growing under the box.
+    /// cut in the middle of its first one. 106 puts the box at -722..-766 on a panel 850
+    /// tall - the 176 that stood it at -644..-688 on the 842 while the help line below
+    /// still held SEVEN lines (36 on the 630 before that line existed, 76 from the 670 it
+    /// arrived on - unchanged across the third option row of the 706 - and 176 from the
+    /// 806 it was given them on): this number is only
+    /// ever the border, the help line, the air and half of this box, so the flight's 78 px
+    /// of new band never entered it - that band moved the BOX (it stands 20 px over the
+    /// band's last row) while the help line's 70 came out here, leaving the edge itself
+    /// 8 taller - 106 = 8 of border + 70 of help + 6 of air + the half of this box the
+    /// number centres.
     /// </summary>
-    private const float StatusY = 176f;
+    private const float StatusY = 106f;
 
     private const float StatusHeight = 44f;
 

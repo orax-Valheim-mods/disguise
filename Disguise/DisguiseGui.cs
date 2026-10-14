@@ -62,8 +62,9 @@ internal static class DisguiseGui
 
     /// <summary>
     /// True while the frame belongs to the UI: the pointer is on the window, or the filter
-    /// field (GuiCreatureList.FilterFocused) or one of the six pose fields (GuiPose.Focused)
-    /// is. Computed once per frame inside Tick's try/catch, so the two patches only ever read
+    /// field (GuiCreatureList.FilterFocused), one of the six pose fields (GuiPose.Focused)
+    /// or one of the two flight fields (GuiFlight.Focused) is. Computed once per frame
+    /// inside Tick's try/catch, so the two patches only ever read
     /// a plain boolean and can never break the game with a throw.
     /// </summary>
     internal static bool BlocksInput { get; private set; }
@@ -115,7 +116,11 @@ internal static class DisguiseGui
                 // the window, or the filter field being typed in (the pointer may well be
                 // somewhere else while typing - Valheim's own build menu search does the
                 // same). The game keeps running otherwise: this window is an overlay.
-                BlocksInput = PointerOnWindow() || GuiCreatureList.FilterFocused || GuiPose.Focused;
+                BlocksInput =
+                    PointerOnWindow()
+                    || GuiCreatureList.FilterFocused
+                    || GuiPose.Focused
+                    || GuiFlight.Focused;
 
                 // Escape closes the window exactly like the Close button, last in the block
                 // because Hide() destroys what the lines above work on. The press is taken
@@ -153,6 +158,7 @@ internal static class DisguiseGui
         GuiCategories.Forget();
         GuiPreview.Forget();
         GuiPose.Forget();
+        GuiFlight.Forget();
         GuiStatus.Forget();
         GuiHelp.Forget();
         CreaturePreview.Forget();
@@ -350,6 +356,7 @@ internal static class DisguiseGui
         GuiCategories.Forget();
         GuiPreview.Forget();
         GuiPose.Forget();
+        GuiFlight.Forget();
         GuiStatus.Forget();
         GuiHelp.Forget();
         CreaturePreview.Forget();

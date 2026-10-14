@@ -140,15 +140,23 @@ running `disguise weapons <creature|player|weapon>` like the console would and a
 status line (and redrawing your own costume and the window's picture with the new pick at
 once), and a value changed in ConfigurationManager or in the console landing in the box
 and in the list without
-closing the window - and, closing the band under that row, the **`Hide from player list`
-box** (`HideFromPlayerList`, `2 - Multiplayer`, the fourth and last row of the band):
+closing the window - and, on the fourth row of the band, the **`Hide from player list`
+box** (`HideFromPlayerList`, `2 - Multiplayer`):
 ticked, the server (which must run the DLL - the host or the dedicated one) leaves YOUR
 entry out of the list every other game receives, so their F2 overlay (`Players` line and
 count), the session player list of their map menu and the pins of their map no longer hold
 you - it travels in your player ZDO like the fake map position, so only this machine
 decides, and it changes **no picture on any screen**: it decides what the OTHER machines
 receive, not what this one draws (the panel grew 36 px taller for this fourth row), with a
-value from outside pushed back into that box like every other one (the branch added them one step at a time; the preview there shows the last
+value from outside pushed back into that box like every other one - and under it the band's
+last two rows: the **`Fly with wheel` box** (`FlyScrollWheel`, `5 - Flight`: one notch of
+the wheel then raises or lowers the costume while the flight is on) and the **`Speed (m/s)`
+and `Step (m)` fields** (`FlySpeed` and `FlyScrollStep`: applied **as you type**, with the
+same parser the console and the pose rows share, `1.5` and `1,5` both landing, a half-typed
+box keeping the value it had) - while the flight's **four chords** (`FlyEnableKey`,
+`FlyDisableKey`, `FlyUpKey`, `FlyDownKey`) stand on their own line in the empty half under
+the pose rows, one per line, spelled as the `.cfg` records them and read when the window
+opens (the branch added them one step at a time; the preview there shows the last
 creature the pointer was on, filmed by a camera of its own into a texture and framed to fill
 it whatever its shape or size - kept there while
 the pointer is anywhere else, so a row can be looked at and then acted on - and the
@@ -180,7 +188,7 @@ and the pose is memory only - a restart starts from `0 0 0` again. **Escape** cl
 pause menu's, for the frame it happens (`Patch_MenuShow`); the next Escape opens the pause
 menu as usual. The window is an **overlay**: nothing is paused,
 you can still walk around with it open, and a frame belongs to the UI only while the pointer
-is on the window **or** the filter field **or** one of the six pose fields is focused - a
+is on the window **or** the filter field **or** one of the six pose fields **or** one of the flight's two number fields is focused - a
 click on a row never reaches your character, the camera waits instead of spinning behind the
 window, and typing a filter or a coordinate never walks your character away nor turns the
 camera.

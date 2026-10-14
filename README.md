@@ -472,6 +472,12 @@ notch = `FlyScrollStep` metres), and the camera then waits: the wheel belongs to
 alone, so it never climbs *and* zooms at once - the zoom comes back the moment the flight
 ends, and the minimap and the build rotation keep their own wheel throughout.
 
+The window carries all of it: its **four chords** stand on their own line under the pose
+rows (one per line, spelled as this file records them and read when the window opens), and
+the band under the command buttons holds the **`Fly with wheel`** switch on its fifth row
+and the **`Speed (m/s)`** and **`Step (m)`** fields on its sixth - the two applying as you
+type, exactly like the pose rows' six.
+
 | Option | Default | Role |
 |---|---|---|
 | `FlyEnableKey` | *(none)* | Start the flight: the creature is raised for everyone who renders you |
@@ -546,7 +552,7 @@ left to read by then, which is why the last frame's is remembered. A place typed
 `.cfg` by hand is honoured too, and kept on screen when it is read: a change of resolution
 cannot push the window out of sight. The window shows
 the line under the title, then the checkbox row under that line, the prefab list, the two pose rows under it, the 3D preview, the
-command buttons, the band with the level row, the armor box and the weapons row (its box and its list), the status line and, closing the window, the help line under it (the branch added them one step at a time): a row of five buttons
+command buttons, the band with the level row, the sparkle, armor and weapons rows (the last with its box and its list), the off-list box and the flight's own two rows, the flight's four chords on their line under the pose rows, the status line and, closing the window, the help line under it (the branch added them one step at a time): a row of five buttons
 under the picture, each one running the sub-command its label stands for
 exactly as the console would (`Add favorite` / `Remove favorite`, `Enable` / `Disable`,
 `Refresh`, `Own view`, `Flight` =
@@ -560,7 +566,7 @@ answer it writes on the status line always names the prefab it changed. The seco
 toggle for the disguise itself: it reads "Disable" while the disguise is on and "Enable"
 while it is off, and both that label and the line under the title are rewritten after every
 click. Under those five
-buttons sits a **band** with four rows on it. At the picture's own left edge sits the
+buttons sits a **band** with six rows on it. At the picture's own left edge sits the
 **level row** - the word `Level`, then `-` and `+` around the number: the level the costume
 is drawn at (§ 2, the `CreatureLevel` setting), each click running `disguise level <n>`
 exactly like every other button of this window runs its sub-command, so the answer lands on
@@ -568,7 +574,7 @@ the status line below. The number is rewritten per frame, so a level typed into 
 or into ConfigurationManager lands without closing the window; and the two buttons stop
 being clickable at the ends of the span (1 and 9) rather than running a command that could
 not move the level. To its right sits the **sparkle box** - `Hide item sparkle`, the first of the
-four checkboxes the band holds: it writes `HideItemSparkle`
+five checkboxes the band holds: it writes `HideItemSparkle`
 (`4 - Own view`) and nothing else, the same control the row above is made of (box and label
 are one hit target, `GuiCategories.BuildBox`); a click on it takes the shimmer off an item
 costume at once, on your own screen and in the picture (both rebuild themselves, § 2), and a
@@ -614,15 +620,35 @@ list goes through the very same `disguise weapons <creature|player|weapon>` call
 costume and in the picture of the window), a click on the box writes `ShowWeapons`
 directly, like the two boxes over it write theirs, and a value changed anywhere else - the
 console, ConfigurationManager - is pushed back into the box and into the list every frame
-like every other label. Under THAT row, closing the band on its fourth and last row, sits
-the **off-list box** - `Hide from player list`, the same checkbox in the same column a third
+like every other label. Under THAT row, on the fourth row of the band, sits
+the **off-list box** - `Hide from player list`, the same checkbox in the same column a fourth
 time: it writes `HideFromPlayerList` (`2 - Multiplayer`) and takes YOUR line out of the
 player list every other game receives (`OffList`, § 2) - the other machines' F2 overlay
 (`Players` line and count), the session player list of their map menu and the pins of their
 map - while it changes **no picture on any screen**: it decides what the other machines
 receive, not what this one draws, so nothing here rebuilds itself when it moves, and the
 panel grew 36 px taller for this row. A value from outside is pushed back into it like the
-three over it, and the console spells the same switch `disguise offlist [on|off]`. The **line under the
+three over it, and the console spells the same switch `disguise offlist [on|off]`.
+
+Under THAT box, on the fifth row of the band, sits the **wheel switch** - `Fly with wheel`,
+the same checkbox a fifth time: it writes `FlyScrollWheel` (`5 - Flight`) and nothing else,
+one notch of the wheel then raising or lowering the costume while the flight is on (the step
+being the row below's), a value from outside pushed back into it every frame like every box
+of the band. Under THAT switch, closing the band on the sixth and last row, sits the
+**flight's number row** - the words `Speed (m/s)` and `Step (m)` around the two fields
+holding `FlySpeed` and `FlyScrollStep` (`5 - Flight`): a number applies **as it is typed**,
+parsed with the same parser the console and the pose rows share (`1.5` and `1,5` both land),
+a box that is not a number yet keeping the value it had, and what is being typed is never
+rewritten - a value from ConfigurationManager or the `.cfg` lands in the field the moment it
+is not focused, and while either of the two HAS the focus the frame belongs to the UI
+exactly as with the pose fields, so typing a speed never walks the character away. And in
+the empty half under the pose rows, on the left, stands the flight's own line: its **four
+chords**, one per line (`Flight on:` = `FlyEnableKey`, `Flight off:` = `FlyDisableKey`,
+`Flight up:` = `FlyUpKey`, `Flight down:` = `FlyDownKey`), spelled the way the `.cfg`
+records them and read from the config when the window opens - the title row only ever held
+the one chord that opens the window itself.
+
+The **line under the
 title** reads
 `Prefab: <name>   -   disguise <on|off>   -   Flight <on|off>   height: <y>   -   size <w> x <h> x <d> m` - the prefab
 and the toggle from the config, the flight from `FlightControl`, the **height** that
@@ -653,7 +679,7 @@ command goes on printing after it stay in the console. Closing the window under 
 the **help line**: it holds what the element the pointer is on is FOR - one sentence for the
 five buttons and the sub-command each of them runs, for the seven boxes and the filter they
 ask of the list, for the filter field and Clear, for the two pose rows and their six fields,
-for the picture, the level row, the sparkle box, the armor box and the weapons row (box and list), the state line, the chord, Close and the answer line
+for the picture, the level row, the sparkle box, the armor box, the weapons row (box and list), the off-list box, the wheel switch, the flight's number row and its four chords, the state line, the chord, Close and the answer line
 itself - and an idle line while the pointer rests on nothing that describes itself
 (`Drag the panel to move the window - this line describes whatever the pointer rests on.`).
 It is written by the element the pointer ENTERS and put back by the one it LEAVES, and the
@@ -672,21 +698,32 @@ event an object does not handle itself still walks up to the panel, which owns t
 a Button keeps its own Enter and Exit (every component of one object is called). The picture
 was the one element that was never a hit target; it is one now, for this and nothing else,
 and not even while it has no texture (a hidden Graphic is not raycast), so its help arrives
-with the picture itself. The line is a band of **seven lines** (`GuiHelp.HelpHeight`, 140
-px): the helps of this window are whole paragraphs - the armor box alone spells around nine
-hundred characters, the weapons list's a thousand - and a band of two lines had them shrunk
-to the minimum size and lost their tails past it, so the band grew and the best fit now
-settles every help at its own size or a little under. The panel is 842 px tall for these two
-lines and for the four rows of the option band: it grew DOWNWARDS by the help line's 40 and
-then by the 36 the weapons row needed and then by the 100 that gave the help line its seven
-lines and then by the 36 the off-list box needed - so nothing above the status line moved any
-of those times, and `GuiStatus.StatusY` grew by the same 40, 36 and 100 to keep that line's
-box at `-608..-652` on the 806 - while the help band's own centre (`GuiHelp.HelpY`) moved
-from 28 to 78, its box keeping the eight pixels it has always had off the very edge the panel
-grew from. The fourth row's 36 were the first those two closing lines never felt: anchored to
-the very edge the panel grew away from, both simply rode the edge down with it - the status
-box now stands at `-644..-688` with neither `StatusY` nor `HelpY` having moved, the same
-numbers giving that place on the taller panel. The **checkbox row**: seven
+with the picture itself. The line is a band of **three lines** (`GuiHelp.HelpHeight`, 70
+px, `HelpFontSize` 17 where the band it replaced had 15): the helps of this window were
+whole paragraphs - the armor box alone spelled around nine hundred characters, the weapons
+list's a thousand - and a band of two lines had them shrunk to the minimum size and lost
+their tails past it, so the band grew to seven lines instead; every one of those paragraphs
+has since been rewritten short enough to stay inside THREE lines at the full size, which is
+what let the band come back down while the font grew - the best fit is still there (a help
+longer than its band shrinks the whole text rather than losing its tail), it is simply never
+asked to. The panel is 850 px tall for these two lines and for the six rows of the option
+band: it grew DOWNWARDS by the help line's 40 and then by the 36 the weapons row needed and
+then by the 100 that gave the help line its seven lines and then by the 36 the off-list box
+needed and then by the 78 the flight's two rows added past where the band ended, while the
+help band handed 70 of those 100 back - so nothing above the status line moved any of those
+times, and `GuiStatus.StatusY` grew by the help line's own asks alone - +40 when that line
+arrived and +100 when it was given its seven lines - the band rows' 36s never entering a
+number that is only ever the border, the help line, the air between them and half of itself
+(`8 + HelpHeight + 6 + 22`: 36, then 76, then 176) before becoming 106, the flight's
+taller band never entering it either - while the help band's own centre (`GuiHelp.HelpY`)
+moved from 28 to 78 and now to 43, its box keeping the eight pixels it has always had off
+the very edge the panel grows from. The weapons row's 36 and the off-list row's joined the
+band over those two lines without either number moving for either of them: anchored to the
+very edge the panel grew away from, both simply rode the edge down with it - the status box
+standing at `-644..-688` on the 842, `StatusY` still 176 - and the flight's rows
+moved them again: the box travelled 78 down with the band above it while the help line
+handed 70 of its own height back - those 70 coming out of `StatusY` (176 to 106) so that
+the edge itself grew by only 8 - the box standing at `-722..-766` on the 850. The **checkbox row**: seven
 boxes in the band under the state line and over the list - `Favorites` first, then the six
 categories in alphabetical order of their label, `Buildings`, `Creatures`, `Items`, `Nature`,
 `Other`, `Static` - the last six one per
@@ -824,12 +861,13 @@ passes over every component of it - per row crossed.
 
 The window is an **overlay**: nothing is paused, and you can still walk around with it open.
 The frames that belong to the UI are the ones where the pointer sits on the window **or**
-where the filter field is being typed in, which `DisguiseGui.Tick` measures once per frame
-(`DisguiseGui.BlocksInput`, read by `Patch_TakeInput` and `Patch_SetMouseLook`): a click on
+where one of its fields is being typed in - the filter, one of the six pose fields or one of
+the flight's two numbers (`GuiFlight.Focused` joining the other two halves of
+`DisguiseGui.BlocksInput`), which `DisguiseGui.Tick` measures once per frame: a click on
 a row never reaches the character, the camera waits instead of spinning behind the window,
-and typing a filter never walks the character away nor turns the camera - Valheim does the
+and typing a filter or a number never walks the character away nor turns the camera - Valheim does the
 same with `Hud.m_buildUi.SearchFieldFocused` for the build menu search. Pointer anywhere
-else and no filter focused, both patches stay silent and the game runs as usual. While the
+else and no field focused, both patches stay silent and the game runs as usual. While the
 window is open, Jotunn's `GUIManager.BlockInput` takes the
 mouse away from the camera (`GameCamera.m_mouseCapture`, without it
 `GameCamera.UpdateMouseCapture` would lock the cursor again on the next frame) and gives it
@@ -1550,13 +1588,15 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   corner of the two pose rows (`GuiPose.Build` gets the band the layout leaves under the
   list BLOCK - the scroll view is only its lower part, the filter field and its gap being
   part of the block too, measured through `GuiCreatureList.BlockHeight`, which is what keeps
-  the rows off the last rows of the list; the panel is 842 px tall because of them, of the
-  two lines that close it and of the four rows of the option band, the status line being
+  the rows off the last rows of the list; the panel is 850 px tall because of them, of the
+  two lines that close it and of the six rows of the option band, the status line being
   anchored to the bottom edge (nothing above moves when the panel grows, and `StatusY` is
-  the number that keeps its own box where it was across the 40 px it grew by for the help
-  line, the 36 more the weapons row asked for and the 100 the help band grew by for its
-  seven lines - the fourth row's 36 being the first it never felt: box and edge simply
-  ride the taller panel down together)), the
+  the number that kept its own box where it was across the help line's own asks - the 40
+  it arrived with and the 100 its seven lines asked for - while the option rows' 36s moved
+  box and edge together instead (the weapons row's first, the off-list one's after: box and
+  edge simply ride the taller panel down) - until the flight's rows moved it again: 78 down
+  with the band, the help line's new three taking 70 of its distance from the edge,
+  `176` becoming `106`)), the
   row of five command buttons under the picture (Favorite first, then Enable/Disable,
   Refresh, Own view, Flight; each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
@@ -1596,11 +1636,17 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   turns it off and a Graphic that is off is not raycast, so no row could be clicked - and
   Unity gives the open list a canvas of its own at sorting order 30000, so the two lines it
   drops over are the only ones it can cover; which is why the row is the LAST thing the
-  window builds), the
+  window builds), then the **off-list box** on the fourth row (`OfflistBox`: the same
+  control again, writing `HideFromPlayerList` - the one row of the band that changes no
+  picture on any screen) and the **flight's two rows** under it - the `Fly with wheel`
+  switch on the fifth and the `Speed (m/s)` / `Step (m)` number row on the sixth
+  (`GuiFlight.Build`, which also puts the flight's **four chords** on their own line in the
+  empty half under the pose rows: read from the config at every open like the chord on the
+  title row, `DescribeChord` spelling each one), the
   status line below them, the **help line** closing the window under that one (`GuiHelp.Build`
   - the words of every control are handed to `GuiHelp.Watch` as it is built: Close, the chord,
-  the state line, the five buttons, the level row, the sparkle box, the armor box and the weapons row here, and the same call made by
-  `GuiStatus`, `GuiPose`, `GuiCreatureList` and `GuiCategories` for their own), and the
+  the state line, the five buttons, the level row, the sparkle box, the armor box, the weapons row, the off-list box and the flight's own line here, and the same call made by
+  `GuiStatus`, `GuiPose`, `GuiFlight`, `GuiCreatureList` and `GuiCategories` for their own), and the
   coordinates of the list block. It only builds,
   it never keeps the window alive nor talks to the console - both stay in `DisguiseGui`.
 - `GuiText.cs` - one thing the whole window does over and over: put a word on a label, and
@@ -1616,7 +1662,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   every line spanning the window is cut to (the 860 of the window minus the margin it keeps
   on both sides - the help line, the status line and the state line all line up on it), and
   the 40 px of one row (a command button, a line of the list - the help line's band is its
-  own seven lines, `GuiHelp.HelpHeight`, the one line of the window that stopped being one
+  own three lines, `GuiHelp.HelpHeight` (seven of them while its helps were paragraphs), the one line of the window that stopped being one
   row when its long helps needed the room). Both names
   replace two private constants each plus one raw literal, so the measure a player sees
   line up cannot drift apart in four files again; the status line keeps its own 44 (it sits
@@ -1713,12 +1759,15 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `GuiHelp.cs` - the line at the very bottom of the window, under the status line: what the
   element the pointer is on is FOR, and an idle line (`Drag the panel to move the window -
   this line describes whatever the pointer rests on.`) while it rests on nothing that
-  describes itself. The band it writes in is seven lines tall (`GuiHelp.HelpHeight`, 140 px,
-  `HelpY` keeping the box eight pixels off the panel's bottom edge): the helps of this
-  window are whole paragraphs - the armor box alone spells around nine hundred characters,
-  the weapons list's a thousand - and a band of two lines had them shrunk to the minimum
-  size and still clipped past it, so the panel grew by those 100 downwards for them
-  (`GuiWindow.Height`, the status line following its own edge through `GuiStatus.StatusY`).
+  describes itself. The band it writes in is three lines tall (`GuiHelp.HelpHeight`, 70 px,
+  `HelpFontSize` 17 where the two-line band it replaced had 15, `HelpY` keeping the box
+  eight pixels off the panel's bottom edge): the helps of this window USED to be whole
+  paragraphs - the armor box alone spelled around nine hundred characters, the weapons
+  list's a thousand - and a band of two lines had them shrunk to the minimum size and still
+  clipped past it, so the panel grew by those 100 downwards for them (`GuiWindow.Height`,
+  the status line following its own edge through `GuiStatus.StatusY`) - and they are
+  rewritten short enough for three lines at the full size now, which is what let the band
+  take those 100 back while the font grew.
   Exactly two events write it - `Show` from the element entered, `Clear`
   from the one left - and the words are OWNED: a `Clear` is only obeyed from the component
   the line belongs to, so the order Unity sends the two events in cannot leave a stale line
@@ -1736,6 +1785,20 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   else changes hands: an event an object does not handle itself still walks up to the panel,
   which owns the drag, and a Button keeps its own Enter and Exit (every component of one
   object is called). Dropped with the window (`Forget`, beside `GuiStatus`'s).
+- `GuiFlight.cs` - the flight's side of the window, in the two places that have room for it:
+  the four chords (`FlyEnableKey`, `FlyDisableKey`, `FlyUpKey`, `FlyDownKey`) on their own
+  line in the empty half under the pose rows - one per line, spelled the way the `.cfg`
+  records them (`GuiWindow.DescribeChord`, the shared half of the title row's own), read
+  from the config when the window opens - and the band's last two rows: the `Fly with wheel`
+  switch (the very control `GuiCategories.BuildBox` puts in the rows over it, writing
+  `FlyScrollWheel`) and the `Speed (m/s)` / `Step (m)` number row writing `FlySpeed` and
+  `FlyScrollStep`. A number applies as it is typed through the parser the console and the
+  pose rows share (`DisguiseCommand.TryParseCoordinate`, `1.5` and `1,5` both landing), a
+  box that is not a number yet keeping the value it had, and `Sync` - called with `GuiPose`'s
+  on the same `RefreshState` pass - repairs the fields and the chords from the outside only
+  while they are not focused, `Focused` joining `BlocksInput` beside `FilterFocused` and
+  `GuiPose.Focused` so typing a speed never walks the character away. Dropped with the
+  window (`Forget`, beside `GuiPose`'s).
 - `GuiPreview.cs` - the right half of the window: the `RawImage` the preview is drawn into
   (a hit target for the help line and for nothing else - `GuiHelp.Watch` makes it one, it
   handles Enter and Exit alone and every other event walks up to the panel, which owns the
@@ -2016,7 +2079,7 @@ server's full list) |
 | The camera does not zoom while you fly | Normal: while the flight is on, the wheel belongs to the creature (`FlyScrollWheel`). Land (`FlyDisableKey`) or set the option to `false` and the zoom is back immediately - the minimap and the build rotation were never affected |
 | A mob attacks the air below you while you hover over it | Normal: the server simulates your player on the ground (§ 4.8) - that is what makes the flight unusable as a cheat. Landing puts both views back in agreement |
 | `disguise gui` says "not opened" (or `GuiKey` does nothing at all) | A dedicated server has no GUI, and before a world is loaded Jotunn's `CustomGUIFront` does not exist yet (`Window: ...` in the log, visible only with `Logs = true`, § 2). An unset `GuiKey` (`Not set`, recorded in ConfigurationManager) never fires. Jotunn itself is a hard dependency (§ 1): without it the mod does not load at all |
-| You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** the filter field is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
+| You click a row, or type in the filter, and the character moves anyway (or the camera spins behind the window) | The two patches of the window are not running: the DLL in `BepInEx\scripts` is older than the build → deploy a current one and **restart** (§ 6). While it is current, both take a frame only when the pointer is *on* the window **or** one of its fields (the filter, a pose field, a flight number) is focused: the window is an overlay, and everything outside of it keeps working on purpose (§ 2) |
 | The list is empty and reads "the prefab list is available in game" | Normal in the main menu: there is no `ZNetScene` to list prefabs from yet, exactly like `disguise list`. The window rebuilds its list at every opening, so open it again once a world is loaded. An empty list in a world means the six `Show*` boxes of `6 - GUI` are all off - or that `ShowFavorites` is ticked while `Favorites` is still empty - the window then says "no prefab matches the filter" instead |
 | Your building costume does not follow you on the client (it stays where you changed it) | Normal, and it is the prefab and not the sync: on a machine running no DLL of ours the only code that applies a ZDO position to a transform is `ZSyncTransform`, and no `Piece` has one - the client drew your wall once, where your ZDO was, and has nothing left to move it with (§ 3). `disguise set <creature>` follows everywhere; so do ships, carts and dropped items. The `Static` category of the window is precisely the set of prefabs that cannot move, and `disguise list` prints its count (`static <n>`) |
 | A cart or a raft costume shivers by a few centimetres on the machine of a player watching you | The ground rest is relayed by the **server** (§ 3): the dedicated server must run the current DLL (§ 1.b) - with it, the costume is sent to the height where it rests instead of one it has to be pushed out of, and the receiving body stops fighting back. Water and thin air never had that shiver (there is no contact to lose), and neither does your own clone (GhostFactory gives it no physics at all). With `Logs = Enabled` the log says what a costume really gets: `Ground rest: <name> is relayed <n> m above its player, laid <d> degrees off upright | ground <x> m vs feet (<ray|probe|heightmap|zone>), rise <r> m` - a lift of roughly *hang + 5 cm* with `rise 0.00` **and a tilt above zero degrees on a slope** is the costume lying on it, while the same lift with `laid 0.0 degrees` on ground you can see sloping, or `no terrain read` when none of the four reads answered, means the costume never left the terrain buried in it; a failed read prints its own line right after it - `Ground rest: no ground under <name> at (x, y, z) \| terrain mask <n> (layer <n>) \| <what the unfiltered ray met> \| heightmaps <n>, Heightmap.GetHeight <resolved\|not resolved> \| zone probe <reason>` - which is the whole diagnosis of that case. `ray meets nothing in 10000 m` together with maps that do not cover your feet is the dedicated server standing on zones it ghost-generated (§ 3), and the reason at the end says how far the zone got: `terrain build timed out` or `another zone is building` means the tile was still being produced when the bounded wait ran out - it only has to be produced once, so the next packet has it -, `reflection unresolved` means this machine cannot ask the game at all (an error saying so is logged once), while `Ground rest: no terrain instance stands where the costume is read, so the zone at (x, z) is built to read it.` (written once) says a zone stands there, and the read that used it reports the source as `zone`. `Ground rest: <name> rotation written into the packet: <d> degrees` is the companion line showing that tilt really went out. |

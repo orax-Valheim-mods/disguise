@@ -25,11 +25,14 @@ namespace Disguise;
 /// where to sit), on the right the 3D preview (GuiPreview builds the picture, CreaturePreview
 /// films into it), under it the five command buttons and, under those, the band the level row
 /// holds at the picture's own left edge - the sparkle box (HideItemSparkle) to its right -
-/// and the two option rows standing under the picture's own left edge, the armor box
+/// and the option rows standing under the picture's own left edge: the armor box
 /// (ShowArmor) over the weapons row (ShowWeapons as a box like it, with the WhoseWeapons
-/// list at its right), the
-/// three of them gating nothing in the row above: it is the costume itself that is drawn
-/// differently - then the status line
+/// list at its right), the off-list box (HideFromPlayerList) under that, and the flight's
+/// own two - the wheel switch (FlyScrollWheel) and its row of number fields (FlySpeed,
+/// FlyScrollStep, both GuiFlight), all of them gating nothing in the row above: it is the
+/// costume itself that is drawn differently. The flight's four CHORDS stand alone in the
+/// empty half under the pose rows (GuiFlight as well, read from the config when the window
+/// opens), and then comes the status line
 /// (GuiStatus), which is the hint while no button has been pressed and the answer of the
 /// last one after that - and, closing the window under it, the help line (GuiHelp), which
 /// holds what the element the pointer is on is for and the idle line while it is on
@@ -44,9 +47,10 @@ internal static class GuiWindow
     /// Height of the panel. The list block takes 338 of them (filter 36 + gap 2 + 300 of
     /// list, GuiCreatureList.BlockHeight) under the -132 it starts at, so it ends at -470;
     /// the two pose rows (GuiPose) take 78 more with their gaps, -476 down to -554; the
-    /// status line keeps the band it has always had under them (-644..-688 since the fourth
-    /// option row arrived); and the help line (GuiHelp) closes the window below that band.
-    /// 630 is what left those two rows their band above the status line: 540 left 50 px
+    /// status line keeps the band it has always had under them (standing today at
+    /// -722..-766, the flight settings' rows having joined the band over it); and the help
+    /// line (GuiHelp) closes the window below that band. 630 is what left those two rows
+    /// their band above the status line: 540 left 50 px
     /// under the list, which fit neither of them, and 600 put the Offset row back over the
     /// last rows of the list. The help line then asked for 40 px at the BOTTOM, and the
     /// panel grew downwards for them - so nothing above moved a pixel, the status line alone
@@ -55,20 +59,28 @@ internal static class GuiWindow
     /// band under the command buttons grew a THIRD option row (WeaponsY, under the armor
     /// box), which the 94 px left to the two-row band could not hold - the panel grew by the
     /// 36 px of that row, again downwards, so every top-anchored corner above stands where
-    /// it stood; GuiStatus.StatusY alone grew by those 36 too (bottom-anchored like the help
-    /// line, it would otherwise have travelled down with the edge and stood IN the new row),
+    /// it stood; neither of the two bottom-anchored numbers grew for it (StatusY and HelpY
+    /// both stayed put while the edge - and with them the two boxes - rode down 36 under
+    /// the new row: only the help line's own height ever moves StatusY),
     /// while GuiHelp.HelpY keeps closing the window against the very edge it grew from.
     /// And 806 was the help line's own asking - its band grew to SEVEN lines for the long
     /// helps (GuiHelp.HelpHeight), the two bottom-anchored lines moving with it. And 842 is
-    /// the next telling of the same story, and the first that cost those two lines nothing
-    /// of their own: the band got a FOURTH option row (OfflistY, the off-list box closing
-    /// it under the weapons row), and the panel grew by those 36 DOWNWARDS like every time
+    /// the next telling of the same story: the band got a FOURTH option row (OfflistY, the
+    /// off-list box closing it under the weapons row), and the panel grew by those 36
+    /// DOWNWARDS like every time
     /// - but the status line and the help line are both anchored to the very edge the
     /// panel grew away from, so both rode the edge down and neither of their numbers moved
-    /// (StatusY, HelpY): the status box simply stands at -644..-688 now, on the taller
-    /// panel, where it stood at -608..-652 on the 806.
+    /// (StatusY, HelpY). And 850 is the flight settings' telling, the first where the two
+    /// lines moved AGAIN: the band took two more rows under the off-list box (FlyWheelY,
+    /// FlyFieldsY - the wheel switch and the number row of the flight), 78 px of band past
+    /// where the last row ended, while the help line cut its band from seven lines to three
+    /// and handed 70 of the 100 it once asked for back - its helps rewritten short enough
+    /// for three lines at a bigger font (GuiHelp). The status box travelled down 78 with
+    /// the band, the help line's 70 coming out of its own distance from the edge (StatusY,
+    /// 176 to 106) so that the edge itself grew by only 8, and HelpY went 78 to 43 with its
+    /// own band; every top-anchored corner above still stands where it always stood.
     /// </summary>
-    internal const float Height = 842f;
+    internal const float Height = 850f;
 
     // The band at the very top: the title, Close and the chord all sit on it, 34 px under
     // the top edge - one Y for the three, so the row stays a row when one of them moves.
@@ -132,8 +144,10 @@ internal static class GuiWindow
     /// have 94 px between the bottom of the command row (-478) and the band the status line
     /// took (-572), split into two rows - this one 14 px under the buttons, the box under it
     /// 20 px above that line, both starting at the picture's own left edge's right, after
-    /// the level row. The panel is 72 px taller since the band holds four rows (Height), so
-    /// the band ends at -644 now. The same control as the checkbox row (GuiCategories builds
+    /// the level row. The band has held SIX rows since the flight settings joined it
+    /// (Height): it ends at -702 now, where the two rows it began with left it at -552 - 150
+    /// px of band, of which 72 are the weapons and off-list rows and 78 the flight's own
+    /// two. The same control as the checkbox row (GuiCategories builds
     /// it), standing alone here with its own entry to write and no list to re-filter.
     /// </summary>
     private const float SparkleY = -504f;
@@ -201,16 +215,42 @@ internal static class GuiWindow
     private const string CreatureDefaultLabel = "Creature default";
 
     /// <summary>
-    /// Centre of the off-list box (HideFromPlayerList): the fourth and last row of the
-    /// band, 36 px under the weapons row and at the picture's own left edge like the two
-    /// rows above that one. The panel grew by those 36 DOWNWARDS for it (Height) - and this
-    /// time the two lines closing the window felt nothing of it: both are anchored to the
-    /// very edge the panel grew from, so the status box simply stands at -644..-688 now and
-    /// StatusY and HelpY keep their numbers. Unlike everything else of the band it changes
+    /// Centre of the off-list box (HideFromPlayerList): the fourth row of the band, 36 px
+    /// under the weapons row and at the picture's own left edge like the two
+    /// rows above that one. Unlike everything else of the band it changes
     /// no picture: it decides what the OTHER screens receive (the player list the server
     /// broadcasts, OffList), not what this one draws.
     /// </summary>
     private const float OfflistY = -612f;
+
+    /// <summary>
+    /// Centre of the wheel switch (FlyScrollWheel): the FIFTH row of the band, 36 px under
+    /// the off-list box - the first of the two rows the flight settings brought with them,
+    /// and the same control as every box of the band (GuiFlight builds it through
+    /// GuiCategories.BuildBox, GuiWindow only says where it sits).
+    /// </summary>
+    private const float FlyWheelY = -648f;
+
+    /// <summary>
+    /// Centre of the number row of the flight settings (FlySpeed and FlyScrollStep, one
+    /// field each, GuiFlight): the SIXTH and last row of the band, 36 px under the wheel
+    /// switch. It is a row of FIELDS and 36 tall like a switch row, but its fields end 78
+    /// under where the band used to end - which is the whole movement of the status line
+    /// over it (Height, GuiStatus.StatusY: 78 down with the band, 70 of them handed back
+    /// when the help line cut its own band).
+    /// </summary>
+    private const float FlyFieldsY = -684f;
+
+    /// <summary>
+    /// Where the four flight chords stand (GuiFlight): the empty half of the window under
+    /// the pose rows, 400 wide like the list over it - this being its CENTRE in the
+    /// window's own coordinates (ListX + half the list width, measured from the middle),
+    /// and that one the middle of the air between the rows ending at -554 and the status
+    /// line starting at -722, which is the room the panel has there.
+    /// </summary>
+    private const float FlyKeysX = -206f;
+
+    private const float FlyKeysY = -640f;
 
     /// <summary>
     /// The band's split, in pixels of the picture above it: the level row stands at the
@@ -485,7 +525,7 @@ internal static class GuiWindow
         // The 3D preview on the right: the picture here, the stage it shows in CreaturePreview.
         GuiPreview.Build(window.transform, PreviewX, PreviewY);
 
-        // The five command buttons under the picture, the four option rows under them, the
+        // The five command buttons under the picture, the six option rows under them, the
         // line they answer on (which still holds the hint about clicking a row while no
         // button has been pressed), and the help line closing the window under that one.
         CommandButtons(gui, window.transform);
@@ -495,10 +535,19 @@ internal static class GuiWindow
         GuiStatus.Build(window.transform);
         GuiHelp.Build(window.transform);
 
-        // The off-list box closes the band under the weapons row: no list of its own and no
-        // picture to redraw, so it is built with the other rows - before the weapons row,
-        // which stays the LAST thing built.
+        // The off-list box under the weapons row, and the flight's own two rows under that
+        // one: no picture to redraw, so both are built with the other rows - before the
+        // weapons row, which stays the LAST thing built. The four flight chords stand in
+        // the empty half under the pose rows, read from the config at this very open.
         OfflistBox(window.transform);
+        GuiFlight.Build(
+            window.transform,
+            FlyKeysX,
+            FlyKeysY,
+            (Width * 0.5f) + PreviewX,
+            FlyWheelY,
+            FlyFieldsY
+        );
 
         // The weapons row comes LAST of everything, after the lines it stands over: its
         // list opens downwards from here, across the status line, the help line and the
@@ -564,7 +613,7 @@ internal static class GuiWindow
             ref cursor,
             ArmorY,
             "Show armor",
-            "Draw the costume with the ARMOR a real creature of that prefab is born with - the gear the game gives a creature of it at spawn: its default items and one pick of each random pool. On, the default, is how a Fuling in the world stands - helmet and all; off draws the costume without helmet, chest, legs or cape (whose WEAPON it holds is the row under this one). It reaches every screen drawing that costume: yours here, the picture above, and the machines running no DLL of this mod, whose packets your ZDO carries that gear in - rolled the way the game rolls it, so every machine agrees on the same pick. The machines running this DLL keep drawing YOU with your own equipment, whatever this says. Console: disguise armor [on|off].",
+            "Draw the costume with the ARMOR a creature of that prefab is born with: on, the default, is how it stands in the world, off draws it bare - its WEAPON is the row below. Machines running no DLL read the gear from your ZDO; this DLL keeps YOU in your own gear. Console: disguise armor.",
             s_armorApplied,
             on =>
             {
@@ -575,7 +624,8 @@ internal static class GuiWindow
     }
 
     /// <summary>
-    /// The box on the fourth and last row of the band: HideFromPlayerList, the option that
+    /// The box on the fourth row of the band - the flight's own two rows stand under it:
+    /// HideFromPlayerList, the option that
     /// takes this player OUT of the player list the server broadcasts (OffList publishes it
     /// into the player ZDO, the modded server leaves the entry out of the packet it writes
     /// for the other peers - their F2 overlay, the session list of their map menu, their map
@@ -600,7 +650,7 @@ internal static class GuiWindow
             ref cursor,
             OfflistY,
             "Hide from player list",
-            "Leave YOUR line out of the player list every other game receives: the server (which must run this DLL - the host or the dedicated one) then leaves you out of the list it writes for the others, so their F2 overlay (Players), the session player list of their map menu and the pins of their map no longer hold you, and the count beside the list shrinks with it. The choice travels in your player ZDO like the fake map position: only this machine decides, a server running no DLL of ours has no patch to leave anything out, and vanilla clients need none of it - they only ever show what the server sends them. The server writes ONE list for every joining game: while this is ticked it holds every name but yours, your own F2 too while you play as a client (the host's own F2 reads the server's list, whole again after every write). Off, the default, is the plain list. Console: disguise offlist [on|off].",
+            "Take YOUR line out of the player list every other game receives: their F2 Players and count, their session list, their map pins - your own F2 too. It travels in your ZDO like the fake map position; the server must run this DLL, vanilla clients need none. Console: disguise offlist.",
             s_offlistApplied,
             on =>
             {
@@ -612,11 +662,11 @@ internal static class GuiWindow
 
     /// <summary>What the box of the weapons row describes (GuiHelp.Watch).</summary>
     private const string WeaponsBoxHelp =
-        "Draw the costume with weapons at all: ticked, its hands hold what the list to the right picks (WhoseWeapons); unticked, both hands are empty - and YOUR held items stay hidden from the machines running no DLL of this mod then as well, there being nothing to glue them to. It reaches every screen drawing that costume: yours here, the picture above, and the machines running no DLL, whose packets your ZDO carries that gear in - rolled the way the game rolls it, so every machine agrees on the same pick. The machines running this DLL keep drawing YOU with your own equipment, whatever this says. Console: disguise weapons [on|off].";
+        "Draw the costume with weapons at all: ticked, its hands hold what the list to the right picks; unticked, both hands are empty and YOUR held items stay hidden from machines running no DLL too. Machines running this DLL keep you in your own gear. Console: disguise weapons [on|off].";
 
     /// <summary>What the list of the weapons row describes (GuiHelp.Watch - the box beside it has its own).</summary>
     private const string WhoseHelp =
-        "Whose weapons the costume is held with while the box to the left is ticked: \"Creature default\", the default, is the one a real creature of that prefab takes into a hand at spawn - MonsterAI takes the best weapon of its inventory, so a Fuling stands with its spear; the names between the two are every weapon that very creature can hold, and picking one FIXES the costume's hands on it (the other hand empty) whatever the roll answers; \"Player\" is the ones YOU hold in both hands, an empty hand drawing nothing. It reaches every screen drawing that costume, and it decides what YOUR hands carry there too: hidden from the machines running no DLL of this mod while the costume wears its own, exactly what it shows while it wears yours. Greyed out while that box is unticked - a costume drawn with empty hands gives nobody's weapons to name - and put back on \"Creature default\" whenever another creature is configured, one that holds no such weapon. Console: disguise weapons <creature|player|weapon>.";
+        "Whose weapons the costume is held with while the box to the left is ticked: \"Creature default\", the default, is what a creature of that prefab takes at spawn; a name in between FIXES both hands on it; \"Player\" is yours. Console: disguise weapons <creature|player|weapon>.";
 
     /// <summary>
     /// The third row of the band, at the picture's own left edge like the armor box
@@ -628,8 +678,9 @@ internal static class GuiWindow
     /// the list which ones while there are), which is also why the console takes both a
     /// switch and an argument (disguise weapons [on|off|creature|player|weapon]).
     ///
-    /// The box is the very control the armor box and the sparkle box are built with
-    /// (GuiCategories.BuildBox), so the four of them are one control four times - and
+    /// The box is the very control the sparkle, armor and off-list boxes are built with
+    /// (GuiCategories.BuildBox) - and the flight's wheel switch too (GuiFlight) - so the
+    /// five of them are one control five times - and
     /// like them it writes its entry itself, while a click on the LIST runs its sub-command
     /// (RunCommand) so the answer lands on the status line and the console and the window
     /// stay one single call. RefreshState then pushes both values back - into the box and
@@ -1177,9 +1228,10 @@ internal static class GuiWindow
     private static void ToggleFavorite() => RunCommand("favorite");
 
     /// <summary>
-    /// Rewrites the line under the title, the labels of the toggle and of the Favorite button,
-    /// the sparkle box, the armor box, the weapons box and its list and the six pose fields,
-    /// writing NONE
+    /// Rewrites the line under the title, the labels of the toggle and of the Favorite
+    /// button, the sparkle box, the armor box, the off-list box, the wheel switch, the two
+    /// number fields and the chord line of the flight, the weapons box and its list and the
+    /// six pose fields, writing NONE
     /// of them when it is unchanged: called once per frame while the window is open
     /// (DisguiseGui.Tick), by GuiCreatureList after a row was clicked or after a change the
     /// console made while the window was open, and by the command buttons after they ran
@@ -1188,9 +1240,11 @@ internal static class GuiWindow
     /// a write to the Text (which would lay it out again for the same words); the Favorite
     /// label follows the configured prefab, which costs a look at the config and one at the
     /// marks (both a string compare and a set lookup); the pose fields cost six more string
-    /// comparisons, and skip the one being typed in (GuiPose); the five option controls cost
-    /// one bool each and one int - a click on one writes that cache itself, so only
-    /// a value from outside (ConfigurationManager, the console) is ever pushed back - and the
+    /// comparisons, and skip the one being typed in (GuiPose); the option controls cost one
+    /// bool each and one int - a click on one writes that cache itself, so only
+    /// a value from outside (ConfigurationManager, the console) is ever pushed back - the
+    /// flight adds a bool, two more strings (again skipping the field being typed in) and
+    /// its four chords, and the
     /// weapons list one prefab-hash compare more, filling itself again only when the creature
     /// behind it has really moved (FillWhose).
     /// Does nothing without a window, which is every frame it is closed and every frame after
@@ -1276,6 +1330,7 @@ internal static class GuiWindow
         }
 
         GuiPose.Sync();
+        GuiFlight.Sync();
     }
 
     /// <summary>
@@ -1414,9 +1469,15 @@ internal static class GuiWindow
     /// is what the .cfg holds ("F9 + LeftAlt") - or "Not set", the word ConfigurationManager
     /// shows for an empty one and the reason the chord never fires then.
     /// </summary>
-    private static string DescribeChord()
+    private static string DescribeChord() => DescribeChord(DisguiseConfig.ConfigGuiKey.Value);
+
+    /// <summary>
+    /// One chord spelled the way the .cfg holds it (main key first, then the modifiers) -
+    /// or "Not set" for an empty one. Shared with GuiFlight, which writes the four flight
+    /// chords on its own line the same way.
+    /// </summary>
+    internal static string DescribeChord(KeyboardShortcut shortcut)
     {
-        KeyboardShortcut shortcut = DisguiseConfig.ConfigGuiKey.Value;
         if (shortcut.MainKey == KeyCode.None)
         {
             return "Not set";
