@@ -58,8 +58,16 @@ internal static class GuiWindow
     /// it stood; GuiStatus.StatusY alone grew by those 36 too (bottom-anchored like the help
     /// line, it would otherwise have travelled down with the edge and stood IN the new row),
     /// while GuiHelp.HelpY keeps closing the window against the very edge it grew from.
+    /// And 806 is the fourth telling of the same story: the help line's band was two lines
+    /// of its own font (40 px), and the long helps - the armor box alone spells around nine
+    /// hundred characters, the weapons list's a thousand - did not fit it even shrunk to
+    /// the minimum size, losing their tails past it. The band is SEVEN lines now
+    /// (GuiHelp.HelpHeight, 140 px), and the panel grew by those 100 DOWNWARDS like every
+    /// time - the status line alone following its own edge again (GuiStatus.StatusY grew by
+    /// the same 100), while GuiHelp.HelpY moved from 28 to 78 to keep its own box eight
+    /// pixels off the very edge the height change does not touch.
     /// </summary>
-    internal const float Height = 706f;
+    internal const float Height = 806f;
 
     // The band at the very top: the title, Close and the chord all sit on it, 34 px under
     // the top edge - one Y for the three, so the row stays a row when one of them moves.

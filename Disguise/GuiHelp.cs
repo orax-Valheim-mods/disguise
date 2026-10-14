@@ -38,14 +38,26 @@ internal static class GuiHelp
     /// Centre of the box, from the bottom edge of the panel: the 44 px of the status line
     /// above it (GuiStatus, which keeps the -608..-652 it has had since the option controls
     /// joined the band over it - six pixels clear of this box) leave this line a band of its
-    /// own - 40 px, from 8 to 48 above the bottom edge, six clear of that line and eight of
-    /// the panel's border. The panel is 40 px taller than it was for this band and nothing
-    /// else under the band (GuiWindow.Height, which is why GuiStatus.StatusY grew by the
-    /// same 40: bottom-anchored, it would have moved down with the edge otherwise; the 36 px
-    /// more the panel grew by since then took the status line up with it, and this box never
-    /// moves - it is anchored to the very edge the height change does not touch).
+    /// own - HelpHeight of it, from 8 to 148 above the bottom edge, six clear of that line
+    /// and eight of the panel's border. The band was 40 px, two lines of this font, and that
+    /// was the one band of the window the long helps did not fit: squeezed to the minimum
+    /// size they still lost their tails, the armor box alone spelling around nine hundred
+    /// characters. It is 140 px - seven lines - now, and the PANEL grew by those 100 with
+    /// it (GuiWindow.Height, which is why GuiStatus.StatusY grew by the same 100:
+    /// bottom-anchored, it would have moved down with the edge otherwise). 78 is the 8 px
+    /// clear of the border plus half of HelpHeight: this box sits on the very edge the
+    /// height change does not touch, and it was only its own growth that moved it - the
+    /// earlier growths of the panel took the status line up and left it where it stood.
     /// </summary>
-    private const float HelpY = 28f;
+    private const float HelpY = 78f;
+
+    /// <summary>
+    /// Height of the band - seven lines of the 20 px one line of this font takes at its own
+    /// size, the same two lines' 40 px the band had grown seven times over. Every help but
+    /// the two monsters of this window now draws at the full size (HelpFontSize), and those
+    /// two settle a little under it rather than at the minimum and clipped.
+    /// </summary>
+    private const float HelpHeight = 140f;
 
     private const int HelpFontSize = 15;
 
@@ -79,14 +91,16 @@ internal static class GuiHelp
             HelpFontSize,
             gui.ValheimBeige,
             GuiMetrics.LineWidth,
-            GuiMetrics.RowHeight
+            HelpHeight
         );
         Text? text = label.GetComponent<Text>();
         if (text != null)
         {
-            // Two lines at most, and a help that is longer than the line it was written for
-            // makes the whole text smaller rather than losing its tail: the rule the chord
-            // and the state line of this window already follow.
+            // Seven lines at most, and a help longer than the line it was written for makes
+            // the whole text smaller rather than losing its tail: the rule the chord and
+            // the state line of this window already follow. At two lines the long helps
+            // were past this rule - shrunk to the minimum AND clipped - which is why the
+            // band grew with the panel (HelpHeight, HelpY).
             text.resizeTextForBestFit = true;
             text.resizeTextMaxSize = HelpFontSize;
             text.resizeTextMinSize = 10;

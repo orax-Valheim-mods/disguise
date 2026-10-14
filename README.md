@@ -620,10 +620,17 @@ event an object does not handle itself still walks up to the panel, which owns t
 a Button keeps its own Enter and Exit (every component of one object is called). The picture
 was the one element that was never a hit target; it is one now, for this and nothing else,
 and not even while it has no texture (a hidden Graphic is not raycast), so its help arrives
-with the picture itself. The panel is 706 px tall for these two lines and for the third row
-of the option band: it grew DOWNWARDS by the help line's 40 and then by the 36 that row
-needed, so nothing above the status line moved either time, and `GuiStatus.StatusY` grew by
-the same 40 and 36 to keep that line's box at `-608..-652`. The **checkbox row**: seven
+with the picture itself. The line is a band of **seven lines** (`GuiHelp.HelpHeight`, 140
+px): the helps of this window are whole paragraphs - the armor box alone spells around nine
+hundred characters, the weapons list's a thousand - and a band of two lines had them shrunk
+to the minimum size and lost their tails past it, so the band grew and the best fit now
+settles every help at its own size or a little under. The panel is 806 px tall for these two
+lines and for the third row of the option band: it grew DOWNWARDS by the help line's 40 and
+then by the 36 that row needed and then by the 100 that gave the help line its seven lines,
+so nothing above the status line moved any of those times, and `GuiStatus.StatusY` grew by
+the same 40, 36 and 100 to keep that line's box at `-608..-652` - while the help band's own
+centre (`GuiHelp.HelpY`) moved from 28 to 78, its box keeping the eight pixels it has always
+had off the very edge the panel grew from. The **checkbox row**: seven
 boxes in the band under the state line and over the list - `Favorites` first, then the six
 categories in alphabetical order of their label, `Buildings`, `Creatures`, `Items`, `Nature`,
 `Other`, `Static` - the last six one per
@@ -1483,11 +1490,12 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   corner of the two pose rows (`GuiPose.Build` gets the band the layout leaves under the
   list BLOCK - the scroll view is only its lower part, the filter field and its gap being
   part of the block too, measured through `GuiCreatureList.BlockHeight`, which is what keeps
-  the rows off the last rows of the list; the panel is 706 px tall because of them, of the
+  the rows off the last rows of the list; the panel is 806 px tall because of them, of the
   two lines that close it and of the third row of the option band, the status line being
   anchored to the bottom edge (nothing above moves when the panel grows, and `StatusY` is
   the number that keeps its own box where it was across the 40 px it grew by for the help
-  line and the 36 more the weapons row asked for)), the
+  line, the 36 more the weapons row asked for and the 100 the help band grew by for its
+  seven lines)), the
   row of five command buttons under the picture (Favorite first, then Enable/Disable,
   Refresh, Own view, Flight; each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
@@ -1546,7 +1554,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `GuiMetrics.cs` - the two measures the window shares with the lines around it: the 800 px
   every line spanning the window is cut to (the 860 of the window minus the margin it keeps
   on both sides - the help line, the status line and the state line all line up on it), and
-  the 40 px of one row (a command button, a help line, a line of the list). Both names
+  the 40 px of one row (a command button, a line of the list - the help line's band is its
+  own seven lines, `GuiHelp.HelpHeight`, the one line of the window that stopped being one
+  row when its long helps needed the room). Both names
   replace two private constants each plus one raw literal, so the measure a player sees
   line up cannot drift apart in four files again; the status line keeps its own 44 (it sits
   under the window's frame) and the title row its `TitleRowY`, in `GuiWindow`.
@@ -1642,7 +1652,13 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `GuiHelp.cs` - the line at the very bottom of the window, under the status line: what the
   element the pointer is on is FOR, and an idle line (`Drag the panel to move the window -
   this line describes whatever the pointer rests on.`) while it rests on nothing that
-  describes itself. Exactly two events write it - `Show` from the element entered, `Clear`
+  describes itself. The band it writes in is seven lines tall (`GuiHelp.HelpHeight`, 140 px,
+  `HelpY` keeping the box eight pixels off the panel's bottom edge): the helps of this
+  window are whole paragraphs - the armor box alone spells around nine hundred characters,
+  the weapons list's a thousand - and a band of two lines had them shrunk to the minimum
+  size and still clipped past it, so the panel grew by those 100 downwards for them
+  (`GuiWindow.Height`, the status line following its own edge through `GuiStatus.StatusY`).
+  Exactly two events write it - `Show` from the element entered, `Clear`
   from the one left - and the words are OWNED: a `Clear` is only obeyed from the component
   the line belongs to, so the order Unity sends the two events in cannot leave a stale line
   up, and the words are compared before they are written, so hovering one control for a

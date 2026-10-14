@@ -20,8 +20,8 @@ namespace Disguise;
 /// (GuiHelp) closes the window under it and the band of the level row and the option
 /// controls (GuiWindow) stands over it, which is the reason the panel is 76 px taller than
 /// it once was - this box sits at the very same -608..-652 it settled at when the help line
-/// arrived (StatusY grew by 40 then and by 36 more for the third row of that band, the box
-/// being anchored to the bottom edge).
+/// arrived (StatusY grew by 40 then and by 36 more for the third row of that band and by
+/// 100 when that line was given its seven lines, the box being anchored to the bottom edge).
 /// </summary>
 internal static class GuiStatus
 {
@@ -32,13 +32,14 @@ internal static class GuiStatus
     /// <summary>
     /// The centre of the box as a height from the BOTTOM edge of the panel, which is what it
     /// is anchored to: 44 px are two lines of 16 px, so a long answer wraps instead of being
-    /// cut in the middle of its first one. 76 puts the box at -608..-652 on a panel 706 tall
-    /// - the very place 40 gave it on the 670 it was when the help line (GuiHelp) arrived,
-    /// and 36 gave it on the 630 it grew from: anchored to the edge, the box would otherwise
-    /// have moved down with the panel and stood in the band those two changes needed above
-    /// it (the help line under it, the level row and the option controls over it).
+    /// cut in the middle of its first one. 176 puts the box at -608..-652 on a panel 806
+    /// tall - the very place 76 gave it on the 706 it was before the help line (GuiHelp) got
+    /// its seven lines, 40 on the 670 it was when that line arrived, and 36 on the 630 it
+    /// grew from: anchored to the edge, the box would otherwise have moved down with the
+    /// panel and stood in the band those three changes needed above it (the help line under
+    /// it, the level row and the option controls over it).
     /// </summary>
-    private const float StatusY = 76f;
+    private const float StatusY = 176f;
 
     private const float StatusHeight = 44f;
 
