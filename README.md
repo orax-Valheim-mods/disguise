@@ -806,7 +806,7 @@ The **3D preview** (`CreaturePreview`) is not a scene but a texture. On the firs
 asked for, the stage is built once: a free layer (the highest one no mod named, 31 down to
 8, else one of the three Unity keeps spare), a camera of its own (`enabled = false`,
 `cullingMask` that layer alone, a transparent clear colour) rendering into a `RenderTexture`
-as big as the picture (380 x 300 - the canvas under the window is 1 unit = 1 screen pixel,
+as big as the picture (420 x 300 - the canvas under the window is 1 unit = 1 screen pixel,
 so nothing is ever scaled), and two directional lights on that layer, the key one hung on the
 camera so the side you look at is always lit. The stage stands **20 km under the world**, and
 every camera and every directional light of the game has that layer taken away while the
@@ -1603,7 +1603,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   Refresh, Own view, Flight; each one runs its sub-command through
   `DisguiseCommand.Run`, then `RefreshState` rewrites the state line and the labels of the
   two toggles among them - the Favorite one from the configured
-  prefab and its mark, the other from the config; their text is best-fit, five buttons now sharing the width of the picture), the
+  prefab and its mark, the other from the config; their text is best-fit, five buttons now sharing the width of the picture - `79.2` x `44` each: `CommandHeight` is four above the 40 of a plain row, the two gaps around the row gave two each, and the picture grew to 420 wide to carry the wider row), the
   **band** under those buttons: the **level row** first, at the picture's own left edge
   (`LevelRow`: the word `Level`, then `-` and `+` around the number - each button runs
   `disguise level <n>` through the very same `DisguiseCommand.Run` path as every button of
@@ -1611,8 +1611,7 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
   `SyncLevelButtons` stops the two at the ends of the span the game itself keeps a creature
   inside, 1 to 9, and the whole row's width is the shared `LevelRowWidth`), then the
   **sparkle box** to its right (`SparkleBox`: the very control `GuiCategories.BuildBox`
-  puts in the row above, starting after `LevelRowWidth` + a gap of the band and centred in
-  the top of the 130 px the right half has between the buttons and the status line - its listener writes
+  puts in the row above, starting after `LevelRowWidth` + a gap of the band and standing on the band's first row, 14 px under the buttons - its listener writes
   `HideItemSparkle` and the cache `RefreshState` compares against, so a value typed in
   ConfigurationManager is pushed back into the box while a click never is), then the
   **armor box** on the second row of the band under it (`ArmorBox`: the same control in the
@@ -1663,7 +1662,9 @@ Sources in `A:\_MODDING\Valheim\MODS\Disguise\Disguise\` - **one class per file*
 - `GuiMetrics.cs` - the two measures the window shares with the lines around it: the 880 px
   every line spanning the window is cut to (the 940 of the window minus the margin it keeps
   on both sides - the help line, the status line and the state line all line up on it), and
-  the 40 px of one row (a command button, a line of the list - the help line's band is its
+  the 40 px of one row (a line of the list, the level row's squares - the five command
+  buttons under the picture stand 44 with a measure of their own, `CommandHeight` in
+  `GuiWindow` - the help line's band is its
   own three lines, `GuiHelp.HelpHeight` (seven of them while its helps were paragraphs), the one line of the window that stopped being one
   row when its long helps needed the room). Both names
   replace two private constants each plus one raw literal, so the measure a player sees

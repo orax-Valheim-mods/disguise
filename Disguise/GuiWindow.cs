@@ -43,8 +43,9 @@ internal static class GuiWindow
     /// <summary>
     /// Final size of the window: it must not jump when the last step arrives. The width is
     /// the row of checkboxes' - eight short labels have to stop 24 px short of the right
-    /// edge (GuiCategories), and the margin keeps the lines spanning the window on both
-    /// sides of it (GuiMetrics.LineWidth).
+    /// edge (GuiCategories) - and the picture's: its 420 keeps the 25 px it stands off the
+    /// right edge while the command row below is as wide as it is. The margin also keeps
+    /// the lines spanning the window on both sides of it (GuiMetrics.LineWidth).
     /// </summary>
     internal const float Width = 940f;
 
@@ -131,8 +132,13 @@ internal static class GuiWindow
 
     private const float PreviewY = -132f;
 
-    /// <summary>Gap between the bottom of the picture and the row of buttons under it.</summary>
-    private const float PreviewGap = 6f;
+    /// <summary>
+    /// Gap between the bottom of the picture and the row of buttons under it. The row stands
+    /// CommandHeight tall - four more than the plain 40 of a row - and those four came out of
+    /// this gap and the one the row keeps over the band (SparkleY): six px stood on either
+    /// side of the row while it was a plain 40, four stand there now.
+    /// </summary>
+    private const float PreviewGap = 4f;
 
     // The command row, as wide as the picture above it: CommandCount buttons of equal width.
     private const int CommandCount = 5;
@@ -141,12 +147,21 @@ internal static class GuiWindow
 
     private const float ButtonTop = PreviewY - CreaturePreview.PictureHeight - PreviewGap;
 
+    /// <summary>
+    /// Height of the five command buttons: four taller than the 40 of a plain row
+    /// (GuiMetrics.RowHeight, which the level row of the band still stands at). This row
+    /// holds the longest labels of the window ("Remove favorite" is the one to watch), so
+    /// the room was asked for here - out of the two gaps around the row (PreviewGap above,
+    /// SparkleY below), not out of the panel under it.
+    /// </summary>
+    private const float CommandHeight = 44f;
+
     /// <summary>Centre of the row, given to CreateButton as a position of the window.</summary>
-    private const float ButtonY = ButtonTop - (GuiMetrics.RowHeight * 0.5f);
+    private const float ButtonY = ButtonTop - (CommandHeight * 0.5f);
 
     /// <summary>
     /// Centre of the sparkle box (HideItemSparkle): the right half of the window used to
-    /// have 94 px between the bottom of the command row (-478) and the band the status line
+    /// have 92 px between the bottom of the command row (-480) and the band the status line
     /// took (-572), split into two rows - this one 14 px under the buttons, the box under it
     /// 20 px above that line, both starting at the picture's own left edge's right, after
     /// the level row. The band has held SIX rows since the flight settings joined it
@@ -1012,6 +1027,7 @@ internal static class GuiWindow
                 plusX,
                 height,
                 SparkleY,
+                height,
                 () => RunCommand($"level {DisguiseConfig.ConfigCreatureLevel.Value + 1}")
             )
         );
@@ -1040,6 +1056,7 @@ internal static class GuiWindow
                 minusX,
                 height,
                 SparkleY,
+                height,
                 () => RunCommand($"level {DisguiseConfig.ConfigCreatureLevel.Value - 1}")
             )
         );
@@ -1099,7 +1116,8 @@ internal static class GuiWindow
     }
 
     /// <summary>
-    /// The row under the picture: CommandCount buttons of equal width, each one running its
+    /// The row under the picture: CommandCount buttons of equal width and CommandHeight
+    /// tall, each one running its
     /// sub-command through DisguiseCommand.Run, which has no console here and answers on the
     /// status line below. The first follows the configured prefab and its mark
     /// (DescribeFavorite); the second is a toggle, so what it says and what it runs both
@@ -1120,6 +1138,7 @@ internal static class GuiWindow
             centre,
             width,
             ButtonY,
+            CommandHeight,
             ToggleFavorite
         );
 
@@ -1132,6 +1151,7 @@ internal static class GuiWindow
             centre,
             width,
             ButtonY,
+            CommandHeight,
             TogglePower
         );
 
@@ -1144,6 +1164,7 @@ internal static class GuiWindow
             centre,
             width,
             ButtonY,
+            CommandHeight,
             () => RunCommand("refresh")
         );
 
@@ -1156,6 +1177,7 @@ internal static class GuiWindow
             centre,
             width,
             ButtonY,
+            CommandHeight,
             () => RunCommand("view")
         );
 
@@ -1168,11 +1190,16 @@ internal static class GuiWindow
             centre,
             width,
             ButtonY,
+            CommandHeight,
             () => RunCommand("fly")
         );
     }
 
-    /// <summary>One button of the command row; its label Text is returned for the toggle.</summary>
+    /// <summary>
+    /// One button of the command row and of the level row; its label Text is returned for
+    /// the toggle. The height comes from the caller: CommandHeight under the picture, the
+    /// plain row of GuiMetrics for the level row's own squares.
+    /// </summary>
     private static Text? Command(
         GUIManager gui,
         Transform parent,
@@ -1181,6 +1208,7 @@ internal static class GuiWindow
         float centreX,
         float width,
         float centreY,
+        float height,
         UnityAction onClick
     )
     {
@@ -1191,7 +1219,7 @@ internal static class GuiWindow
             new Vector2(0.5f, 1f),
             new Vector2(centreX, centreY),
             width,
-            GuiMetrics.RowHeight
+            height
         );
         GuiHelp.Watch(body, help);
         Button? button = body.GetComponent<Button>();

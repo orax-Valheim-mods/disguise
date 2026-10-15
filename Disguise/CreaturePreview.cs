@@ -37,7 +37,7 @@ internal static class CreaturePreview
     /// under the window is 1 unit = 1 pixel), so the texture is made at exactly this size and
     /// no scaling can blur it.
     /// </summary>
-    internal const float PictureWidth = 380f;
+    internal const float PictureWidth = 420f;
 
     internal const float PictureHeight = 300f;
 
@@ -540,7 +540,7 @@ internal static class CreaturePreview
         float height = (y * Mathf.Cos(tilt)) + (plan * Mathf.Sin(tilt));
 
         // The horizontal field of view is the vertical one widened by the shape of the
-        // picture: 380 over 300, so a little wider than tall (a projection keeps angles).
+        // picture: 420 over 300, so a little wider than tall (a projection keeps angles).
         float halfTan = Mathf.Tan(0.5f * VerticalFov * Mathf.Deg2Rad);
         float horizontalTan = halfTan * (PictureWidth / PictureHeight);
         float vertical = (height * 0.5f) / halfTan;
