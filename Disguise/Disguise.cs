@@ -35,6 +35,7 @@ namespace Disguise;
 ///    modified (only the outgoing packet is), so saves and game logic stay untouched.
 /// </summary>
 [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
+[BepInDependency(Jotunn.Main.ModGuid)]
 public class Disguise : BaseUnityPlugin
 {
     public const string PluginGUID = "orax.Disguise";
