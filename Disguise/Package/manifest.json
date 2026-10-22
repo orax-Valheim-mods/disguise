@@ -1,10 +1,10 @@
 ﻿{
-  "name": "JotunnModStub",
-  "description": "",
+  "name": "Disguise",
+  "description": "Makes your player appear as a creature - or any other prefab of the game - to every other player, including players who have no mod installed.",
   "version_number": "0.1.0",
-  "website_url": "",
+  "website_url": "https://github.com/orax-Valheim-mods/disguise",
   "dependencies": [
-    "denikson-BepInExPack_Valheim-5.4.2333",
-    "ValheimModding-Jotunn-2.26.1"
+    "denikson-BepInExPack_Valheim-5.4.2351",
+    "ValheimModding-Jotunn-2.30.2"
   ]
 }
